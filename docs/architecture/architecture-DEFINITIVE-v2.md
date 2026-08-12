@@ -211,6 +211,51 @@ it via `builtins.fromJSON`. A stranger adopting the project fills in _their_
 Site Model and runs the same generic code — that is the whole portability
 story.
 
+### 4.3 Optional authoring frontend: the Nix module system (D12, new)
+
+**Nix the language, not Nix the runtime — a different question from §5.1's
+"no bare-metal Nix."** That constraint is about installing Nix as the
+_runtime substrate_ on target hosts. It says nothing about what language an
+operator uses to _write_ the Site Model. The Site Model's canonical, at-rest
+representation stays exactly what §4.1 already specifies: plain JSON,
+schema-validated. Every consumer — Ansible, mise, generic code, a stranger's
+non-Nix fork — keeps reading that same JSON, unchanged.
+
+On top of that unchanged wire format, the Site Model MAY be authored as Nix
+expressions using the standard NixOS-style module system (`lib.mkOption`,
+`types.*`, `mkIf`/`mkDefault`/`mkForce`/`mkMerge`) instead of, or alongside,
+hand-written JSON/YAML. A render step —
+
+```
+nix eval --json .#siteModel > site-<name>/rendered/site-model.json
+```
+
+— produces the same JSON §4.1 already specifies, which is then validated
+against the existing JSON Schema exactly as any other Site Model write would
+be. **The two type systems must not diverge:** generate the JSON Schema from
+the Nix module's option declarations; never hand-maintain both.
+
+**Rationale:** the Nix module system already solves layered site+role+host
+config with real override semantics — precisely the merge problem the Site
+Model has, and would otherwise hand-roll on top of raw JSON Schema. Nix is
+already a load-bearing dependency for builds (§5.1, §6); this widens _where_
+it's used, not _whether_ it's required anywhere new.
+
+**Constraints:**
+
+- Rendering requires Nix wherever the Site Model is authored/rendered (dev
+  machine, CI) — never on a deployed target. Consistent with R5/D6.
+- The **rendered JSON**, not the Nix source, is what gets schema-validated,
+  signed into a release (§7), and consumed downstream. Nix authorship is a
+  frontend, never the wire format.
+- A stranger adopting the project is never required to know Nix to _read or
+  fork_ their Site Model — the rendered JSON (or a plain YAML/JSON authoring
+  path, kept as a fallback) remains the interop surface. This is what
+  preserves adoptability (R5/R10): only operators who opt into the Nix
+  frontend need Nix syntax.
+- §9's consent/sovereignty UI shows users their config in plain language
+  regardless of authoring language, so this doesn't touch that surface.
+
 ---
 
 ## 5. Platform layers (Nix everywhere except bare metal)
@@ -663,6 +708,7 @@ unresolved, it should write a question doc and stop, not improvise.
 | D9 (new)  | OpenHands                | Vendor the analyzer _technique_ for coding agents (§8.2 Surface A); no role as fleet gate (Surface B).                                                                                             |
 | D10 (new) | Task runner              | **Keep `just`** as the human verb surface; start using its dependency support; mise stays scoped to toolchains/baseline. Both reviewers concurred; a real DAG need is the only trigger to revisit. |
 | D11 (new) | Trust-layer scope cuts   | Per the defensive pass: FIX-IN-V1 the root/executor/high-water/secret-monitor; CLOSE-BY-SCOPE consent/cache/failover/APK-provenance behind §8 gates; never automate local-fix.                     |
+| D12 (new) | Site Model authoring language | **Nix module system MAY author the Site Model** (§4.3), rendered to the same schema-validated JSON everything already consumes. Distinct from D6: this is about the authoring frontend, not the runtime substrate — D6's "no bare-metal Nix" is unchanged. Non-Nix JSON/YAML authoring stays a supported fallback for adoptability. |
 
 Silence = proceed from Step 0. Objections amend this register, not the
 archived documents.
