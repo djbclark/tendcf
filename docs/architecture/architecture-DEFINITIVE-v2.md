@@ -256,6 +256,71 @@ it's used, not _whether_ it's required anywhere new.
 - §9's consent/sovereignty UI shows users their config in plain language
   regardless of authoring language, so this doesn't touch that surface.
 
+#### 4.3.1 Why this works for partial state achieved non-deterministically
+
+The Site Model has to describe plenty of facts that are **not** fully
+Nix-buildable: a Termux `pkg` package (not reproducible, no derivation), a
+CFEngine promise that converges over time with retries, a service that's
+"desired: running" but reconciled by Ansible on its own schedule. This is
+not a problem for Nix-the-language, only for Nix-the-build-system —
+and D12 only invokes the former.
+
+**Nix conflates two things that are worth separating explicitly:**
+
+- **Nix the language** — a lazy, pure, functional data-description
+  language. `lib.mkOption`, `types.*`, and the merge functions describe
+  typed, mergeable **data**. Nothing about that data has to become a
+  derivation.
+- **Nix the build system / store** — turns a fully-pinned derivation into
+  one deterministic, content-addressed output. A derivation is built or
+  it isn't; there's no "eventually, somehow, with retries" in that model.
+
+D12 only uses the first. A Site Model entry like "this service should be
+running" or "this Termux package should be present" is just typed data —
+the module system doesn't care, and was never asked, whether the eventual
+realizer is `nix-build`, `ansible-playbook`, `cfengine agent`, or a human
+tapping a button on a phone. The determinism lives entirely in **what
+state is being described**, never in **how or when it's reached** — the
+same separation Kubernetes makes between a deterministic desired-state
+manifest and its genuinely non-deterministic, eventually-consistent
+controller loop. Site Model authoring is the manifest; Ansible/mise/
+CFEngine/the Android agent are the controllers.
+
+**One real constraint this implies:** don't use the nixpkgs-derived option
+types that assume a buildable output (`types.package`, `types.derivation`)
+for concerns realized outside Nix's build system — that would smuggle a
+determinism expectation into a field CFEngine or Termux `pkg` can never
+actually satisfy. Use the plain data types (`types.str`, `types.enum`,
+`types.submodule`, `types.attrsOf`, `types.bool`, `types.int`, …) for
+anything not literally built by Nix.
+
+#### 4.3.2 Running the evaluator with zero store footprint
+
+Authoring the Site Model in Nix does not require adopting the Nix store,
+daemon, or nix-darwin anywhere — including on the Mac (§5.2 is a separate,
+independent decision). Evaluating Nix expressions to JSON needs only a
+Nix-language evaluator, not a working store:
+
+- **`nix eval --store dummy://`** — Nix ships a "dummy" store backend
+  built for exactly this: pure evaluation, nothing written to
+  `/nix/store`, no daemon required. `nix eval --store dummy:// --json
+  --file site-model.nix`.
+- **Ephemeral store dir** — point `NIX_STORE_DIR`/`NIX_STATE_DIR` at a
+  throwaway tmp path per invocation if `dummy://` doesn't cover a
+  particular builtin; keeps every eval disposable and parallel-safe (CI
+  pattern).
+- **[tvix-eval](https://tvix.dev/)** — the Rust reimplementation of the
+  Nix evaluator, explicitly decoupled from the store/builder by design.
+  No C++ Nix, no store concept at all, not even the dummy one. The
+  cleanest long-term answer to "Nix language, nothing else" if it matures
+  enough to depend on.
+
+Practically: install just the `nix` CLI wherever the Site Model is
+rendered (dev machine, CI), never run `nix-darwin switch` or `darwin-
+rebuild` as a side effect of authoring the model, and never touch
+`/nix/store` for anything beyond the evaluator's own transient scratch
+space.
+
 ---
 
 ## 5. Platform layers (Nix everywhere except bare metal)
