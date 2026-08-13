@@ -1230,6 +1230,14 @@ archived documents.
   "two systems" conclusion reverses to one. D16 narrows to a
   composition-only question; blast radius and multi-author composition
   survive, authorization and tenancy do not.
+- `research-answers-and-corrections-2026-08-13.md` — **the current head of
+  this chain; read it before the three docs above, it corrects them.**
+  CFEngine on Termux is in production (closes that item); Choria is
+  **dropped** — its sole justification was platform reach and
+  `cf-runagent-wrapper.sh` already exists; D19's open question is answered
+  (`flake.lock` and `ops-release.json` are parallel, keep both); `mgmt`
+  AutoEdges mechanism documented; **D15 is unprototyped and has a new
+  precondition** — verify augments load under standalone `cf-agent -f`.
 - `ideas-dump-claude.md` — unprotected; the two-agent-consent control, the
   semantic/verifiable plan split, the role-mesh-is-consensus flag, and the
   model/vendor notes all graduated into this document.
