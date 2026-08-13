@@ -50,23 +50,19 @@ to *understand and refuse* a proposed change to their own computer.
 That framing produces the usual requirements (portability, no permanent
 control node, a signed update path) and one unusual one.
 
-**The unusual requirement is who writes the configuration.** In this project
-the answer is: AI agents, as the primary authorship model, with human
-authorship as the exception rather than the rule. This is not a prediction
-about the industry; it is a description of how this specific site is already
-being operated. The consequence we care about is that the *cost structure of
-a configuration language changes* when its principal author is a machine
-with a bounded context window, and several design decisions that are settled
-under human authorship become live again.
-
-We state that as a requirement (R13 in the source document) with an
-operational decision rule, and §4 is that rule.
+**The unusual requirement is who writes the configuration.** Here the answer
+is: AI agents, as the primary authorship model, with human authorship as the
+exception. This is not a prediction about the industry; it is a description
+of how this specific site is already being operated. The consequence we care
+about is that the *cost structure of a configuration language changes* when
+its principal author is a machine with a bounded context window, and several
+decisions that are settled under human authorship become live again.
 
 The rest of the paper: §2 describes the architecture in enough detail to
-argue about; §3 the design rule; §4 the two decisions it inverted; §5 where
-we depart from Bcfg2 and why; §6 what we took from it; §7 an honest account
-of validation status, which is thin; §8 the open questions we would most
-like attacked.
+argue about; §3 the design rule we derive; §4 the two decisions it inverted;
+§5 where we depart from Bcfg2 and why; §6 what we took from it; §7 an honest
+account of validation status, which is thin; §8 the open questions we would
+most like attacked.
 
 ---
 
@@ -88,24 +84,21 @@ machines: they supply their own Site Model through the same schema.
 
 Three record types matter for what follows. `services.yml` holds one record
 per service (name, run-as user, argv command, environment as secret *names*
-only, platform notes, role binding, owning writer); every launchd plist and
-systemd unit in the fleet is a rendering of one such record. `roles.yml`
-maps a feature role to `{main, backups[], peers[]}` — this is how "the
-control node" is dissolved into data, since any host may hold any role.
-`launchd-writers.yml` declares exactly one writer per launchd label prefix,
-which kills a two-writers-on-one-plist hazard at the source.
+only, role binding, owning writer); every launchd plist and systemd unit in
+the fleet is a rendering of one such record. `roles.yml` maps a feature role
+to `{main, backups[], peers[]}` — this is how "the control node" is dissolved
+into data, since any host may hold any role. `launchd-writers.yml` declares
+exactly one writer per launchd label prefix, killing a two-writers-on-one-plist
+hazard at the source.
 
 The Site Model *may* be authored in the Nix module system — `mkOption`,
 `types.*`, `mkIf`/`mkDefault`/`mkMerge` — and rendered to the same JSON
 everything else consumes. That is an authoring frontend only; the rendered
 JSON is what is schema-validated, signed, and read downstream, and a person
-adopting the project is never required to know Nix in order to read or fork
-their own site data. We use the Nix *language* here and not the Nix *build
-system*: a service that should be running or a Termux package that should be
-present is typed data, and nothing about it needs to become a derivation.
-(The corresponding discipline is to avoid the nixpkgs option types that
-assume a buildable output for concerns realized by CFEngine or by a package
-manager that has no derivation at all.)
+adopting the project is never required to know Nix to read or fork their own
+site data. We use the Nix *language* and not the Nix *build system*: a
+service that should be running is typed data, and nothing about it needs to
+become a derivation.
 
 ### 2.2 The compiler: a pure function into CFEngine's own data layer
 
@@ -116,13 +109,12 @@ Policy Framework is already substantially data-driven on top of that layer,
 so for the common case the compiler emits *data*, not promise text: a
 generic bundle written once handles "this package is present and pinned,
 these directories exist, this service is loaded" for any entry in the data.
-Only promise types the stock library does not cover need actual policy text,
-and that is templated from typed option values rather than synthesized.
+Only promise types the stock library does not cover need policy text, and
+that is templated from typed option values rather than synthesized.
 
 Merging of the site → role → host layers happens once, in the compiler,
-before render. We do not additionally use CFEngine's own `mergedata()` for
-this, on the same grounds we do not hand-maintain two type systems: one
-merge engine, one source of truth.
+before render — we do not additionally use CFEngine's `mergedata()`, on the
+same grounds we do not hand-maintain two type systems.
 
 The pipeline has four stages: merge, conflict check, dependency inference,
 render. The conflict check is deliberately a *separate stage over
@@ -145,13 +137,12 @@ operator host holding a deploy role can trigger an immediate convergence run
 on a target rather than waiting for its next cycle — but it is one mode of
 the same mechanism rather than a separate system.
 
-This shape was scoped out of an earlier revision of the design on the belief
-that CFEngine required dedicated policy-server infrastructure and an SSH
-push model. Both beliefs were wrong, and had entered the design as an
-analyst's unvalidated assumptions rather than as checked constraints. We
-record that because it changed the answer: once the practical objections
-dissolved, CFEngine was the better fit on its own terms, not an acceptable
-substitute for what we had been using.
+This shape was scoped out of an earlier revision on the belief that CFEngine
+required dedicated policy-server infrastructure and an SSH push model. Both
+beliefs were wrong, and had entered the design as an analyst's unvalidated
+assumptions rather than as checked constraints. We record it because it
+changed the answer: once the practical objections dissolved, CFEngine was
+the better fit on its own terms, not an acceptable substitute.
 
 ### 2.4 The record of truth is local
 
@@ -159,17 +150,14 @@ Each device owns a SQLite database, populated from CFEngine's local
 promise-outcome log, and *that* is the authoritative record of what
 converged. Any central or shared view is optional and eventually consistent.
 
-The grounds are narrower than the local-first literature's, and worth
-stating precisely because one of them is an operational fact about this
-fleet rather than a principle. On CFEngine Community the local capture has
-to be built regardless, so local-as-record is the null option and
-central-as-record is a second system that must be kept complete and in sync.
-Devices in this fleet demonstrably go unreachable — flaky ADB over wireless,
-Android boot-recovery failures, offline peers — so any central copy fed by
-best-effort sync is incomplete during exactly the windows one would want it.
-And one SQLite file with one owning host has no concurrent-writer failure
-mode, which is the same single-writer-per-node discipline we apply to Nix's
-own store.
+The grounds are narrower than the local-first literature's, and one of them
+is an operational fact about this fleet rather than a principle. On CFEngine
+Community the local capture must be built regardless, so local-as-record is
+the null option and central-as-record is a second system to keep complete and
+in sync. And devices in this fleet demonstrably go unreachable — flaky ADB
+over wireless, Android boot-recovery failures, offline peers — so any central
+copy fed by best-effort sync is incomplete during exactly the windows one
+would want it.
 
 We keep the outcome vocabulary of `ncf` — Rudder's library of parameterized
 CFEngine generic methods, which we vendor as a reference corpus rather than
@@ -190,11 +178,9 @@ allowlist and **mechanically refuses any effect outside the declared set**.
 The distinction we are drawing is between "apply this bundle because its
 hash is signed" and "apply only these operations, on these resources,
 because the plan says so." The first authenticates the author; only the
-second constrains the effect. Signing is a TUF subset sized for one
-operator: an offline 2-of-3 root, an offline targets role, snapshot to bind
-the metadata set, an emergency revocation role, and a durable per-client
-high-water mark so that replay, freeze, and downgrade are closed. Delegations,
-mirrors, and online snapshot are left out.
+second constrains the effect. Signing itself is an unremarkable TUF subset
+sized for one operator, plus a durable per-client high-water mark so replay,
+freeze, and downgrade are closed.
 
 Layered on the verifiable plan is a *semantic* layer — generated, cached,
 and written for a language model to read: "this bumps a TLS library across a
@@ -303,11 +289,11 @@ adopting it fleet-wide on day one is not survivable in an environment that
 was never built under it.
 
 Our first decision was opt-in per domain. The rule flipped it to
-**default-on with an explicit, reasoned opt-out**, because AI-authored drift
-is exactly what extra-entry detection catches, so the safe default belongs on
+**default-on with an explicit, reasoned opt-out**: AI-authored drift is
+exactly what extra-entry detection catches, so the safe default belongs on
 the detecting side. A bare opt-out boolean would let an agent widen the
 unmanaged surface silently; requiring a reason string makes every gap in
-coverage a visible, greppable, reviewable decision rather than an absence.
+coverage a visible, greppable decision rather than an absence.
 
 The reason is drawn from a closed set of two, and keeping them distinct is
 what makes default-on survivable:
@@ -450,13 +436,12 @@ codebase authenticates the VPN first; only a safe default and a comment
 prevent it today. We had characterized this as inexpressible in a catalog,
 which is true, and had left it there.
 
-Bcfg2 Actions are the shipped precedent for exactly this shape: a command
-bound to a bundle with timing, a `when` condition, and a status policy, where
-— the load-bearing sentence [4, §A.2.1] — *unless exit status is ignored, a
-failing pre-action prevents modification of entries in the enclosing bundle.*
+Bcfg2 Actions are the shipped precedent for exactly this shape — the
+load-bearing sentence [4, §A.2.1]: *unless exit status is ignored, a failing
+pre-action prevents modification of entries in the enclosing bundle.*
 
 That is a guard with a defined blast radius: not an edge in a graph, and not
-a bare `if`. We make it a first-class Site Model field that compiles to a
+a bare `if`. We make it a first-class Site Model field compiling to a
 CFEngine guard class plus a bundle-scoped refusal, which turns "the VPN must
 be authenticated before lockdown may be enforced" from a safe default plus a
 comment into a stated precondition. The bundle is simultaneously the
@@ -494,14 +479,14 @@ when, and carry that revision into every statistics upload. We already have
 the identifier — the coordinated release tag and its manifest — so this is
 one column in the row schema, not an integration. Every row records the
 release that produced it and each device records which release it is
-currently converged to.
+converged to.
 
 What it buys, per the paper: the desired state of any device at any past time
-becomes reconstructible; "did this break after the last release" becomes a
-query rather than an argument; and "which hosts were exposed, over what
-window, and when were they actually patched" becomes answerable. Given a
-fleet whose devices are routinely unreachable, the reconstructibility is
-worth more to us than it was in the paper's always-on cluster.
+becomes reconstructible, "did this break after the last release" becomes a
+query rather than an argument, and "which hosts were exposed, over what
+window, and when were they patched" becomes answerable. Given a fleet whose
+devices are routinely unreachable, the reconstructibility is worth more here
+than in the paper's always-on cluster.
 
 ### 6.4 Deploy reporting early, and dry-run as the default posture
 
@@ -511,16 +496,15 @@ administrator *trust*, not tool correctness — with the stated pivot being
 that client-side functionality was not sufficient, and that nearly all
 subsequent development went into information presentation.
 
-Two operational practices follow, and we adopt both. Their production servers
-ran in dry-run nightly and mailed the resulting state to the responsible
-administrator, with auto-apply reserved for workstations; we make dry-run
-the standing posture for the first platform we bring under management, which
+Two practices follow and we adopt both. Their production servers ran in
+dry-run nightly and mailed the resulting state to the responsible
+administrator, auto-apply reserved for workstations; we make dry-run the
+standing posture for the first platform we bring under management, which
 happens to be the operator's own laptop — the one machine that cannot easily
 be reimaged. And "deploy reporting early, not last" reframes our local SQLite
 plus a trivial "what changed, what is dirty, what am I converged to" view as
-an **adoption requirement rather than an observability nicety**, which is the
-argument against sequencing it last on the grounds that nothing consumes it
-yet.
+an **adoption requirement rather than an observability nicety** — which is
+the argument against sequencing it last because nothing consumes it yet.
 
 ### 6.5 What did not transfer
 
@@ -555,14 +539,12 @@ prefix nested inside another.
 **Validated only in the following narrow sense.** A lint that passes on
 correct input demonstrates nothing about whether it catches incorrect input,
 so the schemas were tested against twelve deliberately broken fixtures — an
-opt-out with no reason, the contradictory comprehensive-plus-reason
-combination, a rogue launchd label, a nested writer prefix, a literal secret
-where a key name belongs, a typo'd capability token kind, an enforce-mode row
-carrying an audit-mode outcome, a coverage row missing its counter — and each
-is caught. Two of the twelve exposed error messages that were useless
-(`is not valid under any of the given schemas`, with no field pointer), which
-is the failure §3 rules out for the compiler and had not been applied to the
-compiler's own tooling; the lint now discriminates on row type first.
+opt-out with no reason, a rogue launchd label, a nested writer prefix, a
+literal secret where a key name belongs, a typo'd capability token kind, an
+enforce-mode row carrying an audit-mode outcome — and each is caught. Two of
+the twelve exposed error messages that were useless (`is not valid under any
+of the given schemas`, with no field pointer): the failure §3 rules out for
+the compiler, which we had not applied to the compiler's own tooling.
 
 **Not implemented, and this is most of it:** the compiler, all three platform
 adapters, the signed release path, the ChangePlan executor, the consent
