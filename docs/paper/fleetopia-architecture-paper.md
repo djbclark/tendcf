@@ -559,59 +559,176 @@ first place. Both approaches assume the same premise — a machine author's
 failure mode is disproportionately about consistency with information it
 cannot see, not syntax it cannot produce.
 
-### 3.2 Nine concrete instances, and what checking them found
+### 3.2 Nine concrete instances
 
 Grounding the rule in prior work (§3.1) answers whether the idea is
 defensible. It does not show whether it pays for itself in a real design.
 Extending the same search past this paper's own claims, into the
 architecture document `fleetopia` is built from, surfaced nine concrete
-applications of §3's rule — worth reporting because checking each against
-its primary source, rather than trusting a first-pass summary of it,
-corrected two of the nine before they were adopted. Seven held up as
-originally framed:
+applications of §3's rule, each checked directly against its cited source
+rather than a summary of it.
 
-1. A registry check ("is this port free") should be one targeted lookup,
-   not a whole file read — closely analogous work on planning-language
-   generation found retrieving the relevant fragment improves generation
-   directly, not merely cost [15].
-2. Worked examples belong beside their schema, and the pairing should be
-   enforced rather than customary — the same source finds examples
-   consistently outperform prose description [15].
-3. A convention a document states about itself should be a check, not
-   prose — applying §3's own second clause reflexively to the document that
-   states it, closing the one place it wasn't yet applied to itself.
-4. Guardrail investment should match the measured error distribution, not
-   intuition — the taxonomy already cited in §3.1 [13] shows structural/
-   syntax errors are the smallest real category (1.5%) and factual
-   incorrectness the largest (65%); stating that plainly, once measured,
-   is different from assuming it.
-5. A generated summary that never authorizes an action can still mislead
-   the human reading it — the same shape of problem citation-grounding
-   research addresses generally: requiring a generated claim to cite the
-   specific fact it summarizes measurably reduces unsupported claims
-   relative to free generation.
-6. Grammar-constrained decoding [14] (§3.1) is now efficient enough for
-   production use, which is worth re-checking against any guardrail that
-   was designed as lint-only because no such constraint existed when it was
-   written.
-7. The positional effect [11] measures (§3.1) generalizes past prompting to
-   any long document a machine or a bounded-context human reads in full —
-   this paper follows the convention itself.
+**1. A targeted lookup instead of a whole-file read.** An agent that needs
+to know whether a given port is already claimed, or whether a named role
+exists, has today exactly one option: open the registry file that holds
+that fact and read the whole thing to find one line. That is a small
+version of the same global-knowledge cost §3 argues against — the fact the
+agent needs is local and small, but the file it has to open to get it is
+neither. A single-purpose lookup — ask the one question, get the one
+answer — is a smaller, more literal application of the rule than the
+Site Model's schema design, and closely analogous work on generating
+planning-language code found that retrieving just the relevant fragment of
+documentation, instead of the whole specification, improves the generated
+result directly, not merely the cost of producing it [15].
 
-Two did not survive checking against source, and are kept in the design
-record as corrected rather than quietly dropped: a claimed JSON-over-YAML
-generation-reliability advantage traced back to a study that in fact shows
-no consistent format winner across models [16], and a claimed performance
-benefit from a standard machine-readable repository instruction file
-traced back to a dedicated study whose actual finding is closer to the
-opposite — such files did not generally improve task success and increased
-inference cost [17]. Recording a checked negative result, rather than
-silently removing the claim, is the same instinct behind §5.4's own
-negative result about dependency inference: a checked "no" is worth more
-than an unchecked assumption either way. Seven of nine claims held; two did
-not, and the correction is the more useful data point of the two, not an
-embarrassment to smooth over — a design that makes its own claims
-checkable is what caught it.
+**2. Worked examples belong beside their schema, enforced, not customary.**
+The same study finds worked examples consistently outperform prose
+description as a way of telling a generator what correct output looks like
+[15]. The project's own compiler-schema repository already pairs one
+concrete, validated example file with every schema it defines — a
+convention adopted before this literature search, for ordinary
+documentation reasons, that turns out to be exactly the intervention the
+literature says matters most. The gap this closes is not that the pairing
+is missing; it is that nothing currently stops the pairing from silently
+lapsing as new schemas are added. Making the build fail when a schema
+arrives without its paired example is the same move §3 makes generally:
+convert a habit that depends on someone remembering into a check that
+does not.
+
+**3. A document's warning about itself should be a check, not prose.** The
+architecture document this paper describes carries, at its own top, an
+instruction telling any AI agent reading it not to modify the document
+without a human's explicit approval. That instruction is exactly the
+shape of thing §3's second clause warns about: a convention a reader must
+remember, stated in prose, with nothing enforcing it. The fix is not
+subtle — a repository-level check that refuses any change to that file
+unless the commit carries an explicit marker recording that a human
+approved it, mechanically the same treatment already given to a separate,
+unrelated incident earlier in the project's history, where an agent's
+edit landed in another agent's unreviewed workspace. What makes this
+instance worth naming on its own is not the mechanism, which is ordinary,
+but where it was found: the rule caught a document failing to apply the
+rule to itself, in the document that states the rule.
+
+**4. Guardrail investment should match the measured error distribution,
+not intuition.** The error taxonomy already cited in §3.1 [13] does not
+just show that cross-resource, global-knowledge errors are real (§3.1's
+point); it ranks every error category by how often it actually occurs in
+real machine-generated infrastructure code. Errors that reference
+something invalid, outdated, or nonexistent are the largest category by a
+wide margin, at roughly two-thirds of all technical errors; errors of
+simple omission are the second-largest, at roughly a quarter; syntax and
+structural errors — the category schema validation is best at catching —
+are the smallest, at under two percent. This produces two findings, not
+one. First, the mechanical checks worth adding next are the ones that
+verify a referenced value actually exists and is current, since that is
+where most real errors are, not additional structural strictness, since
+that is where almost none of them are. Second, and unplanned: a design
+decision made for an unrelated reason — detecting when two contributors
+change the same device without coordinating — turns out to already be
+close to the correct structural answer to the second-largest error
+category, because an AI agent's accidental omission and a second writer's
+uncoordinated drift produce the identical observable symptom: something
+present on the device that nothing describes. That alignment was not
+designed in; it was found by checking a decision already made against
+data that did not exist when the decision was made.
+
+**5. A generated summary that cannot authorize an action can still
+mislead the person reading it.** Part of this design's sovereignty
+feature (§2.5) works by generating, for the person receiving a proposed
+change to their own device, a plain-language explanation of what the
+change does — separate from, and strictly weaker than, the exact,
+machine-checked description that actually governs what the change is
+allowed to do. The explanation cannot authorize anything by itself. But a
+wrong explanation can still talk a person into accepting a change they
+would have refused, or into refusing one they would have wanted, even
+though it never touches the authority to act — which is precisely the
+harm the design's consent mechanism exists to prevent. This is the same
+shape of problem addressed by a broader body of work on grounding
+generated text in retrieved or cited source material, which finds that
+requiring a generated claim to point at the specific fact it summarizes
+measurably reduces unsupported claims relative to generating freely from
+the same underlying facts. Filling the explanation in from the same exact
+fields the machine-checked description already carries, wherever a fixed
+phrasing can say it, and requiring any explanation written in free prose
+to cite the exact field it is describing, gives a skeptical reader
+something to check the explanation against — the same discipline a
+citation gives a claim in a paper.
+
+**6. Grammar-constrained decoding narrows the design's weakest-guarded
+surface.** One part of this design still permits an agent to author a
+small amount of raw, low-level configuration text by hand, for cases the
+higher-level schema does not yet cover — and that surface is already
+flagged elsewhere as the design's least-verified corner, precisely because
+there is no schema there to check the output against, unlike everywhere
+else machine authorship touches this system. A recent line of work makes
+it practical to constrain what a model can generate, token by token, to a
+formal grammar, efficiently enough for production use rather than only as
+a research demonstration [14] (§3.1). That line of work did not exist in
+a mature form when this design's guardrail for that surface was first
+specified as a lint check run after generation. If a grammar for that
+low-level language were written once, incorrect output would become
+impossible to produce rather than merely possible to catch afterward —
+worth reopening now that the tooling exists to make it real, not just a
+nice idea.
+
+**7. Put what matters at the front or the back, never the middle — and
+name it.** A model working with a long document reliably favors
+information at the very start or the very end, and loses accuracy on
+information placed in the middle, even when the entire document fits
+comfortably inside its context window [11] (§3.1). Both this paper and
+the internal document it describes already followed that instinct without
+naming it: warnings and orientation material sit at the top of each, not
+partway through a numbered list where a careful reader would still find
+them but a skimming one might not. Naming the convention explicitly is
+what makes it something the project can apply forward, deliberately,
+rather than something it happens to have gotten right twice by habit — in
+particular to things the system generates for another agent to read
+later, where a rendered configuration file or the plan behind a proposed
+change should place its highest-stakes fields, what it is allowed to
+touch and when it expires, at a fixed, predictable position, rather than
+wherever the code producing the file happens to emit them.
+
+**8. No format shows a consistent generation-reliability advantage —
+guard YAML's own ambiguities instead of switching formats.** A controlled
+comparison of structured-output formats across several models and tasks
+finds no format that wins consistently; in at least one tested case YAML
+outperformed JSON [16]. That rules out a blanket format-preference
+argument for the Site Model's fallback-authoring path — used as plain
+YAML today, pending the Nix-based authoring frontend of §2.1 — but does
+not remove a format-preference-independent reason for caution: YAML's
+specification carries ambiguities that have nothing to do with who or
+what is writing it. An unquoted `no` parses as the boolean value false
+rather than the word; indentation carries meaning invisibly; a key can be
+silently redefined through aliasing. A small mechanical check — parse the
+file, re-serialize it, and diff against the original — catches exactly
+that class of drift before it reaches the compiler, independent of any
+comparative claim about model reliability.
+
+**9. A standard agent-orientation file is worth adopting for
+interoperability, not for a performance gain it does not have.** A short,
+conventionally-named file at a repository's root that briefs an AI coding
+agent before it starts work is now read natively by essentially every
+major coding agent — a real, verifiable adoption fact. The dedicated study
+of whether such files actually improve agent performance found they
+generally do not: task success was not improved by either developer-
+written or model-generated context files, inference cost rose by more
+than a fifth on average, and model-generated files specifically performed
+worse than supplying no context file at all [17]. Where such a file is
+added, the interoperability benefit alone justifies it, and it should be
+minimal and hand-written rather than generated — but it should not be
+budgeted for, or defended, as a productivity intervention, because on
+current evidence it is not one.
+
+Together, these nine are the concrete shape §3's rule takes once applied
+past the level of a general design principle. Most strengthen a mechanism
+already in place; one (item 3) catches a place the rule was not yet
+applied to itself; and one (item 9) is a caution against a plausible-
+sounding practice that does not, on the evidence, do what it is commonly
+assumed to do — worth stating alongside the other eight for the same
+reason §5.4 records a negative result rather than only positive ones:
+what a design rule rules out is as much a product of applying it
+carefully as what it recommends.
 
 ---
 
