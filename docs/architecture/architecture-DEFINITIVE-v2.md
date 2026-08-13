@@ -155,6 +155,47 @@ final round.
 - **R12 (budget):** AI token spend ≤ ~$60/month for this project (≤$100 all
   projects). Design so routine work runs on cheap/subscription models; the
   architecture itself must keep agent token cost low (§13).
+- **R13 (AI authorship is the primary authorship model — operator-stated
+  2026-08-13):** **most of this system's configuration and code will be
+  written by AI agents, not by hand.** The project therefore optimizes, as a
+  first-order objective on par with the others in this list, for two things:
+  making it as easy as possible for an agent to write something correctly,
+  and catching mistakes automatically rather than by review. This
+  generalizes §7.5, which previously scoped the concern to the compile
+  targets alone, into a project-wide objective.
+
+  **The decision rule this yields, which is what makes R13 operational
+  rather than a slogan: prefer designs that require only _local_ knowledge
+  over designs that require _global_ knowledge.** An agent's context window
+  bounds what it can know; it sees the file in front of it, not the
+  invariants living in twelve other files it never opened. A design where
+  correctness follows from information present at the point of authorship
+  is one an agent can satisfy reliably. A design where correctness depends
+  on the author already knowing what everyone else declared is one an agent
+  will violate confidently and plausibly — which is worse than violating it
+  obviously. Note this cuts against the usual human-authorship intuition,
+  where "just write down the constraint you know about" is cheap; for an
+  agent it is precisely the expensive thing.
+
+  Second rule: **prefer machine-checkable to conventional.** A convention an
+  agent must remember is a convention it will eventually break silently; a
+  schema, a type, or a compile-time check catches it for free and reports it
+  in a form the next agent can act on.
+
+  R13 re-weights decisions already recorded rather than reopening them:
+  D12's typed Site Model becomes the cheapest available error-catcher for a
+  generator, not merely an ergonomic authoring choice; §4.5.1(a)'s
+  requirement that conflict errors carry full resolution context hardens,
+  because the reader of that message is now usually an agent that cannot
+  go exploring for the missing half; the `buildfile`-style "show me exactly
+  what device X receives" affordance (`bcfg2-papers-2026-08-13.md` §2)
+  becomes an agent's self-check loop rather than a debugging convenience;
+  and R9's literate-programming widening is reinforced, since prose that
+  states intent is what lets an agent tell a deliberate oddity from a bug.
+  **Flagged, not decided:** R13 is an argument for making §4.5.1(d)'s
+  per-domain comprehensiveness default-on with opt-out rather than opt-in,
+  since AI-authored drift is exactly what extra-entry detection catches.
+  Revisit when the first two domains are real.
 
 ---
 
@@ -537,12 +578,58 @@ configuration, and the `serverapp_*` launchd services. The
 managed/unmanaged entry ratio per device falls out for free and is the
 build order's progress metric.
 
-**(b) Ordering mechanism — OPEN.** Whether `nix2cf` gains an
-AutoEdges-style dependency-inference stage in v1 or later. Not a blocker
-for Step 0: (a) and (d) are schema properties and must land first; (b) is
-a compiler stage that can be added over an unchanged schema, provided type
-definitions carry a slot for the two-sided provides/requires declaration
-from the start.
+**(b) Ordering mechanism — DECIDED: build the inference stage (AutoEdges
+level), in v1, sequenced after the first two platform adapters exist.**
+Convergence fixpoint remains the substrate underneath either way — CFEngine
+re-runs and re-converges whether or not anything is ordered — and explicit
+`depends_on` remains available and authoritative. The decision is that
+`nix2cf` additionally *derives* edges, rather than relying on authors to
+write every one.
+
+**The reasoning is R13, and it inverts the cost analysis that pointed the
+other way under human authorship.** Explicit `depends_on` is a
+**global-knowledge** mechanism: to write the constraint, the author must
+already know that someone else's resource exists and must run first.
+Inference is a **local-knowledge** mechanism: each type states only what it
+provides and what it needs, which is answerable from inside a single file
+by an agent that has never seen the rest of the system. Under R13 that is
+the whole ballgame — inference converts the one thing agents are reliably
+bad at into the one thing they are reliably good at.
+
+`stayturgid#288` is the confirming evidence and it is not hypothetical: a
+hand-authored order in which `ensure_apps` installs after `app_privileges`
+hardens, so anything added there goes unhardened for a full deploy cycle. A
+list that contradicts its own stated rule is what accreted global-knowledge
+ordering looks like, and the humans writing it did not catch it. Nor was
+the cost side of the original analysis robust: "implement provides/requires
+per type across every platform adapter" is mechanical, locally scoped,
+well-specified work — the profile AI authorship is cheapest at, not most
+expensive at.
+
+Three constraints on the build, all of which follow from R13's second rule
+rather than being separate preferences:
+
+- **Sequencing: types first, inference second, both inside v1.** Useful
+  provides/requires semantics cannot be designed before real type
+  definitions exist on at least two platforms — inference rules invented
+  ahead of the types they range over will encode guesses. This orders work
+  within v1; it is not a deferral.
+- **Edge attribution is mandatory, not a debugging nicety.** Every edge in
+  the compiled output carries its provenance: authored (with source
+  location) or inferred (with the rule that produced it). The failure mode
+  inference introduces is a *spurious* edge, which presents as "why is this
+  waiting?" and is harder to diagnose than a missing edge's "why did this
+  fail?" — unless provenance makes it a query instead of an investigation.
+- **Authored edges win, and are never silently duplicated or overridden by
+  inferred ones.** Where both exist for the same pair, the authored edge is
+  authoritative and the coincidence is reported, not hidden.
+
+The residual risk R13 does not remove is **false confidence**: inference
+that is mostly right invites authors, human and AI alike, to stop stating
+constraints and trust the compiler. The mitigations are already decided
+elsewhere — inferred edges are visible in dry-run/explain output (§7.3's
+ChangePlan), and (d)'s two-way verification catches the residue that
+ordering gets wrong.
 
 ### 4.6 ncf/Rudder: reuse the code, not the project (D17, new)
 
@@ -1290,7 +1377,7 @@ unresolved, it should write a question doc and stop, not improvise.
 | D13 (new) | Ansible removal / service owner | **Ansible is fully removed — from service ownership AND host-baseline/bootstrap.** CFEngine (promises) + mise (toolchains only) replace it everywhere, all platforms, superseding D1 (§5.3, §5.1). The original Ansible-over-CFEngine blockers (no Android binaries, SSH/push incompatibility, needing dedicated policy-server infra, GPLv3) were an earlier analyst's unvalidated assumptions, corrected 2026-08-13 — not real constraints. Purely on theoretical fit (Promise Theory/Couch's algebra vs. no comparable formal grounding for Ansible), CFEngine was always the better answer; D1 reflected an unchecked practicality objection, not a considered rejection. |
 | D14 (new) | CFEngine deployment shape | **Git-distributed policy, `cf-serverd` on every client, no dedicated central policy host, no push/SSH requirement** (§4.4, §7.4). Push (via `cf-runagent`/`just cf-run`) and pull (each host's own convergence schedule) are both first-class, same mechanism. |
 | D15 (new) | Nix→CFEngine compile target | **CFEngine's native Augments layer (`def.json`/`host_specific.json`), not raw `.cf` synthesis** (§4.4). Merging happens once, in Nix, before render — CFEngine's `mergedata()` is not used for this, to avoid a second, divergent merge engine. Still unprototyped as of 2026-08-13; the augments-load-under-standalone-`cf-agent -f` precondition (`research-answers-and-corrections-2026-08-13.md`) is **assumed satisfied by operator decision 2026-08-13** — verifying it stays on the task list as validation, not as a gate. |
-| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected; semantic verdict accepted as a working assumption by operator decision 2026-08-13** — a real from-scratch provision remains the validation step (and the right forcing function for the bootstrap/interlock designs) but is no longer a gate on proceeding. The surviving **multi-writer composition** half is three-quarters decided (§4.5.1, operator 2026-08-13): **(a)** same-resource conflict is a compile-time error carrying enough detail for a human to resolve it, with the Nix priority algebra explicitly reserved as a later policy change rather than a schema redesign; **(c)** the bundle is the collective re-verify unit and interlocks are a first-class Site Model field compiling to a CFEngine guard class with bundle-scoped refusal (Bcfg2 Actions' semantics — closes `stayturgid#289` structurally); **(d)** per-domain comprehensiveness is adopted opt-in, making out-of-band and cross-writer skew visible as extra entries. **Open: (b)** whether an AutoEdges-style inference stage is v1 or later — a compiler stage, not a schema property, so it does not block Step 0. |
+| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected; semantic verdict accepted as a working assumption by operator decision 2026-08-13** — a real from-scratch provision remains the validation step (and the right forcing function for the bootstrap/interlock designs) but is no longer a gate on proceeding. The surviving **multi-writer composition** half is three-quarters decided (§4.5.1, operator 2026-08-13): **(a)** same-resource conflict is a compile-time error carrying enough detail for a human to resolve it, with the Nix priority algebra explicitly reserved as a later policy change rather than a schema redesign; **(c)** the bundle is the collective re-verify unit and interlocks are a first-class Site Model field compiling to a CFEngine guard class with bundle-scoped refusal (Bcfg2 Actions' semantics — closes `stayturgid#289` structurally); **(d)** per-domain comprehensiveness is adopted opt-in, making out-of-band and cross-writer skew visible as extra entries. **(b)** `nix2cf` builds an AutoEdges-style dependency-inference stage, in v1, sequenced after the first two platform adapters; fixpoint stays the substrate and explicit `depends_on` stays authoritative, with mandatory edge attribution (authored vs inferred) and authored-wins on collision. Decided on **R13** grounds: explicit ordering is a global-knowledge mechanism and inference is a local-knowledge one, which inverts the cost analysis under AI authorship — `stayturgid#288` is the confirming instance of hand-authored global ordering failing. **D16's composition half is now fully decided.** |
 | D17 (new) | ncf/Rudder reuse            | **Vendor and adapt individual generic-method bundle bodies as a reference corpus, strip Rudder's reporting scaffolding** (§4.6). Not a dependency — `ncf` is archived, folded into the Rudder monorepo, no independent release to track. Zero coverage for macOS/Android; that work was always fleetopia-original. **Rationale corrected 2026-08-13:** the licence is *not* what limits Rudder use — GPLv3 restricts deriving from Rudder's code, not running it or authoring techniques for it, and Rudder grants a plugin-licence exception; the platform matrix and ncf's archived status are the real limits (§4.6, `rudder-as-umbrella-evaluation-2026-08-13.md` §4). |
 | D18 (new) | Local-first reporting        | **Per-device SQLite (owned by `stayturgid-agent`) is the authoritative record, not the central observability stack** (§4.7). **Re-decided 2026-08-13 on new grounds** — the original rationales are off the record (Postgres objection void per operator; local-first debuggability withdrawn as a hard requirement). Surviving grounds: the local capture must exist anyway on CFEngine Community, so local-as-record is the null option while central-as-record is a second system with no remaining consumer (Choria telemetry spine dropped, no site-pika compliance UI); only the local copy is guaranteed complete across this fleet's real unreachability windows; single-writer-per-node symmetry with D20; SQLite's weight class fits Termux. Sync to Vector/OpenObserve/Grafana stays optional and best-effort. |
 | D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `fleetopia`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap **answered 2026-08-13: parallel, keep both** — `ops-release.json` is a suite-coherence marker across co-equal repos, which `flake.lock` (a DAG of inputs under one root) structurally cannot express; the release check gains one line (§6.1, `research-answers-and-corrections-2026-08-13.md` §3). Nix store locality (D20, §4.8) applies to every flake `packages` build. |
