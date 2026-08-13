@@ -331,7 +331,11 @@ the JSON Schema they render-validate against — belong to `nix2cf` (the
 compiler layer's working name) as its public contract; the *instances*
 (concrete site data, including site-pika's) live in the fleet/site repos
 and are supplied through that contract. A schema change is a `nix2cf`
-interface change; an instance change is site data. Ubuntu/mise reads the model via a small generator
+interface change; an instance change is site data.
+**The repo exists as of 2026-08-13** — `djbclark/nix2cf`, created at Step 0
+rather than Step 3 because this boundary leaves the schemas no other legal
+home, and staging them somewhere else would have guaranteed a later move.
+It currently holds the contract and its lint, and nothing else. Ubuntu/mise reads the model via a small generator
 (toolchains/baseline only); CFEngine reads it via rendered Augments
 (`def.json`/`host_specific.json`, §4.4 — this is now the primary consumer
 for everything that used to be an Ansible task); Nix (for builds only)
@@ -1513,6 +1517,11 @@ Two consequences of the sequence, both deliberate:
   for `services.yml`/`roles.yml`/`launchd-writers.yml`, **including the
   three D16 fields from §4.1** — `provides`/`requires` per type,
   `interlocks` per bundle, `comprehensive`/`opt_out_reason` per domain.
+  _Schemas written 2026-08-13 and living in `djbclark/nix2cf` per D21
+  (§4.2), alongside a `bin/schema_lint.py` carrying the cross-file rules
+  JSON Schema cannot state on its own — reference resolution, launchd
+  labels against the writer prefixes, no prefix nested in another. The
+  remaining Step 0 work is transcription and the provenance gate, below._
   Those are schema decisions, so getting them in now is much cheaper than
   retrofitting them across transcribed reality later; nothing *consumes*
   them until Step 3, which is fine. Transcribe current reality — expect
