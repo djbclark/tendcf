@@ -523,6 +523,42 @@ resolution would look like.
 We are aware this rule can be used to justify almost anything, and §8.2 asks
 directly whether it is an argument or a hypothesis.
 
+### 3.1 This rule is not new; the reason for it is
+
+Local reasoning about global properties is not a new idea in programming-language
+theory. It is the organizing idea behind separation logic and, more directly,
+Banerjee, Naumann, and Rosenberg's region logic [9], which derives global
+heap invariants from purely local reasoning about mutation and separation.
+What differs here is the cost function: those logics discharge a
+bounded-context *verifier*. We are designing for a bounded-context *author*.
+Tratt [10] makes a closely related argument from the language-design side,
+independently and roughly concurrently with this draft: AI code generation is
+reliably good at local (e.g., function-level) reasoning and unreliable at
+global reasoning, so a language that lets a local author discharge a global
+property — his example is Rust's ownership system enforcing data-race
+freedom through local signatures — benefits AI-generated code the same way
+it benefits human-verified code. We did not originate this framing; §9
+returns to what we think our actual contribution is.
+
+That the failure mode motivating this is real, not just plausible, has
+empirical support in exactly this domain. Liu et al. [11] show LLM accuracy
+degrades sharply once relevant information sits away from the start or end
+of the context window — the bounded-context premise this paper assumes,
+measured rather than asserted. Kon et al.'s IaC-Eval [12] found GPT-4
+produces a correct Terraform configuration on the first try only 19.36% of
+the time on real-world AWS scenarios; Nekrasov et al.'s error taxonomy of
+LLM-generated infrastructure-as-code [13] isolates why, naming "Contextual
+Reasoning Failure" — missing or incorrect cross-resource references, i.e.
+exactly the global-knowledge dependency §4.1 discusses below — as a
+distinct, substantial failure category separate from syntax or schema
+errors. Grammar-constrained decoding [14] is a parallel response to the same
+underlying problem at a different layer: instead of designing the language
+so a local author cannot express an inconsistent global state, it constrains
+the decoder so the model cannot emit tokens outside a formal grammar in the
+first place. Both approaches assume the same premise — a machine author's
+failure mode is disproportionately about consistency with information it
+cannot see, not syntax it cannot produce.
+
 ---
 
 ## 4. Two decisions the rule inverted
@@ -936,10 +972,18 @@ Maginot line.
 
 ## 9. Conclusion
 
-We have described a configuration management architecture whose one genuinely
-novel commitment is treating machine authorship as a first-order design
-constraint, and deriving from it a rule — prefer local knowledge to global —
-that inverted two decisions we had already settled. The rest is composition:
+We have described a configuration management architecture built on treating
+machine authorship as a first-order design constraint, and deriving from it
+a rule — prefer local knowledge to global — that inverted two decisions we
+had already settled. That rule itself is not novel: it is a
+machine-authorship instance of a local-reasoning-for-global-properties
+pattern with decades of standing in programming-language theory [9], and
+Tratt [10] argues the same design move for AI-generated code in general,
+independently of and roughly concurrently with this draft (§3.1). What we
+claim as new is narrower — applying that rule to build a concrete
+configuration-management architecture for a heterogeneous fleet, with §4's
+two inversions as evidence that it does something rather than merely
+sounding right. The rest is composition:
 a data spine, a pure compiler into CFEngine's own data layer, per-device
 local records, and a signed plan the executor may not exceed, with four of
 its load-bearing ideas taken from Bcfg2 and credited above. We do not claim
@@ -991,6 +1035,31 @@ DSOM 2003.
 
 [8] W. Fu, R. Perera, P. Anderson, and J. Cheney. *µPuppet: A Declarative
 Subset of the Puppet Configuration Language.* ECOOP 2017.
+
+[9] A. Banerjee, D. A. Naumann, and S. Rosenberg. *Local Reasoning for Global
+Invariants, Part I: Region Logic.* Journal of the ACM, 60(3), Article 18,
+2013.
+
+[10] L. Tratt. *Local Reasoning for Global Properties.* tratt.net blog, July
+2026. https://tratt.net/laurie/blog/2026/local_reasoning_for_global_properties.html
+
+[11] N. F. Liu, K. Lin, J. Hewitt, A. Paranjape, M. Bevilacqua, F. Petroni,
+and P. Liang. *Lost in the Middle: How Language Models Use Long Contexts.*
+Transactions of the Association for Computational Linguistics, 2023.
+arXiv:2307.03172.
+
+[12] P. T. J. Kon, J. Liu, Y. Qiu, W. Fan, T. He, L. Lin, H. Zhang, O. M.
+Park, G. S. Elengikal, Y. Kang, A. Chen, M. Chowdhury, M. Lee, and X. Wang.
+*IaC-Eval: A Code Generation Benchmark for Cloud Infrastructure-as-Code
+Programs.* Advances in Neural Information Processing Systems 37 (NeurIPS
+2024), Datasets and Benchmarks Track, pp. 134488–134506.
+
+[13] R. Nekrasov, S. Fossati, I. Kumara, D. A. Tamburri, and W.-J. van den
+Heuvel. *IaC Generation with LLMs: An Error Taxonomy and A Study on
+Configuration Knowledge Injection.* arXiv:2512.14792, December 2025.
+
+[14] K. Park, T. Zhou, and L. D'Antoni. *Flexible and Efficient
+Grammar-Constrained Decoding.* arXiv:2502.05111, 2025.
 
 [9] M. Kleppmann, A. Wiggins, P. van Hardenberg, and M. McGranaghan.
 *Local-first software: you own your data, in spite of the cloud.* Onward!
