@@ -87,6 +87,16 @@ you touch anything:
    writing "remember to…", that belongs in a schema or a compile-time check
    instead. This is not style advice; it decided §4.5.1(b) and (d).
 
+7. **Put what matters at the front or the back, never buried in the middle
+   — for what you read and what you write (D31).** Long-context models
+   measurably lose information placed mid-document; this section is
+   literally "read this first" for exactly that reason. Apply it to
+   anything you generate for another agent to read: rendered Augments, a
+   ChangePlan, a commit message. Two related affordances, once built: a
+   registry-lookup CLI (D24, §4.4) so you query a fact instead of reading a
+   whole registry file, and a root `AGENTS.md` (§16) — checked against the
+   actual evidence before being added, see that section.
+
 Everything below is organized so you can implement front-to-back and the
 system is in a coherent, describable state at every boundary (§12). That
 property is not about "in case the operator quits" — it's just good design,
@@ -290,6 +300,26 @@ edit small data files, not a sprawling config tree — cheap to read).
   `org.nixos.*`), CI-enforced. Kills the two-writers hazard at the source.
 - **Schema + lint** — JSON-Schema every file; enforce with the existing
   `registry_lint.py` pattern in CI and pre-commit.
+- **Example fixtures are mandatory, not just customary (D25, new).**
+  `nix2cf/examples/*.yml` already pairs one fixture per
+  `nix2cf/schema/*.schema.json`. Wang & Zhang (arXiv:2509.19931) found, for
+  planning-language generation, that "examples consistently outperform
+  descriptions" and that documentation bundling both dramatically
+  outperforms either alone (`ai-optimization-review-2026-08-13.md` item 3).
+  Extend `bin/schema_lint.py` to fail if any schema lacks a matching
+  example (or vice versa) — the pairing already exists; this makes it
+  checked rather than customary, per rule 6/R13's second clause.
+- **Existence checks extend past ports/paths (D28, new).** A 2025 error
+  taxonomy of real LLM-generated IaC (Nekrasov et al., cited in the paper's
+  §3.1) found 65% of technical errors are *factual incorrectness* —
+  referencing a value that is invalid, nonexistent, deprecated, or
+  incompatible — against 1.5% for structural/syntax errors
+  (`ai-optimization-review-2026-08-13.md` item 6). `ports.yml`/`paths.yml`
+  already carry eval-time asserts for exactly this reason; extend the same
+  treatment to every enum-like or cross-reference field in
+  `services.yml`/`roles.yml`/`launchd-writers.yml`. Schema-shape validation
+  alone defends the smallest error category; this is what defends the
+  largest one.
 
 **Fields mandated by D16's composition half (§4.5.1) — these are schema, so
 they land in Step 0, not later.** All three were decided 2026-08-13 and are
@@ -387,6 +417,23 @@ it's used, not _whether_ it's required anywhere new.
   frontend need Nix syntax.
 - §9's consent/sovereignty UI shows users their config in plain language
   regardless of authoring language, so this doesn't touch that surface.
+
+**Until D12's Nix frontend exists, the fallback path is the only path — add
+a canonicalizing check there (D23, new).** `nix2cf/examples/services.yml`,
+`roles.yml`, and `launchd-writers.yml` are all YAML today, because the
+Nix-rendering pipeline is Step 3+ work, not yet built. **Checked directly
+and correcting an earlier draft of this proposal:** no controlled study
+found supports a general "LLMs generate JSON more reliably than YAML"
+claim — format performance varies by model and task with no consistent
+winner. What *is* real, independent of any LLM-specific study: YAML's own
+spec has documented structural footguns regardless of author — implicit
+type coercion (unquoted `no`/`yes`/`on`/`off` parsing as booleans),
+indentation sensitivity, and alias/anchor ambiguity, which are exactly the
+shape of the (real, §4.1/D28) "Structural Deficit" error class. Add a cheap
+canonicalizing pre-commit step for the YAML fallback path — parse,
+re-serialize, diff against the original — justified on the format's own
+known ambiguity classes, not a comparative LLM-reliability claim
+(`ai-optimization-review-2026-08-13.md` item 1).
 
 #### 4.3.1 Why this works for partial state achieved non-deterministically
 
@@ -530,6 +577,23 @@ for three separate reasons that happen to converge:
 - **It is decision transparency, which LISA '05 identifies as what
   actually buys administrator trust** — the binding constraint on their
   adoption, and directly applicable to site-pika's three admins.
+
+**A second, complementary self-check affordance: registry lookups as a
+tool call, not a file to read (D24, new).** `buildfile` answers "what does
+device X receive"; this answers a smaller, more frequent question — "is
+port 8080 free," "does this role exist" — without an agent reading
+`ports.yml`/`roles.yml` in full. A `nix2cf registry check <domain> <field>
+<value>` CLI (or equivalent) serves R13 (a targeted lookup is less
+error-prone than skimming a whole file for one fact) and R12 at once: an
+academic result on documentation retrieval (Wang & Zhang, arXiv:2509.19931)
+found retrieving just the relevant fragment improves generation directly,
+not only cost, and a widely-cited industry benchmark (not peer-reviewed,
+cited at that weight) puts context-stuffing at roughly 2.7x the token/cost
+of retrieval-as-a-tool for equivalent answer quality
+(`ai-optimization-review-2026-08-13.md` item 2). Serving both R13 and R12
+with one mechanism is unusual — those two objectives are more often in
+tension elsewhere in this document (§14 exists because they aren't always
+free to satisfy together).
 
 Only promise types MPF's stock library doesn't cover need actual `.cf`
 text, and even that is templated from typed Nix option values, not
@@ -1249,6 +1313,22 @@ across a CVE and restarts the public proxy"). The semantic layer briefs the
 user and their advisor AI; it never authorizes — only the verifiable layer,
 checked by the executor, authorizes.
 
+**Generation discipline for the semantic layer (D29, new).** "Never
+authorizes" bounds the blast radius but not the harm: a hallucinated claim
+here can still mislead the human or their advisor AI, which is the actual
+sovereignty guarantee §9 depends on. Citation-grounding research shows
+forcing a model to cite the specific source it's summarizing measurably
+reduces unsupported claims relative to free generation from the same facts
+(general finding; the specific paper reused here, arXiv:2606.00898, is
+about legal citations, not configuration management — the generalization is
+this design's, not that paper's claim; `ai-optimization-review-2026-08-13.md`
+item 7). Generate the semantic layer primarily by template-filling from the
+verifiable IR's typed fields (`capability`, `resources`, `target`) wherever
+a template covers the case; where free generation is used for a
+novel/compound change, require it to quote or reference the specific IR
+fields it describes, so a human or their advisor AI can mechanically check
+the prose against the ground truth it claims to summarize.
+
 ### 7.4 Push and pull (both first-class, both now CFEngine — D13)
 
 Post-D13, push and pull are two modes of the **same** mechanism (CFEngine's
@@ -1325,6 +1405,34 @@ schema to check against, no formal semantics to verify against (unlike
 Puppet's µPuppet fragment, §4.5), and exactly the category the empirical
 IaC-bug literature identifies as where idempotence bugs concentrate.
 
+**Sharper empirical grounding for the guardrail split above (D28, new; see
+also §4.1).** A 2025 error taxonomy of real LLM-generated IaC (Nekrasov et
+al., cited in the paper's §3.1) breaks failures into four categories:
+factual incorrectness (invalid/nonexistent/deprecated/incompatible values)
+at 65%, incompleteness at 26.5%, contextual reasoning failure
+(cross-resource — the category §4.5.1(b)'s inference stage targets) at 7%,
+and structural deficit (syntax) at just 1.5%. Schema validation, this
+design's main automated guardrail, defends the smallest category; §4.1's
+registry existence-checks (extended under D28) defend the largest one; and
+D16(d)'s default-on comprehensiveness (§4.5.1(d)) already happens to be the
+right structural answer to the second-largest, for reasons unrelated to why
+it was originally decided. No design change here — this is why the
+guardrails already chosen are aimed where they are, made explicit
+(`ai-optimization-review-2026-08-13.md` item 6).
+
+**Grammar-constrained decoding, worth a look when this guardrail is
+actually built (D30, new).** The "no schema to check against" gap above is
+narrower than it was when this section was written: grammar-constrained
+decoding is now efficient enough for production use (Park, Zhou, D'Antoni,
+arXiv:2502.05111), and a formal CFEngine promise-body grammar, written
+once, could constrain *generation itself* at exactly this surface —
+stronger than post-hoc lint, since invalid promise syntax becomes
+unrepresentable rather than merely detectable
+(`ai-optimization-review-2026-08-13.md` item 8). Not urgent — this escape
+hatch isn't exercised until later build-order steps — but check for an
+existing grammar or the cost of writing one before defaulting to lint-only
+for this surface.
+
 ---
 
 ## 8. Security gates (what must hold before each capability opens)
@@ -1351,6 +1459,16 @@ reviewed checkout — **never a task worktree**; and the worktree
 ownership/provenance rules become **automated deterministic checks** (a
 `git log`/`git diff` range gate that fails closed under YOLO), not prose. This
 is also the correct home for the **OpenHands technique** (§8.2).
+
+**The same fix applies to this document's own header (D27, new).** The
+protection notice at the top of this file — "AI agents: DO NOT MODIFY
+without explicit, specific human approval" — is currently prose, which is
+precisely the pattern rule 6/R13's second clause warns against: a
+convention an agent must remember is one it will eventually break silently
+(`ai-optimization-review-2026-08-13.md` item 5). A pre-commit/CI check that
+fails any diff touching `architecture-DEFINITIVE-v2.md` unless the commit
+carries an explicit marker (e.g. an `Approved-change:` trailer) is the same
+mechanism as the paragraph above, applied reflexively to this file.
 
 ### 8.2 OpenHands security — adopt the technique for agents, never as the fleet gate
 
@@ -1528,7 +1646,12 @@ Two consequences of the sequence, both deliberate:
   nearly every domain to start at `not-yet-migrated`, which is the normal
   day-one state (Bcfg2's first client run reports 0 managed / 2308
   unmanaged), and that count is the progress metric from here on. Lint in
-  CI + pre-commit; automate the worktree provenance gate (§8.1). Settle
+  CI + pre-commit — including D25's schema/example-pairing check and D28's
+  extended existence-checks; automate the worktree provenance gate (§8.1)
+  and D27's self-protection check for this file; settle D23's YAML
+  canonicalization step and stub D24's registry-lookup CLI here too, since
+  all four are schema/tooling work with no runtime dependency, the same
+  reason the original three D16 fields landed in this step. Settle
   D18's row schema here too (§4.7.1) even though nothing writes rows yet —
   the release stamp and the separated managed/`not-yet-migrated`/
   `deliberately-unmanaged` counters are one column each now and a migration
@@ -1727,6 +1850,27 @@ unresolved, it should write a question doc and stop, not improvise.
 
 | D22 (new) | Platform build sequence      | **macOS first, Android second, Linux third** (§12; notes in §5.1/§5.2/§5.4). Operator decision 2026-08-13. **Reverses the pre-mortem's "prove the Ubuntu path before investing in Mac Nix"** as applied to the macOS *adapter* — that caution was reasoning about the nix-darwin *substrate*, which remains late (Step 7) and remains gated on §14.1. The two had been conflated; §5.3 (services are CFEngine-owned on every platform) and §5.2 (nix-darwin owns substrate only) are what make them separable, so Step 1 needs no premium-token decision resolved. Accepted consequences: the adoptability keystone is proven third rather than first, and the first machine converged is the one that cannot easily be reimaged — mitigated by dry-run-first posture and the `launchd-writers.yml` lint, not by reordering. **Also softens R5's distro half:** "no bare-metal Nix, must resemble what a stranger runs" binds; *which* mainstream distro is open until Step 4 (operator: "Ubuntu, or maybe a different distro"). |
 
+| # | Decision | Resolution |
+| --- | --- | --- |
+| D23 (new) | Site Model fallback-authoring format | **Add a canonicalizing pre-commit check (parse, re-serialize, diff) for the YAML fallback path** (§4.3) — until D12's Nix frontend exists, YAML is the only authoring path in practice (`nix2cf/examples/*.yml`). Originally proposed as "prefer JSON, LLMs generate it more reliably"; checked directly against the cited study and **that claim does not hold** — no consistent format winner across models/tasks. Kept on YAML's own documented spec ambiguities (type coercion, indentation, anchors) instead, independent of any LLM-specific claim. |
+| D24 (new) | Registry lookup CLI | **A `nix2cf registry check` (or equivalent) tool-call lookup, alongside the `buildfile` self-check CLI** (§4.4) — answers a single registry fact without an agent reading the whole file. Serves R13 (accuracy) and R12 (token budget) simultaneously — one of the few places those objectives aren't in tension. |
+| D25 (new) | Schema/example pairing enforcement | **`bin/schema_lint.py` fails if any `schema/*.schema.json` lacks a matching `examples/*.yml`, or vice versa** (§4.1) — the pairing already exists in `nix2cf`; this makes it checked, not customary. |
+| D26 (new) | Root `AGENTS.md` per repo | **Checked, not adopted on a performance rationale — see §16.** The dedicated study found context files do not generally improve task success and raise cost 20%+; recorded so this isn't re-proposed and re-researched later. If ever added, discoverability only, minimal, hand-curated. |
+| D27 (new) | This document's own edit-protection, mechanized | **A pre-commit/CI check fails any diff touching `architecture-DEFINITIVE-v2.md` without an explicit `Approved-change:` trailer** (§8.1) — the same automated-check-not-prose treatment §8.1 already gives the worktree-provenance problem, applied to this file's own header notice. |
+| D28 (new) | Guardrails weighted by the real IaC error distribution | **No design change; makes explicit why existing guardrails are aimed where they are** (§4.1, §4.5.1(d), §7.5). Real LLM-IaC errors: 65% factual incorrectness, 26.5% incompleteness, 7% contextual reasoning failure, 1.5% structural (Nekrasov et al., paper §3.1; percentages re-verified directly against the paper's table). Registry existence-checks (extended past ports/paths) defend the largest category; D16(d)'s default-on comprehensiveness already happens to defend the second-largest; schema validation alone defends the smallest. |
+| D29 (new) | Semantic-layer generation discipline | **Template-fill the ChangePlan's semantic layer from the verifiable IR's typed fields wherever a template covers the case; free generation must quote/reference the specific IR fields it describes** (§7.3). "Never authorizes" bounds the blast radius, not the harm — a hallucinated claim can still mislead the human or their advisor AI, which is the sovereignty guarantee §9 actually depends on. |
+| D30 (new) | Grammar-constrained decoding for the CFEngine escape hatch | **Check for or write a formal CFEngine promise-body grammar before defaulting to lint-only for `commands`-type freehand text** (§7.5) — grammar-constrained decoding is now efficient enough for production use, turning "no schema to check against" into a real option. Not urgent; this surface isn't exercised until later build-order steps. |
+| D31 (new) | Front-or-back positional convention, named | **Critical information goes at the very start or very end of any agent-facing artifact, never buried mid-document** (§0 rule 7). Already practiced here (§0 is "read this first"); apply deliberately to rendered outputs (`def.json`/`host_specific.json`, the ChangePlan) going forward. |
+
+**D23–D31 provenance:** proposed in `ai-optimization-review-2026-08-13.md`
+(literature review, requested by the operator to find further concrete
+AI-authorship optimizations beyond R13's existing scope); four of the nine
+original claims (1, 2, 3, 4 — now D23, D24, D25, D26) were corrected in
+place the same day after direct source verification found the original
+numbers didn't hold up, D26 most substantially (the proposed benefit was
+reversed by its own primary source). **Adopted in full, including D26's
+negative result, by operator decision 2026-08-13.**
+
 Silence = proceed from Step 0. Objections amend this register, not the
 archived documents.
 
@@ -1734,6 +1878,31 @@ archived documents.
 
 ## 16. Document map (for the next AI)
 
+**D26, new: root `AGENTS.md` — checked, and not adopted on a performance
+rationale.** `AGENTS.md` is a real Linux-Foundation-governed cross-tool
+discovery convention (read natively by Claude Code, Codex CLI, Cursor,
+Aider, Devin, Copilot, Gemini CLI, Windsurf, Amazon Q). It was proposed here
+on a performance claim that did not survive checking against its primary
+source: the dedicated study (Gloaguen et al., ETH Zürich, arXiv:2602.11988)
+found context files — LLM-generated *and* developer-written — do not
+generally improve task success and increase inference cost 20%+;
+LLM-generated files specifically *reduced* success versus no context file
+at all (`ai-optimization-review-2026-08-13.md` item 4, corrected in place
+2026-08-13). **Decision: do not add one on the strength of a performance
+argument, because there isn't one.** If a root `AGENTS.md` is ever added —
+`fleetopia`/`nix2cf`/eventually the site repos, once Step 0+ lands real
+code — the only defensible reason is discoverability, and it must be
+minimal and hand-curated pointing to §0, never LLM-generated boilerplate or
+a repository-overview dump (the study's specific failure mode). Recorded
+here so a future agent doesn't re-propose this and re-run the same research
+to the same answer.
+
+- `ai-optimization-review-2026-08-13.md` — the literature pass behind D23,
+  D24, D25, D26 (above), D27, D28, D29, D30, D31. **Adopted in full by
+  operator decision 2026-08-13**, including item 4/D26's negative result.
+  Full rationale, citations, and the correction history (four claims
+  fixed same-day after direct source verification) live there; not
+  duplicated here.
 - **This file** — authoritative architecture + build order. Start here.
 - `architecture-final-v1.md` — prior synthesis; superseded where they differ.
 - `architecture-proposal-v1.md` — Claude's detailed §7–8/§12 (manifest/consent
