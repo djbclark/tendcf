@@ -205,7 +205,13 @@ edit small data files, not a sprawling config tree — cheap to read).
 ### 4.2 Placement & consumption
 
 Site Model lives in `site-<n>` (site data). Generic code lives fact-free
-under `freeops/` (§11). Ubuntu/mise reads the model via a small generator
+under `freeops/` (§11). **Boundary (decided 2026-08-13, recorded as
+D21):** the Site Model *schemas* — the module-system type definitions and
+the JSON Schema they render-validate against — belong to `nix2cf` (the
+compiler layer's working name) as its public contract; the *instances*
+(concrete site data, including site-pika's) live in the fleet/site repos
+and are supplied through that contract. A schema change is a `nix2cf`
+interface change; an instance change is site data. Ubuntu/mise reads the model via a small generator
 (toolchains/baseline only); CFEngine reads it via rendered Augments
 (`def.json`/`host_specific.json`, §4.4 — this is now the primary consumer
 for everything that used to be an Ansible task); Nix (for builds only)
@@ -501,6 +507,19 @@ package/service operations, worth lifting rather than re-deriving — while
 stripping the Rudder-specific reporting scaffolding and replacing it with
 fleetopia's own (§4.7). Not a dependency to track upstream (no
 independent release exists anymore); a one-time, per-method adaptation.
+
+**What this decision does NOT rest on (rationale corrected 2026-08-13):**
+the licence. GPLv3 restricts depending on or deriving from Rudder's
+*code*; it does not restrict running Rudder, managing nodes with it, or
+authoring techniques/generic methods for it (configuration data, not
+derived works), and Rudder grants an explicit plugin-licence exception
+besides. Vendoring the bundle bodies is itself unproblematic — the
+generic layer here is GPL-3.0-or-later anyway (§11). What keeps Rudder a
+reference corpus rather than anything more is the platform matrix (no
+macOS or Android agent at any tier; ARM absent from the Core repository,
+checked directly against `repository.rudder.io`) and ncf's archived,
+no-independent-release status. Full correction:
+`rudder-as-umbrella-evaluation-2026-08-13.md` §4.
 **Zero coverage for the actual hardest part:** ncf/Rudder targets Linux
 and Windows only — no macOS/launchd story, no Android/Termux story. The
 `serverapp_*` launchd-plist-and-brew pattern was always fleetopia-original
@@ -508,19 +527,41 @@ work regardless of this decision.
 
 ### 4.7 Local-first reporting: per-device SQLite is the record of truth (D18, new)
 
-The centralized-shipping design (ship every promise outcome to the
-existing Vector/OpenObserve/VictoriaMetrics/Grafana stack, treat that as
-the record) is the wrong default for this fleet specifically: the
-documented operational history (Fire OS boot-recovery failures, flaky
-ADB-over-wireless, the peer-help mesh for offline devices) means a device
-is often unreachable from any hub exactly when its own debug history
-matters most. The relevant framing is **local-first software**
-(Kleppmann, Hardy, Kaffman & van Hardenberg, Ink & Switch 2019): each
-device holds its own authoritative copy, works fully offline, and any
-central/shared view is optional and eventually-consistent, never required
-for the device's own operation. (Same theoretical family as Couch's
-algebra and Promise Theory — convergent, order-independent state, not a
-new pattern.)
+**Re-decided 2026-08-13 — same decision, new grounds.** The two rationales
+originally recorded here are both off the record: the objection to
+Rudder's Postgres-backed compliance DB is void (operator: "Postgres is
+fine"), and local-first debuggability as a hard requirement was withdrawn
+by the operator (2026-08-13, `bolt-choria-as-umbrella-2026-08-13.md`).
+The decision stands on what actually survives:
+
+1. **The local capture must exist regardless.** On CFEngine Community
+   (the edition in scope) promise outcomes are captured by on-device glue
+   either way (below); the local store is built no matter what. Promoting
+   anything *else* to authoritative therefore adds a second system that
+   must be kept complete and in sync — and as of 2026-08-13 that second
+   system has **no consumer**: Choria's telemetry spine is dropped
+   (`research-answers-and-corrections-2026-08-13.md`) and site-pika has no
+   compliance UI requirement. Central-as-record is infrastructure without
+   a customer; local-as-record is the null option.
+2. **Completeness.** Devices in this fleet demonstrably go unreachable
+   (Fire OS boot-recovery failures, flaky ADB-over-wireless, offline
+   peers). Any central copy fed by best-effort sync is incomplete during
+   exactly those windows; only the local copy is guaranteed complete.
+   This is an operational fact about the fleet, not the withdrawn
+   debuggability *requirement* — it makes the local copy the only
+   candidate for "record," whether or not anyone requires debugging there.
+3. **Single-writer-per-node symmetry (D20).** One SQLite file, one
+   owning host, no concurrent-writer failure modes — the same principle
+   the Nix store decision applies, not a new one.
+4. **Weight class.** SQLite is trivially available on Termux with no
+   server process — consistent with the adoptability instinct behind D6.
+
+The local-first framing (Kleppmann, Hardy, Kaffman & van Hardenberg,
+Ink & Switch 2019) remains the right *description* of the design — each
+device holds its own authoritative copy; any central/shared view is
+optional and eventually-consistent — it is just no longer load-bearing
+as a requirement. (Same theoretical family as Couch's algebra and
+Promise Theory — convergent, order-independent state.)
 
 **Design:** `stayturgid-agent` owns a local SQLite database per device as
 the authoritative record, populated from CFEngine's local promise-outcome
@@ -659,8 +700,13 @@ Routers → OpenWrt uci rendered from the Site Model (same adapter contract; no
 bare-metal Nix there either, consistent with R5's spirit). iPhone / wearables
 / glasses → `trust_tier: consented` endpoints; consume services + artifacts,
 never converge-managed. Microcontrollers → firmware as a Nix-built artifact,
-flashing as a task. All are Site Model inventory entries + artifacts, not new
-architecture.
+flashing as a task. Appliance-class devices → image-based atomic updates
+(RAUC / SWUpdate+hawkBit / OSTree family): the whole image is a Nix-built
+artifact, the flash/switch is a task, and the device is inventory — not a
+new convergence path. Recorded as an extension point rather than a
+D-number by operator decision 2026-08-13: "IoT growth" does mean
+appliance-class devices, but as a nice-to-have, not a hard requirement.
+All are Site Model inventory entries + artifacts, not new architecture.
 
 ---
 
@@ -697,10 +743,15 @@ by matching `ops-vX.Y.Z` tags (unchanged, R11). Each declares its own
 "github:djbclark/fleetopia?ref=<tag>"`), pinned exactly by `flake.lock` —
 which doubles as machine-readable cross-repo provenance for a release,
 close to free reproducibility documentation on top of what
-`ops-release.json` already tracks. **Open question, not yet resolved:**
-whether `flake.lock` can replace part of what `ops-release.json` tracks,
-or should stay a parallel, separately-maintained pin — needs a decision
-before Step 0 work on this touches release tooling.
+`ops-release.json` already tracks. **Answered 2026-08-13
+(`research-answers-and-corrections-2026-08-13.md` §3): parallel, keep
+both.** `ops-release.json` is a three-field suite-coherence marker across
+co-equal repos; `flake.lock` pins build inputs. `flake.lock` structurally
+cannot express the former — it would require making one repo the root and
+the others inputs, and the peer relationship is mutually referential,
+which flake inputs (a DAG) cannot encode. The release check gains one
+line (verify each repo's `flake.lock` is committed and clean at tag
+time); nothing else changes.
 
 **fleetopia's flake is the one the others import, not the reverse.** The
 Site Model module-system _type definitions_ (D12/§4.3) live in
@@ -1173,12 +1224,13 @@ unresolved, it should write a question doc and stop, not improvise.
 | D12 (new) | Site Model authoring language | **Nix module system MAY author the Site Model** (§4.3), rendered to the same schema-validated JSON everything already consumes. Distinct from D6: this is about the authoring frontend, not the runtime substrate — D6's "no bare-metal Nix" is unchanged. Non-Nix JSON/YAML authoring stays a supported fallback for adoptability. |
 | D13 (new) | Ansible removal / service owner | **Ansible is fully removed — from service ownership AND host-baseline/bootstrap.** CFEngine (promises) + mise (toolchains only) replace it everywhere, all platforms, superseding D1 (§5.3, §5.1). The original Ansible-over-CFEngine blockers (no Android binaries, SSH/push incompatibility, needing dedicated policy-server infra, GPLv3) were an earlier analyst's unvalidated assumptions, corrected 2026-08-13 — not real constraints. Purely on theoretical fit (Promise Theory/Couch's algebra vs. no comparable formal grounding for Ansible), CFEngine was always the better answer; D1 reflected an unchecked practicality objection, not a considered rejection. |
 | D14 (new) | CFEngine deployment shape | **Git-distributed policy, `cf-serverd` on every client, no dedicated central policy host, no push/SSH requirement** (§4.4, §7.4). Push (via `cf-runagent`/`just cf-run`) and pull (each host's own convergence schedule) are both first-class, same mechanism. |
-| D15 (new) | Nix→CFEngine compile target | **CFEngine's native Augments layer (`def.json`/`host_specific.json`), not raw `.cf` synthesis** (§4.4). Merging happens once, in Nix, before render — CFEngine's `mergedata()` is not used for this, to avoid a second, divergent merge engine. |
-| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected pending confirmation by a real from-scratch provision** — the verdict reasons about a cold path that has never been executed, so it is not closed outright. |
-| D17 (new) | ncf/Rudder reuse            | **Vendor and adapt individual generic-method bundle bodies as a reference corpus, strip Rudder's reporting scaffolding** (§4.6). Not a dependency — `ncf` is archived, folded into the Rudder monorepo, no independent release to track. Zero coverage for macOS/Android; that work was always fleetopia-original. |
-| D18 (new) | Local-first reporting        | **Per-device SQLite (owned by `stayturgid-agent`) is the authoritative record, not the central observability stack** (§4.7). Populated from CFEngine's local promise-outcome log; ncf's outcome-state vocabulary retained; sync to Vector/OpenObserve/Grafana is optional and best-effort, never required for local debugging. Rudder's own Postgres-backed compliance DB is explicitly not adopted (no SQLite path exists; its hub-and-spoke topology is the wrong shape here). |
-| D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `fleetopia`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap is an **open question**, not yet resolved — needs a decision before Step 0 work touches release tooling. Nix store locality (D20, §4.8) applies to every flake `packages` build. |
+| D15 (new) | Nix→CFEngine compile target | **CFEngine's native Augments layer (`def.json`/`host_specific.json`), not raw `.cf` synthesis** (§4.4). Merging happens once, in Nix, before render — CFEngine's `mergedata()` is not used for this, to avoid a second, divergent merge engine. Still unprototyped as of 2026-08-13; the augments-load-under-standalone-`cf-agent -f` precondition (`research-answers-and-corrections-2026-08-13.md`) is **assumed satisfied by operator decision 2026-08-13** — verifying it stays on the task list as validation, not as a gate. |
+| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected; semantic verdict accepted as a working assumption by operator decision 2026-08-13** — a real from-scratch provision remains the validation step (and the right forcing function for the bootstrap/interlock designs) but is no longer a gate on proceeding. The surviving open half of D16 is the **multi-writer composition question** (how independently-authored config composes without explicit ordering — §4.5, `site-pika-requirement-change-2026-08-13.md` §3); governance/authorization dropped out with site-pika's requirement change. |
+| D17 (new) | ncf/Rudder reuse            | **Vendor and adapt individual generic-method bundle bodies as a reference corpus, strip Rudder's reporting scaffolding** (§4.6). Not a dependency — `ncf` is archived, folded into the Rudder monorepo, no independent release to track. Zero coverage for macOS/Android; that work was always fleetopia-original. **Rationale corrected 2026-08-13:** the licence is *not* what limits Rudder use — GPLv3 restricts deriving from Rudder's code, not running it or authoring techniques for it, and Rudder grants a plugin-licence exception; the platform matrix and ncf's archived status are the real limits (§4.6, `rudder-as-umbrella-evaluation-2026-08-13.md` §4). |
+| D18 (new) | Local-first reporting        | **Per-device SQLite (owned by `stayturgid-agent`) is the authoritative record, not the central observability stack** (§4.7). **Re-decided 2026-08-13 on new grounds** — the original rationales are off the record (Postgres objection void per operator; local-first debuggability withdrawn as a hard requirement). Surviving grounds: the local capture must exist anyway on CFEngine Community, so local-as-record is the null option while central-as-record is a second system with no remaining consumer (Choria telemetry spine dropped, no site-pika compliance UI); only the local copy is guaranteed complete across this fleet's real unreachability windows; single-writer-per-node symmetry with D20; SQLite's weight class fits Termux. Sync to Vector/OpenObserve/Grafana stays optional and best-effort. |
+| D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `fleetopia`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap **answered 2026-08-13: parallel, keep both** — `ops-release.json` is a suite-coherence marker across co-equal repos, which `flake.lock` (a DAG of inputs under one root) structurally cannot express; the release check gains one line (§6.1, `research-answers-and-corrections-2026-08-13.md` §3). Nix store locality (D20, §4.8) applies to every flake `packages` build. |
 | D20 (new) | Nix store locality             | **Never point `NIX_STORE_DIR` or the store's `db.sqlite` at shared/network storage written by more than one host** (§4.8). Single-writer-per-host is Nix's own default and its documented failure mode under multi-host writes (NixOS/nix#378). Same principle as D18's local-first SQLite, applied to Nix's own store. Previously recorded only as an aside inside D19; promoted to its own row 2026-08-13. |
+| D21 (new) | Site Model schema/instance boundary | **Schemas belong to `nix2cf` as its public contract; instances live in the fleet/site repos** (§4.2, §6.1). The module-system type definitions and the JSON Schema they validate against are the compiler layer's interface — versioned and released with `nix2cf`; concrete site data (including site-pika's) is supplied through that interface from each site repo. Decided 2026-08-13 (recorded 2026-08-13; `nix2cf` remains the working name until naming is finalized). |
 
 Silence = proceed from Step 0. Objections amend this register, not the
 archived documents.
