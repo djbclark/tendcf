@@ -36,13 +36,22 @@ you touch anything:
    Do not propose conservative scope cuts to save effort; effort is not a
    cost here. **Token spend is the only cost that matters** (§13).
 
-2. **The reference target is Ubuntu Server on bare metal — this is a hard
-   constraint, not a preference.** The operator will NOT run bare-metal Nix.
-   The reason is _adoptability_: a stranger who wants to try this project
-   should start from what they already have (a normal Linux box), and asking
-   them to install duplicate packages is fine while asking them to replace
-   their OS is not. Every design decision inherits this. Nix is still used
-   heavily — but never as the thing a person installs on bare metal (§5).
+2. **The reference target is a stock Linux distro on bare metal — this is a
+   hard constraint, not a preference.** The operator will NOT run bare-metal
+   Nix. The reason is _adoptability_: a stranger who wants to try this
+   project should start from what they already have (a normal Linux box),
+   and asking them to install duplicate packages is fine while asking them
+   to replace their OS is not. Every design decision inherits this. Nix is
+   still used heavily — but never as the thing a person installs on bare
+   metal (§5). _Ubuntu Server LTS is the working default and what §5.1 is
+   written against; which mainstream distro it ends up being is open until
+   §12 Step 4 (D22). The constraint is "stock distro, not NixOS" — the
+   distro's name is not the load-bearing part._
+
+   **Note the build order does not start here.** Linux is platform adapter
+   #3; macOS is first and Android second (D22, §12). Being the *reference*
+   target and being the *first* target are different roles, and this
+   document previously conflated them.
 
 3. **The trust/consent layer is the point, not a liability.** It is the most
    novel and most freedom-relevant part of the whole design. Its purpose is
@@ -151,10 +160,16 @@ final round.
 - **R4** Android keeps Termux (+api,+x11), the built-in Terminal app, the
   Shizuku fork, stayturgid-agent, CFEngine. No nix-on-droid. Nix may build
   zero-on-device-footprint artifacts only.
-- **R5 → HARD FACT:** **The operator will not run bare-metal Nix. Ubuntu
-  Server is the reference Linux target.** Rationale is adoptability, not exit
-  cost: the reference deployment must resemble what a stranger already runs.
-  Nix lives at every level _except_ the installed base OS.
+- **R5 → HARD FACT:** **The operator will not run bare-metal Nix. A stock
+  mainstream Linux distro is the reference target.** Rationale is
+  adoptability, not exit cost: the reference deployment must resemble what a
+  stranger already runs. Nix lives at every level _except_ the installed
+  base OS. **Two halves, different strengths (clarified 2026-08-13, D22):**
+  no-bare-metal-Nix and must-resemble-a-stranger's-box are hard and binding;
+  **Ubuntu Server specifically is the default answer, not the requirement** —
+  any mainstream stock distro satisfies R5, and the choice is open until
+  §12 Step 4, where the reference host actually gets built. NixOS remains
+  excluded by the first half regardless.
 - **R6** Gradle stays for APKs; the suite orchestrates build + deploy; APK
   build does not drive architecture.
 - **R7** Push AND pull. Pull evolves into **user-sovereignty**: plain-English
@@ -256,8 +271,11 @@ edit small data files, not a sprawling config tree — cheap to read).
 ### 4.1 Contents (extends what `site-djbclark` already does right)
 
 - **`inventory/`** — hosts + taxonomy. Gains, per host: `arch`, `platform`,
-  `adapter` (`ubuntu-mise` | `ansible` | `android` | `macos`), `trust_tier`
-  (`operator` | `managed` | `consented`).
+  `adapter` (`ubuntu-mise` | `android` | `macos`), `trust_tier`
+  (`operator` | `managed` | `consented`). _(The `ansible` adapter was
+  removed from this enum by D13 — Ansible is gone from service ownership
+  and from host baseline/bootstrap alike, so it is not a value any host can
+  legally hold.)_
 - **`registry/ports.yml`, `paths.yml`** — unchanged allocation authorities;
   adapters gain eval-time asserts against them.
 - **`registry/services.yml`** (new) — one record per service: name, runs-as,
@@ -611,7 +629,7 @@ purely technical composition question. The Bcfg2 papers
 **All four are now decided** — (a), (c) and (d) below, then (b), which R13
 settled last and which is presented last because its argument depends on
 the other three being in place. The schema consequences are recorded in
-§4.1; the build-order consequences in §12 Step 0 and Step 1.5.
+§4.1; the build-order consequences in §12 Step 0 and Step 3.
 
 **(a) Same-resource conflict rule — DECIDED: compile-time error, with an
 actionable message; leave room for a priority algebra.** When two writers
@@ -916,11 +934,22 @@ keep every store strictly local to the host that owns it.
 
 ## 5. Platform layers (Nix everywhere except bare metal)
 
-### 5.1 Linux — Ubuntu Server is the reference (R5 hard fact)
+### 5.1 Linux — a stock mainstream distro is the reference (R5 hard fact)
 
-- **Base OS:** Ubuntu Server LTS, installed normally. No NixOS, no
-  nixos-anywhere, no bare-metal Nix. A stranger clones the project onto their
-  existing Ubuntu box and it works.
+> **Build-order note (2026-08-13):** Linux is **platform adapter #3**
+> (§12 Step 4), after macOS and Android. It remains the *adoptability*
+> keystone — the portability claim lives here — it is simply no longer the
+> first thing built. **Which distro is open at that step.** R5's binding
+> half is "no bare-metal Nix, and the reference must resemble what a
+> stranger already runs"; Ubuntu Server LTS is the default answer to that
+> and everything below is written for it, but any mainstream stock distro
+> satisfies R5 equally (operator, 2026-08-13). Nothing before Step 4
+> depends on the choice, so it is a decision to make with the reference
+> host in front of you, not now.
+
+- **Base OS:** Ubuntu Server LTS (default; see the note above), installed
+  normally. No NixOS, no nixos-anywhere, no bare-metal Nix. A stranger
+  clones the project onto their existing box and it works.
 - **Host baseline and services** (packages, users, ssh, tailscale, firewall,
   services like Vector/Caddy/etc.): **mise `bootstrap` (toolchains only) +
   CFEngine promises (everything else — D13/D14, §4.4).** Ansible is fully
@@ -936,6 +965,15 @@ keep every store strictly local to the host that owns it.
   might `apt install` a tool. Never required for the runtime.
 
 ### 5.2 macOS (Apple Silicon) — the operator's own machine, a different case
+
+> **Build-order note (2026-08-13):** macOS is **platform adapter #1**
+> (§12 Step 1) — the first platform brought under the Site Model. **This
+> splits the section in two, and the split is what makes going first
+> possible.** The *services* half (launchd services as CFEngine promises,
+> §5.3) is Step 1 and depends on nothing unresolved. The *substrate* half
+> below — nix-darwin, home-manager — is Step 7 and stays gated on §14.1.
+> Read every "[NEEDS FABLE-5]" marker in this section as applying to the
+> substrate half only.
 
 The Mac is not a stranger's machine, so the adoptability constraint doesn't
 bind it. **nix-darwin + home-manager MAY own the Mac substrate** (packages,
@@ -985,6 +1023,13 @@ previously-real gap where the verify layer could drift from the deploy
 layer, §4.7).
 
 ### 5.4 Android — unchanged stack, plus the artifact lane (R4/R6)
+
+> **Build-order note (2026-08-13):** Android is **platform adapter #2**
+> (§12 Step 2). "Unchanged stack" below describes the *runtime* — nothing
+> here is being replaced — but Android is no longer untouched build-order
+> work: Step 2 brings the existing services under `services.yml` and types
+> them with `provides`/`requires`, which is what supplies the second
+> platform §12 Step 3 gates on. The stack stays; its *description* is new.
 
 Termux, Shizuku fork, stayturgid-agent, CFEngine, FIRERPA, SSH CA, Tailscale
 — all unchanged. Two additions:
@@ -1438,9 +1483,31 @@ especially the freedom-relevant glue that Free Sysadmin will publish:
 
 Ordered so each step delivers standalone value and leaves the system
 describable. Not a schedule (effort/time are not costs here) — a _dependency
-and coherence_ order. The one correction kept from the pre-mortem on purely
-logical grounds: **prove the Ubuntu path before investing in Mac Nix**,
-because it de-risks the reference target that everything else depends on.
+and coherence_ order.
+
+**Platform sequence: macOS, then Android, then Linux (operator decision,
+2026-08-13).** This **reverses the pre-mortem correction this section
+previously carried** ("prove the Ubuntu path before investing in Mac Nix").
+That correction was reasoning about *Mac Nix* — the nix-darwin substrate
+question — and it still holds for that, which is why the substrate step
+remains late (Step 7). It does not bind the *macOS adapter*, and the two
+were being conflated. §5.3 makes services CFEngine-owned on every platform
+and §5.2 scopes nix-darwin to substrate only, so bringing macOS services
+under the Site Model is fully separable from §14.1 and needs none of it
+resolved.
+
+Two consequences of the sequence, both deliberate:
+
+- **The adoptability keystone is now proven third, not first.** Linux is
+  where the portability claim lives (a stranger starts from a normal box),
+  so it goes longest unvalidated. Accepted; the mitigation is that Step 4
+  is a *reference* path built from an already-working compiler, not a
+  from-scratch bring-up.
+- **The first target converged is the one machine that cannot easily be
+  reimaged** (§5.2). Step 1 therefore runs dry-run-first as a standing
+  posture, not a courtesy — see the step. This is the same LISA '05
+  finding §4.7.1 records: on machines that matter, dry-run and report is
+  the default and auto-apply is the exception.
 
 - **Step 0 — Site Model + fences (pure data, no runtime change).** Schemas
   for `services.yml`/`roles.yml`/`launchd-writers.yml`, **including the
@@ -1448,7 +1515,7 @@ because it de-risks the reference target that everything else depends on.
   `interlocks` per bundle, `comprehensive`/`opt_out_reason` per domain.
   Those are schema decisions, so getting them in now is much cheaper than
   retrofitting them across transcribed reality later; nothing *consumes*
-  them until Step 1.5, which is fine. Transcribe current reality — expect
+  them until Step 3, which is fine. Transcribe current reality — expect
   nearly every domain to start at `not-yet-migrated`, which is the normal
   day-one state (Bcfg2's first client run reports 0 managed / 2308
   unmanaged), and that count is the progress metric from here on. Lint in
@@ -1459,53 +1526,93 @@ because it de-risks the reference target that everything else depends on.
   later. Coherent stop: same system, now with a truthful data spine and a
   provenance gate. _Also the cheapest possible agent work — good first task
   under the budget._
-- **Step 1 — Ubuntu reference path.** mise `bootstrap` + CFEngine promises
-  render a real Ubuntu host from the Site Model. This is the adoptability
-  keystone; do it early even before you own a VPS, by rendering + dry-running
-  against a throwaway box or container-like target. Coherent stop: the
-  reference deployment provably works on vanilla Ubuntu.
-- **Step 1.5 — `nix2cf` compiler stages (gated on two platform adapters).**
-  The merge → conflict-check → inference → render pipeline of §4.5.1, in
-  v1. **Sequencing is a decision, not a preference:** types first,
-  inference second, and inference does not start until real type
-  definitions exist on **two** platforms. Inference rules invented ahead of
-  the types they range over encode guesses; two adapters is the minimum
-  that exposes which provides/requires relations are general and which were
-  Ubuntu-shaped. Order within the step: (0) the `buildfile`-style
-  render-what-device-X-receives CLI (§4.4) — first, because it is the
-  self-check loop and the compiler's own regression test, so everything
-  after it is cheaper to verify; (1) conflict check as a distinct compiler
-  stage over already-merged declarations — never fused into the type
-  definitions, so the Nix priority algebra can be adopted later as a policy
-  change rather than a schema redesign; (2) extra-entry reporting, which
-  needs no inference and starts paying immediately; (3) the AutoEdges-style
-  inference stage with mandatory edge attribution.
-  Coherent stop: the Site Model compiles, conflicts fail the build with
-  resolvable messages, and skew is visible — with or without inference
-  finished.
-- **Step 2 — First real Linux host.** Provision a VPS (Hetzner) as Ubuntu;
-  give it backup/shadow roles (observability mirror, backup) — **not**
-  obs-main yet. Proves R2 (flip a role's main to it and back) and gives the
-  role mesh a second real node. Coherent stop: a genuine second host; destroy
-  it and the Mac/fleet are unchanged.
-- **Step 3 — Signed releases (push-only) + typed executor.** TUF-subset root
-  ceremony; manifest + ChangePlan generation in `ops-release-*`; the
-  capability-enforcing executor on CFEngine (§7.3, §8). Push-only, operator
-  hosts. Coherent stop: every deploy is a signed, execution-constrained plan;
-  no autonomous anything yet.
-- **Step 4 — Mac substrate (the interesting, optional Nix step).** If §14.1
+- **Step 1 — macOS services adapter (platform adapter #1).** Render the
+  Mac's `com.djbclark.*` / `com.stayturgid.*` launchd services as CFEngine
+  promises from `services.yml` (§5.3). **Explicitly *not* in this step:
+  nix-darwin, home-manager, or anything substrate — that is Step 7 and is
+  gated on §14.1.** Keeping the boundary sharp here is what makes macOS
+  viable as the first adapter at all; blur it and this step inherits an
+  unresolved premium-token decision it does not need.
+  **Dry-run is the default posture and it starts here** (§12 intro): render,
+  diff, read the report, and only then enforce. The `launchd-writers.yml`
+  lint is the safety rail that makes this survivable on a live daily driver
+  — a promise that would write outside CFEngine's declared label prefix
+  fails the lint before it reaches the machine. Coherent stop: the Mac's
+  services are declarative and reproducible, with every other part of the
+  Mac untouched and unmanaged.
+- **Step 2 — Android under the Site Model (platform adapter #2).** Bring
+  the existing Termux/stayturgid-agent/CFEngine stack (§5.4) under the same
+  `services.yml` description the Mac now uses, and write `provides`/
+  `requires` for the Termux types. CFEngine already runs on Termux in
+  production, so this is mostly transcribing reality and typing it, not a
+  bring-up. Expect the honest first-run numbers here — most Android domains
+  land as `not-yet-migrated` (§4.1), and that count is the backlog. Coherent
+  stop: two platforms describe themselves in one vocabulary, which is the
+  precondition the next step needs.
+- **Step 3 — `nix2cf` compiler stages (gate: Steps 1–2 complete).** The
+  merge → conflict-check → inference → render pipeline of §4.5.1, in v1.
+  **Sequencing is a decision, not a preference:** types first, inference
+  second, and inference does not start until real type definitions exist on
+  **two** platforms — satisfied by macOS + Android. Inference rules invented
+  ahead of the types they range over encode guesses; two adapters is the
+  minimum that exposes which `provides`/`requires` relations are general and
+  which were one-platform-shaped. _macOS + Android is a deliberately
+  wide-apart pair — launchd and Termux share almost no assumptions — so
+  rules that survive both are unlikely to be parochial. The residual risk
+  runs the other way: rules co-designed on two non-FHS-typical platforms may
+  need revisiting when Linux lands at Step 4. Treat Step 4 as the
+  generality test for inference, and expect to revise rules there rather
+  than being surprised by it._ Order within the step: (0) the
+  `buildfile`-style render-what-device-X-receives CLI (§4.4) — first,
+  because it is the self-check loop and the compiler's own regression test,
+  so everything after it is cheaper to verify; (1) conflict check as a
+  distinct compiler stage over already-merged declarations — never fused
+  into the type definitions, so the Nix priority algebra can be adopted
+  later as a policy change rather than a schema redesign; (2) extra-entry
+  reporting, which needs no inference and starts paying immediately; (3) the
+  AutoEdges-style inference stage with mandatory edge attribution. Coherent
+  stop: the Site Model compiles, conflicts fail the build with resolvable
+  messages, and skew is visible — with or without inference finished.
+- **Step 4 — Linux reference path (platform adapter #3, the adoptability
+  keystone).** mise `bootstrap` (toolchains only) + `nix2cf`-rendered
+  CFEngine promises bring up a real Linux host from the Site Model. This is
+  where the portability claim gets proven, and where inference rules meet a
+  filesystem layout that neither earlier adapter has. Do it before you own a
+  VPS, by rendering + dry-running against a throwaway box or container-like
+  target. **Open at this step: which distro.** R5's hard half — no
+  bare-metal Nix, the reference must resemble what a stranger already runs
+  — is untouched and binding. Which mainstream distro satisfies it is
+  revisitable (operator, 2026-08-13: "Ubuntu, or maybe a different
+  distro"); §5.1 still reads Ubuntu Server as the default and nothing before
+  this step depends on the answer. Coherent stop: the reference deployment
+  provably works on a stock distro install.
+- **Step 5 — First real Linux host.** Provision a VPS (Hetzner); give it
+  backup/shadow roles (observability mirror, backup) — **not** obs-main yet.
+  Proves R2 (flip a role's main to it and back) and gives the role mesh a
+  second real node. Coherent stop: a genuine second host; destroy it and the
+  Mac/fleet are unchanged.
+- **Step 6 — Signed releases (push-only) + typed executor.** TUF-subset root
+  ceremony; manifest + ChangePlan generation in `ops-release-*` (the
+  ChangePlan now carries the ordering provenance of §7.3, since Step 3's
+  inference is what makes attribution necessary); the capability-enforcing
+  executor on CFEngine (§7.3, §8). Push-only, operator hosts. Coherent stop:
+  every deploy is a signed, execution-constrained plan; no autonomous
+  anything yet.
+- **Step 7 — Mac substrate (the interesting, optional Nix step).** If §14.1
   resolves toward nix-darwin: bring the Mac substrate under nix-darwin +
-  home-manager, services still CFEngine. Fully reversible (`darwin-rebuild
---rollback`). Coherent stop: Mac substrate is declarative; nothing depends
-  on it that couldn't run on the mise path.
-- **Step 5 — Pull convergence.** Converge agent with the full §7.2 client
+  home-manager, services still CFEngine from Step 1. Fully reversible
+  (`darwin-rebuild --rollback`). This is the step the pre-mortem's
+  "exit-before-Mac-Nix" caution was always actually about, and it stays late
+  for exactly that reason. Coherent stop: Mac substrate is declarative;
+  nothing depends on it that couldn't run on the mise path.
+- **Step 8 — Pull convergence.** Converge agent with the full §7.2 client
   protocol + §8 quotas. Any host with the role self-updates. Coherent stop:
   the no-control-node end state exists as data.
-- **Step 6 — Consent/sovereignty v1 (agent 2.0).** The consent surface on one
+- **Step 9 — Consent/sovereignty v1 (agent 2.0).** The consent surface on one
   fleet device, then the advisor and personal-branch loop (§9), each behind
   its §8 gate. This is the payoff — the freedom feature — built on everything
   below it.
-- **Step 7+ — demand-driven.** builder/cache (when a non-substitutable
+- **Step 10+ — demand-driven.** builder/cache (when a non-substitutable
   artifact appears), reproducible-APK provenance (before any consented device
   runs privileged APKs), WoT/transparency-log, freeops extraction (when a
   second person runs it).
@@ -1544,9 +1651,25 @@ Everywhere else, a cheap model executing this document is fine. These are the
 exceptions — places where a wrong guess is expensive to unwind, flagged per
 the operator's request. Spend the premium budget here, nowhere else.
 
+**How this squares with R13, since they can look opposed:** R13 says AI
+authorship is the primary model and the design must optimize for it; this
+section says four things need premium models. Both hold, because they act
+on different variables. R13 governs **how the system is designed** — local
+knowledge over global, machine-checkable over conventional — so that a
+cheap model authoring against it succeeds by construction. §14 governs
+**where the design itself is still undetermined**, and a cheap model's
+failure there is not an authorship error a schema could catch; it is an
+unmade decision being improvised. R13 is what makes the "everywhere else"
+in the sentence above large; §14 is the residue R13 cannot shrink. The two
+compound rather than compete: every §14 item resolved *well* makes more of
+the system safely cheap to author.
+
 - **§14.1 — nix-darwin on the Mac, yes or no.** The fun/coherence fork (§5.2).
-  Multi-AI, low security stakes; a Nix-idiom specialist pass would help. Not
-  urgent — resolvable at Step 4.
+  Multi-AI, low security stakes; a Nix-idiom specialist pass would help.
+  **Not urgent, and specifically *not* a prerequisite for macOS going first
+  in the build order** — it gates the Mac *substrate* (§12 Step 7), not the
+  macOS services adapter (Step 1), which needs none of it. Resolvable any
+  time before Step 7.
 - **§14.2 — the typed ChangePlan operation IR + executor enforcement (§7.3).**
   The highest-value and highest-risk artifact in the whole project. A cheap
   model must not improvise a capability vocabulary or an enforcement boundary.
@@ -1586,12 +1709,14 @@ unresolved, it should write a question doc and stop, not improvise.
 | D13 (new) | Ansible removal / service owner | **Ansible is fully removed — from service ownership AND host-baseline/bootstrap.** CFEngine (promises) + mise (toolchains only) replace it everywhere, all platforms, superseding D1 (§5.3, §5.1). The original Ansible-over-CFEngine blockers (no Android binaries, SSH/push incompatibility, needing dedicated policy-server infra, GPLv3) were an earlier analyst's unvalidated assumptions, corrected 2026-08-13 — not real constraints. Purely on theoretical fit (Promise Theory/Couch's algebra vs. no comparable formal grounding for Ansible), CFEngine was always the better answer; D1 reflected an unchecked practicality objection, not a considered rejection. |
 | D14 (new) | CFEngine deployment shape | **Git-distributed policy, `cf-serverd` on every client, no dedicated central policy host, no push/SSH requirement** (§4.4, §7.4). Push (via `cf-runagent`/`just cf-run`) and pull (each host's own convergence schedule) are both first-class, same mechanism. |
 | D15 (new) | Nix→CFEngine compile target | **CFEngine's native Augments layer (`def.json`/`host_specific.json`), not raw `.cf` synthesis** (§4.4). Merging happens once, in Nix, before render — CFEngine's `mergedata()` is not used for this, to avoid a second, divergent merge engine. Still unprototyped as of 2026-08-13; the augments-load-under-standalone-`cf-agent -f` precondition (`research-answers-and-corrections-2026-08-13.md`) is **assumed satisfied by operator decision 2026-08-13** — verifying it stays on the task list as validation, not as a gate. |
-| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected; semantic verdict accepted as a working assumption by operator decision 2026-08-13** — a real from-scratch provision remains the validation step (and the right forcing function for the bootstrap/interlock designs) but is no longer a gate on proceeding. The surviving **multi-writer composition** half is fully decided (§4.5.1, operator 2026-08-13; schema consequences in §4.1, build-order consequences in §12 Step 0 and Step 1.5): **(a)** same-resource conflict is a compile-time error carrying enough detail for a human to resolve it, with the Nix priority algebra explicitly reserved as a later policy change rather than a schema redesign; **(c)** the bundle is the collective re-verify unit and interlocks are a first-class Site Model field compiling to a CFEngine guard class with bundle-scoped refusal (Bcfg2 Actions' semantics — closes `stayturgid#289` structurally); **(d)** per-domain comprehensiveness is **default-on with explicit, reasoned opt-out** (revised from opt-in on R13 grounds), making out-of-band and cross-writer skew visible as extra entries; opt-out reasons split `not-yet-migrated` (backlog, countable, the build order's progress metric) from `deliberately-unmanaged` (permanent, rare). **(b)** `nix2cf` builds an AutoEdges-style dependency-inference stage, in v1, sequenced after the first two platform adapters; fixpoint stays the substrate and explicit `depends_on` stays authoritative, with mandatory edge attribution (authored vs inferred) and authored-wins on collision. Decided on **R13** grounds: explicit ordering is a global-knowledge mechanism and inference is a local-knowledge one, which inverts the cost analysis under AI authorship — `stayturgid#288` is the confirming instance of hand-authored global ordering failing. **D16's composition half is now fully decided.** |
+| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected; semantic verdict accepted as a working assumption by operator decision 2026-08-13** — a real from-scratch provision remains the validation step (and the right forcing function for the bootstrap/interlock designs) but is no longer a gate on proceeding. The surviving **multi-writer composition** half is fully decided (§4.5.1, operator 2026-08-13; schema consequences in §4.1, build-order consequences in §12 Step 0 and Step 3): **(a)** same-resource conflict is a compile-time error carrying enough detail for a human to resolve it, with the Nix priority algebra explicitly reserved as a later policy change rather than a schema redesign; **(c)** the bundle is the collective re-verify unit and interlocks are a first-class Site Model field compiling to a CFEngine guard class with bundle-scoped refusal (Bcfg2 Actions' semantics — closes `stayturgid#289` structurally); **(d)** per-domain comprehensiveness is **default-on with explicit, reasoned opt-out** (revised from opt-in on R13 grounds), making out-of-band and cross-writer skew visible as extra entries; opt-out reasons split `not-yet-migrated` (backlog, countable, the build order's progress metric) from `deliberately-unmanaged` (permanent, rare). **(b)** `nix2cf` builds an AutoEdges-style dependency-inference stage, in v1, sequenced after the first two platform adapters (macOS then Android, per the 2026-08-13 platform sequence — §12 Steps 1–2); fixpoint stays the substrate and explicit `depends_on` stays authoritative, with mandatory edge attribution (authored vs inferred) and authored-wins on collision. Decided on **R13** grounds: explicit ordering is a global-knowledge mechanism and inference is a local-knowledge one, which inverts the cost analysis under AI authorship — `stayturgid#288` is the confirming instance of hand-authored global ordering failing. **D16's composition half is now fully decided.** |
 | D17 (new) | ncf/Rudder reuse            | **Vendor and adapt individual generic-method bundle bodies as a reference corpus, strip Rudder's reporting scaffolding** (§4.6). Not a dependency — `ncf` is archived, folded into the Rudder monorepo, no independent release to track. Zero coverage for macOS/Android; that work was always fleetopia-original. **Rationale corrected 2026-08-13:** the licence is *not* what limits Rudder use — GPLv3 restricts deriving from Rudder's code, not running it or authoring techniques for it, and Rudder grants a plugin-licence exception; the platform matrix and ncf's archived status are the real limits (§4.6, `rudder-as-umbrella-evaluation-2026-08-13.md` §4). |
 | D18 (new) | Local-first reporting        | **Per-device SQLite (owned by `stayturgid-agent`) is the authoritative record, not the central observability stack** (§4.7). **Re-decided 2026-08-13 on new grounds** — the original rationales are off the record (Postgres objection void per operator; local-first debuggability withdrawn as a hard requirement). Surviving grounds: the local capture must exist anyway on CFEngine Community, so local-as-record is the null option while central-as-record is a second system with no remaining consumer (Choria telemetry spine dropped, no site-pika compliance UI); only the local copy is guaranteed complete across this fleet's real unreachability windows; single-writer-per-node symmetry with D20; SQLite's weight class fits Termux. Sync to Vector/OpenObserve/Grafana stays optional and best-effort. |
 | D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `fleetopia`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap **answered 2026-08-13: parallel, keep both** — `ops-release.json` is a suite-coherence marker across co-equal repos, which `flake.lock` (a DAG of inputs under one root) structurally cannot express; the release check gains one line (§6.1, `research-answers-and-corrections-2026-08-13.md` §3). Nix store locality (D20, §4.8) applies to every flake `packages` build. |
 | D20 (new) | Nix store locality             | **Never point `NIX_STORE_DIR` or the store's `db.sqlite` at shared/network storage written by more than one host** (§4.8). Single-writer-per-host is Nix's own default and its documented failure mode under multi-host writes (NixOS/nix#378). Same principle as D18's local-first SQLite, applied to Nix's own store. Previously recorded only as an aside inside D19; promoted to its own row 2026-08-13. |
 | D21 (new) | Site Model schema/instance boundary | **Schemas belong to `nix2cf` as its public contract; instances live in the fleet/site repos** (§4.2, §6.1). The module-system type definitions and the JSON Schema they validate against are the compiler layer's interface — versioned and released with `nix2cf`; concrete site data (including site-pika's) is supplied through that interface from each site repo. Decided 2026-08-13 (recorded 2026-08-13; `nix2cf` remains the working name until naming is finalized). |
+
+| D22 (new) | Platform build sequence      | **macOS first, Android second, Linux third** (§12; notes in §5.1/§5.2/§5.4). Operator decision 2026-08-13. **Reverses the pre-mortem's "prove the Ubuntu path before investing in Mac Nix"** as applied to the macOS *adapter* — that caution was reasoning about the nix-darwin *substrate*, which remains late (Step 7) and remains gated on §14.1. The two had been conflated; §5.3 (services are CFEngine-owned on every platform) and §5.2 (nix-darwin owns substrate only) are what make them separable, so Step 1 needs no premium-token decision resolved. Accepted consequences: the adoptability keystone is proven third rather than first, and the first machine converged is the one that cannot easily be reimaged — mitigated by dry-run-first posture and the `launchd-writers.yml` lint, not by reordering. **Also softens R5's distro half:** "no bare-metal Nix, must resemble what a stranger runs" binds; *which* mainstream distro is open until Step 4 (operator: "Ubuntu, or maybe a different distro"). |
 
 Silence = proceed from Step 0. Objections amend this register, not the
 archived documents.
@@ -1614,8 +1739,12 @@ archived documents.
   source for D9/D10 and the CFEngine/Tailscale-ACL hardening notes.
 - `premortem-scope-realism-openai-v1.md` — read with the correction in mind:
   its effort estimates assume a commercial objective function that does not
-  apply; its _logical_ points (exit-before-Mac-Nix, coherent stops, two-
-  writers, no-consent-UI-before-executor) are kept and live in §8/§12.
+  apply; its _logical_ points (coherent stops, two-writers,
+  no-consent-UI-before-executor) are kept and live in §8/§12.
+  **Its exit-before-Mac-Nix point was narrowed 2026-08-13:** it holds for
+  the nix-darwin *substrate* (§12 Step 7, still late) but was being applied
+  to the macOS *adapter*, which is a different thing and now goes first
+  (Step 1). The distinction is §5.2's build-order note.
 - `orchestration-research-2026-08-13.md` — the non-VM orchestration research
   leg: Rudder's Core-vs-plugin RBAC split (resolved), Bolt/Choria against the
   operator's two hard constraints, Bcfg2's fixpoint-loop answer to ordering,
