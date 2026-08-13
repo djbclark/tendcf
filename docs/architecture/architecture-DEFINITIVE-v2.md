@@ -1203,6 +1203,12 @@ archived documents.
   its effort estimates assume a commercial objective function that does not
   apply; its _logical_ points (exit-before-Mac-Nix, coherent stops, two-
   writers, no-consent-UI-before-executor) are kept and live in §8/§12.
+- `orchestration-research-2026-08-13.md` — the non-VM orchestration research
+  leg: Rudder's Core-vs-plugin RBAC split (resolved), Bolt/Choria against the
+  operator's two hard constraints, Bcfg2's fixpoint-loop answer to ordering,
+  `mgmt`'s AutoEdges as a shipped dependency-inference precedent, and the
+  image-based-update gap. Evidence for the pending D16 conversation; amends
+  no decision.
 - `ideas-dump-claude.md` — unprotected; the two-agent-consent control, the
   semantic/verifiable plan split, the role-mesh-is-consensus flag, and the
   model/vendor notes all graduated into this document.
