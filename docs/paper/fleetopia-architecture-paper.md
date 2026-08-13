@@ -559,6 +559,60 @@ first place. Both approaches assume the same premise — a machine author's
 failure mode is disproportionately about consistency with information it
 cannot see, not syntax it cannot produce.
 
+### 3.2 Nine concrete instances, and what checking them found
+
+Grounding the rule in prior work (§3.1) answers whether the idea is
+defensible. It does not show whether it pays for itself in a real design.
+Extending the same search past this paper's own claims, into the
+architecture document `fleetopia` is built from, surfaced nine concrete
+applications of §3's rule — worth reporting because checking each against
+its primary source, rather than trusting a first-pass summary of it,
+corrected two of the nine before they were adopted. Seven held up as
+originally framed:
+
+1. A registry check ("is this port free") should be one targeted lookup,
+   not a whole file read — closely analogous work on planning-language
+   generation found retrieving the relevant fragment improves generation
+   directly, not merely cost [15].
+2. Worked examples belong beside their schema, and the pairing should be
+   enforced rather than customary — the same source finds examples
+   consistently outperform prose description [15].
+3. A convention a document states about itself should be a check, not
+   prose — applying §3's own second clause reflexively to the document that
+   states it, closing the one place it wasn't yet applied to itself.
+4. Guardrail investment should match the measured error distribution, not
+   intuition — the taxonomy already cited in §3.1 [13] shows structural/
+   syntax errors are the smallest real category (1.5%) and factual
+   incorrectness the largest (65%); stating that plainly, once measured,
+   is different from assuming it.
+5. A generated summary that never authorizes an action can still mislead
+   the human reading it — the same shape of problem citation-grounding
+   research addresses generally: requiring a generated claim to cite the
+   specific fact it summarizes measurably reduces unsupported claims
+   relative to free generation.
+6. Grammar-constrained decoding [14] (§3.1) is now efficient enough for
+   production use, which is worth re-checking against any guardrail that
+   was designed as lint-only because no such constraint existed when it was
+   written.
+7. The positional effect [11] measures (§3.1) generalizes past prompting to
+   any long document a machine or a bounded-context human reads in full —
+   this paper follows the convention itself.
+
+Two did not survive checking against source, and are kept in the design
+record as corrected rather than quietly dropped: a claimed JSON-over-YAML
+generation-reliability advantage traced back to a study that in fact shows
+no consistent format winner across models [16], and a claimed performance
+benefit from a standard machine-readable repository instruction file
+traced back to a dedicated study whose actual finding is closer to the
+opposite — such files did not generally improve task success and increased
+inference cost [17]. Recording a checked negative result, rather than
+silently removing the claim, is the same instinct behind §5.4's own
+negative result about dependency inference: a checked "no" is worth more
+than an unchecked assumption either way. Seven of nine claims held; two did
+not, and the correction is the more useful data point of the two, not an
+embarrassment to smooth over — a design that makes its own claims
+checkable is what caught it.
+
 ---
 
 ## 4. Two decisions the rule inverted
@@ -1060,6 +1114,17 @@ Configuration Knowledge Injection.* arXiv:2512.14792, December 2025.
 
 [14] K. Park, T. Zhou, and L. D'Antoni. *Flexible and Efficient
 Grammar-Constrained Decoding.* arXiv:2502.05111, 2025.
+
+[15] R. Wang and L. Zhang. *Documentation Retrieval Improves Planning
+Language Generation.* arXiv:2509.19931, 2025.
+
+[16] Z. R. Tam, C.-K. Wu, Y.-L. Tsai, C.-Y. Lin, H. Lee, and Y.-N. Chen.
+*Let Me Speak Freely? A Study on the Impact of Format Restrictions on
+Performance of Large Language Models.* arXiv:2408.02442, 2024.
+
+[17] T. Gloaguen, N. Mündler, M. Müller, V. Raychev, and M. Vechev.
+*Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for
+Coding Agents?* ETH Zürich, arXiv:2602.11988, 2026.
 
 [9] M. Kleppmann, A. Wiggins, P. van Hardenberg, and M. McGranaghan.
 *Local-first software: you own your data, in spite of the cloud.* Onward!
