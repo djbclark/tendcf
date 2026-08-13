@@ -196,7 +196,8 @@ they refuse it — sit on top of the trust layer without becoming part of it.
 ## 3. The design rule
 
 The requirement is that most configuration here is machine-authored. The
-rule we derive from it is:
+rule we derive from it — a rule we are adopting and testing, not one we
+consider settled — is:
 
 > **Prefer designs that require only local knowledge over designs that
 > require global knowledge.** A design whose correctness follows from
@@ -250,12 +251,16 @@ the rest of the system. So the compiler additionally *derives* edges;
 fixpoint remains the substrate and explicit `depends_on` remains available
 and authoritative.
 
-We have one piece of confirming evidence and it is not hypothetical. The
-site's existing Android deploy chain hand-orders app installation *after*
-privilege hardening, so an app added to the install list goes unhardened for
-a full deploy cycle. The list contradicts its own stated install-before-harden
-rule, humans wrote it, and humans did not catch it. That is what accreted
-global-knowledge ordering looks like.
+We have one piece of evidence, and it is not hypothetical, though it is worth
+being precise about what it evidences. The site's existing Android deploy
+chain hand-orders app installation *after* privilege hardening, so an app
+added to the install list goes unhardened for a full deploy cycle. The list
+contradicts its own stated install-before-harden rule, humans wrote it, and
+humans did not catch it. That evidences the broader, weaker claim that
+global-knowledge ordering is error-prone for *any* author, machine or human —
+not, on its own, that it is specifically worse for machine authors. The
+narrower, AI-specific claim rests on §3's argument alone, not on this
+instance.
 
 Three constraints on the build follow from the second rule rather than from
 taste. Types first, inference second, and inference does not start until real
@@ -355,7 +360,11 @@ Three ways we can see it being wrong, offered rather than rebutted:
    problem wearing local clothing. Our mitigation is a closed enumeration of
    token kinds, so a typo is a schema error rather than a silently
    unmatched edge — but the *token values* remain a namespace two authors
-   must agree on.
+   must agree on. That leaves a discovery question we do not answer: absent
+   the global context we are trying not to require, how does an agent find
+   the *right* token to name, as opposed to merely naming one validly? A
+   closed enumeration of token kinds catches a typo; it does not tell an
+   author which token names the resource they actually need.
 3. **Spurious edges may be worse than we have priced in.** We claim
    provenance makes them a query. That claim is untested, and the failure
    mode is silent by construction: a spurious edge does not fail anything,
@@ -595,17 +604,28 @@ one hides drift inside itself just as effectively as opting out would.
 central copy today, but "no consumer yet" is precisely the reasoning LISA '05
 warns against, and we are taking one of its findings while declining another.
 
-**8.6 Does spurious-edge provenance actually work?** We claim attribution
+**8.6 Can an agent ever get a fleet-wide answer, given §2.4/§5.3's
+local-first record?** §3's rule pushes correctness toward information local
+to one file; §2.4 and §5.3 push the record of what happened toward one
+SQLite database per device with no fleet-wide view. Those pull in the same
+direction until someone needs to ask a question that is global by nature —
+"did the security rollout land everywhere?" is not answerable from any one
+device's local record, and the architecture as described has no place to ask
+it. §8.5 discusses local-first from the angle of having no consumer for a
+central copy; that is a different problem from having no way to construct
+one when a genuinely global question arrives.
+
+**8.7 Does spurious-edge provenance actually work?** We claim attribution
 turns "why is this waiting?" into a query. Nobody has run it. If it does not
 work, inference has a silent failure mode and §5.1's argument gets much
 worse.
 
-**8.7 Does the ChangePlan's capability vocabulary survive contact with real
+**8.8 Does the ChangePlan's capability vocabulary survive contact with real
 operations?** A closed vocabulary that the executor enforces is only as good
 as its coverage; the pressure will be to add an escape-hatch capability, and
 the moment one exists the mechanism is decorative.
 
-**8.8 Is the whole premise the wrong shape?** The design optimizes for
+**8.9 Is the whole premise the wrong shape?** The design optimizes for
 machine authors on the assumption that they are the primary authors and that
 their weakness is bounded context. If the real weakness turns out to be
 something else — plausible-looking output that type systems do not catch,
@@ -632,15 +652,15 @@ nothing is deployed, than after a fleet is running on it.
 
 ## Acknowledgements
 
-*(To be written. At minimum: Narayan Desai, for review; and the Bcfg2
-authors, whose four papers are the source of §6 in its entirety.)*
+Thanks to Narayan Desai for reviewing this paper as the hole-finder it was
+written for. Thanks to Desai and his co-authors on the four Bcfg2 papers this
+work draws from — Andrew Lusk, Rick Bradshaw, Rémy Evard, Scott Matott,
+Sandra Bittner, Susan Coghlan, Cory Lueninghoener, Ti Leggett, John-Paul
+Navarro, Gene Rackow, Craig Stacey, Tisha Stacey, and Joey Hagedorn — whose
+work is the source of §6 in its entirety and much of the design vocabulary
+used throughout.
 
 ## References
-
-> **Bibliography needs a verification pass before this leaves the building.**
-> Titles, authors, venues, and years below were written from working notes and
-> memory, not from the PDFs' own reference pages; several should be checked
-> against the originals.
 
 [1] N. Desai, A. Lusk, R. Bradshaw, and R. Evard. *BCFG: A Configuration
 Management Tool for Heterogeneous Environments.* IEEE International
@@ -651,20 +671,21 @@ C. Lueninghoener, T. Leggett, J.-P. Navarro, G. Rackow, C. Stacey, and
 T. Stacey. *A Case Study in Configuration Management Tool Deployment.*
 19th Large Installation System Administration Conference (LISA '05), 2005.
 
-[3] N. Desai et al. *Directing Change Using Bcfg2.* 20th Large Installation
-System Administration Conference (LISA '06), 2006.
+[3] N. Desai, R. Bradshaw, J. Hagedorn, and C. Lueninghoener. *Directing
+Change Using Bcfg2.* 20th Large Installation System Administration
+Conference (LISA '06), 2006.
 
-[4] N. Desai et al. *Configuration Management with Bcfg2.* SAGE Short Topics
-in System Administration #19, USENIX Association, 2008.
+[4] N. Desai and C. Lueninghoener. *Configuration Management with Bcfg2.*
+Short Topics in System Administration #19, USENIX Association, 2008.
 
 [5] M. Burgess. *Cfengine: a site configuration engine.* USENIX Computing
 Systems, 8(3), 1995.
 
-[6] M. Burgess. *Promise Theory: Principles and Applications.* (With
-J. Bergstra.) 2014.
+[6] M. Burgess and J. A. Bergstra. *Promise Theory: Principles and
+Applications.* 2014.
 
-[7] A. Couch, J. Hart, E. Greenlee, and D. Kallas. *On the Algebraic
-Structure of Convergence.* DSOM 2003.
+[7] A. Couch and Y. Sun. *On the Algebraic Structure of Convergence.*
+DSOM 2003.
 
 [8] W. Fu, R. Perera, P. Anderson, and J. Cheney. *µPuppet: A Declarative
 Subset of the Puppet Configuration Language.* ECOOP 2017.
@@ -679,7 +700,9 @@ Compromise in Software Update Systems.* ACM CCS 2010. (The Update Framework.)
 [11] E. Dolstra. *The Purely Functional Software Deployment Model.* PhD
 thesis, Utrecht University, 2006.
 
-[12] Survey of LLM-generated Infrastructure-as-Code, arXiv:2404.00227, 2024.
+[12] K. G. Srivatsa, S. Mukhopadhyay, G. Katrapati, and M. Shrivastava.
+*A Survey of using Large Language Models for Generating Infrastructure as
+Code.* arXiv:2404.00227, 2024.
 Background for §3: the field is weighted toward *generation* with correctness
 verification left thin — evaluated largely by textual similarity to a
 reference rather than by semantic or idempotence correctness. This is the
