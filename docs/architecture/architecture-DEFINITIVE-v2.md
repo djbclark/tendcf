@@ -1209,6 +1209,13 @@ archived documents.
   `mgmt`'s AutoEdges as a shipped dependency-inference precedent, and the
   image-based-update gap. Evidence for the pending D16 conversation; amends
   no decision.
+- `rudder-as-umbrella-evaluation-2026-08-13.md` — evaluates adopting Rudder
+  wholesale and extending it for Termux/Android. Verdict: no (no macOS or
+  Android agent at any tier; ARM packages absent from the Core repository,
+  checked directly). Contains a **correction to D17's stated rationale** —
+  GPLv3 blocks depending on Rudder's *code*, not running it or writing
+  techniques for it, and Rudder grants a plugin exception. Amends no
+  decision; fix the D17 text when it is next touched.
 - `ideas-dump-claude.md` — unprotected; the two-agent-consent control, the
   semantic/verifiable plan split, the role-mesh-is-consensus flag, and the
   model/vendor notes all graduated into this document.
