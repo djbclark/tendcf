@@ -479,6 +479,71 @@ how D16 lands. If that trial surfaces genuine interleaving dependencies,
 that becomes the entire scope of the Puppet path: small and targeted, not
 a parallel general-purpose system built on spec.
 
+#### 4.5.1 The multi-writer composition half of D16 (operator decisions, 2026-08-13)
+
+The site-pika requirement change withdrew D16's governance half, leaving a
+purely technical composition question. The Bcfg2 papers
+(`bcfg2-papers-2026-08-13.md` §6) decomposed that into four sub-decisions.
+Three are decided; one remains open.
+
+**(a) Same-resource conflict rule — DECIDED: compile-time error, with an
+actionable message; leave room for a priority algebra.** When two writers
+declare the same resource, `nix2cf` fails the build rather than resolving.
+This follows Bcfg2's precedent (one plugin may provide content for a given
+entry; on ambiguity the server *refuses to bind* and reports, rather than
+picking a winner — booklet §5.1) and rejects silent last-wins outright,
+because last-wins makes multi-writer skew invisible, which is the exact
+failure (d) exists to catch.
+
+The error is not merely a rejection: **resolution requires human input, so
+the message must contain what a human needs to resolve it** — the resource
+identity, every writer that declared it with source location, the
+conflicting values, and a statement of what a resolution would look like.
+An error that says only "conflict" pushes the work back onto whoever runs
+the build; that is the opposite of the decision-transparency LISA '05
+identifies as the thing that buys administrator trust (§5 of the papers
+doc).
+
+**Explicitly reserved:** the Nix module system already ships a priority
+algebra (`mkDefault` / `mkForce` / `mkOverride`) with defined merge
+semantics, and D12 already adopted that module system as the authoring
+frontend. Type definitions must therefore be written so that adopting the
+priority algebra later is a change of policy at the merge step, **not** a
+schema redesign — the conflict check is a distinct compiler stage over
+already-merged declarations, not logic fused into the type definitions.
+
+**(c) Collective re-verify unit and interlocks — DECIDED: adopt Bcfg2's
+model.** The bundle is both the grouping and the re-verification scope:
+entries in a bundle are validated collectively, all member entries are
+reverified when any one is modified, and services in a bundle are
+restarted when any member changes (booklet §2.2.1). Interlocks become a
+**first-class Site Model field** compiling to a CFEngine guard class plus a
+bundle-scoped refusal, following Bcfg2 Actions' semantics: a failing
+pre-action prevents modification of every entry in the enclosing bundle,
+and the failure is reported centrally (booklet §A.2.1). This is what closes
+`stayturgid#289` structurally — "Tailscale must be authenticated before
+lockdown may be enforced" becomes a stated precondition with a defined
+blast radius, rather than surviving as a safe default plus a comment.
+
+**(d) Per-domain comprehensiveness — DECIDED: yes, opt-in per domain.** A
+domain may declare its Site Model description complete, after which
+anything present on the device and absent from the description is reported
+as an **extra entry** (Bcfg2's two-way verification, CLUSTER '03 §2.2).
+This is the property that makes multi-writer skew detectable at all;
+CFEngine's default posture — promises only about what is mentioned — cannot
+detect it by construction. Adopt domain by domain rather than fleet-wide,
+starting where several people plausibly write: the device app list, SSH
+configuration, and the `serverapp_*` launchd services. The
+managed/unmanaged entry ratio per device falls out for free and is the
+build order's progress metric.
+
+**(b) Ordering mechanism — OPEN.** Whether `nix2cf` gains an
+AutoEdges-style dependency-inference stage in v1 or later. Not a blocker
+for Step 0: (a) and (d) are schema properties and must land first; (b) is
+a compiler stage that can be added over an unchanged schema, provided type
+definitions carry a slot for the two-sided provides/requires declaration
+from the start.
+
 ### 4.6 ncf/Rudder: reuse the code, not the project (D17, new)
 
 Rudder — originally built directly on CFEngine as one of two execution
@@ -1225,7 +1290,7 @@ unresolved, it should write a question doc and stop, not improvise.
 | D13 (new) | Ansible removal / service owner | **Ansible is fully removed — from service ownership AND host-baseline/bootstrap.** CFEngine (promises) + mise (toolchains only) replace it everywhere, all platforms, superseding D1 (§5.3, §5.1). The original Ansible-over-CFEngine blockers (no Android binaries, SSH/push incompatibility, needing dedicated policy-server infra, GPLv3) were an earlier analyst's unvalidated assumptions, corrected 2026-08-13 — not real constraints. Purely on theoretical fit (Promise Theory/Couch's algebra vs. no comparable formal grounding for Ansible), CFEngine was always the better answer; D1 reflected an unchecked practicality objection, not a considered rejection. |
 | D14 (new) | CFEngine deployment shape | **Git-distributed policy, `cf-serverd` on every client, no dedicated central policy host, no push/SSH requirement** (§4.4, §7.4). Push (via `cf-runagent`/`just cf-run`) and pull (each host's own convergence schedule) are both first-class, same mechanism. |
 | D15 (new) | Nix→CFEngine compile target | **CFEngine's native Augments layer (`def.json`/`host_specific.json`), not raw `.cf` synthesis** (§4.4). Merging happens once, in Nix, before render — CFEngine's `mergedata()` is not used for this, to avoid a second, divergent merge engine. Still unprototyped as of 2026-08-13; the augments-load-under-standalone-`cf-agent -f` precondition (`research-answers-and-corrections-2026-08-13.md`) is **assumed satisfied by operator decision 2026-08-13** — verifying it stays on the task list as validation, not as a gate. |
-| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected; semantic verdict accepted as a working assumption by operator decision 2026-08-13** — a real from-scratch provision remains the validation step (and the right forcing function for the bootstrap/interlock designs) but is no longer a gate on proceeding. The surviving open half of D16 is the **multi-writer composition question** (how independently-authored config composes without explicit ordering — §4.5, `site-pika-requirement-change-2026-08-13.md` §3); governance/authorization dropped out with site-pika's requirement change. |
+| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected; semantic verdict accepted as a working assumption by operator decision 2026-08-13** — a real from-scratch provision remains the validation step (and the right forcing function for the bootstrap/interlock designs) but is no longer a gate on proceeding. The surviving **multi-writer composition** half is three-quarters decided (§4.5.1, operator 2026-08-13): **(a)** same-resource conflict is a compile-time error carrying enough detail for a human to resolve it, with the Nix priority algebra explicitly reserved as a later policy change rather than a schema redesign; **(c)** the bundle is the collective re-verify unit and interlocks are a first-class Site Model field compiling to a CFEngine guard class with bundle-scoped refusal (Bcfg2 Actions' semantics — closes `stayturgid#289` structurally); **(d)** per-domain comprehensiveness is adopted opt-in, making out-of-band and cross-writer skew visible as extra entries. **Open: (b)** whether an AutoEdges-style inference stage is v1 or later — a compiler stage, not a schema property, so it does not block Step 0. |
 | D17 (new) | ncf/Rudder reuse            | **Vendor and adapt individual generic-method bundle bodies as a reference corpus, strip Rudder's reporting scaffolding** (§4.6). Not a dependency — `ncf` is archived, folded into the Rudder monorepo, no independent release to track. Zero coverage for macOS/Android; that work was always fleetopia-original. **Rationale corrected 2026-08-13:** the licence is *not* what limits Rudder use — GPLv3 restricts deriving from Rudder's code, not running it or authoring techniques for it, and Rudder grants a plugin-licence exception; the platform matrix and ncf's archived status are the real limits (§4.6, `rudder-as-umbrella-evaluation-2026-08-13.md` §4). |
 | D18 (new) | Local-first reporting        | **Per-device SQLite (owned by `stayturgid-agent`) is the authoritative record, not the central observability stack** (§4.7). **Re-decided 2026-08-13 on new grounds** — the original rationales are off the record (Postgres objection void per operator; local-first debuggability withdrawn as a hard requirement). Surviving grounds: the local capture must exist anyway on CFEngine Community, so local-as-record is the null option while central-as-record is a second system with no remaining consumer (Choria telemetry spine dropped, no site-pika compliance UI); only the local copy is guaranteed complete across this fleet's real unreachability windows; single-writer-per-node symmetry with D20; SQLite's weight class fits Termux. Sync to Vector/OpenObserve/Grafana stays optional and best-effort. |
 | D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `fleetopia`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap **answered 2026-08-13: parallel, keep both** — `ops-release.json` is a suite-coherence marker across co-equal repos, which `flake.lock` (a DAG of inputs under one root) structurally cannot express; the release check gains one line (§6.1, `research-answers-and-corrections-2026-08-13.md` §3). Nix store locality (D20, §4.8) applies to every flake `packages` build. |
