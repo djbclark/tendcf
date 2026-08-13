@@ -1290,6 +1290,18 @@ archived documents.
   (`flake.lock` and `ops-release.json` are parallel, keep both); `mgmt`
   AutoEdges mechanism documented; **D15 is unprototyped and has a new
   precondition** — verify augments load under standalone `cf-agent -f`.
+- `bcfg2-papers-2026-08-13.md` — all four Bcfg2 papers (CLUSTER '03,
+  LISA '05, LISA '06, SAGE booklet #19) read and mapped onto this design.
+  Extends the one-line Bcfg2 entry in `orchestration-research`. Headline:
+  **two-way verification / per-domain comprehensiveness** is the property
+  that makes multi-writer skew detectable at all, and it is a Site Model
+  schema decision — so it belongs in the D16 conversation and before
+  Step 0. Also: revision-stamped client reports (maps onto `ops-v*` tags
+  for D18's SQLite), Bcfg2 Actions' bundle-blocking pre-actions as the
+  interlock precedent for `stayturgid#289`, `bcfg2-info buildfile` as a
+  nix2cf CLI affordance, and LISA '05's finding that trust — bought with
+  dry-run plus reporting — is the adoption gate. **§6 decomposes D16 into
+  four operator decisions.** Amends no decision.
 - `ideas-dump-claude.md` — unprotected; the two-agent-consent control, the
   semantic/verifiable plan split, the role-mesh-is-consensus flag, and the
   model/vendor notes all graduated into this document.
