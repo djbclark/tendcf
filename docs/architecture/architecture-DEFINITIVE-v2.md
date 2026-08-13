@@ -1216,6 +1216,14 @@ archived documents.
   GPLv3 blocks depending on Rudder's *code*, not running it or writing
   techniques for it, and Rudder grants a plugin exception. Amends no
   decision; fix the D17 text when it is next touched.
+- `bolt-choria-as-umbrella-2026-08-13.md` — the same question asked of Bolt
+  and Choria, plus the operator's withdrawal of local-first debuggability as
+  a hard requirement. Bolt: no (inherits the puppet-agent matrix and the
+  25-node packaging EULA via `bolt apply`, push-only). **Choria: the only
+  candidate that reaches every platform in the fleet** — `darwin/arm64` and
+  `linux/arm64` are first-class FOSS build targets — but it fills D14's
+  transport slot, not D13's convergence slot. Gated on an unrun Termux test.
+  Notes that **D18 now has no surviving stated rationale**.
 - `ideas-dump-claude.md` — unprotected; the two-agent-consent control, the
   semantic/verifiable plan split, the role-mesh-is-consensus flag, and the
   model/vendor notes all graduated into this document.
