@@ -323,7 +323,7 @@ rebuild` as a side effect of authoring the model, and never touch
 `/nix/store` for anything beyond the evaluator's own transient scratch
 space.
 
-### 4.4 Compile target: CFEngine promises via Augments (D13/D14, new)
+### 4.4 Compile target: CFEngine promises via Augments (D13/D14/D15, new)
 
 **Ansible is fully removed (D13).** CFEngine — already present in the
 architecture as the self-heal/verification layer (R11, §5.4) — is now the
@@ -389,7 +389,7 @@ merely because it came from a typed schema — rendering from Nix makes
 authorship deterministic, it does not make the underlying operation
 idempotent.
 
-### 4.5 Narrow, deferred: Puppet-catalog-JSON for genuinely ordered operations (D15, new)
+### 4.5 Narrow, deferred: Puppet-catalog-JSON for genuinely ordered operations (D16, new)
 
 Not every operation reduces to an order-independent promise. Puppet's
 catalog compiler (formal semantics: µPuppet, ECOOP 2017) solves a
@@ -409,24 +409,71 @@ ordering primitives (`notify`/`handlers`) anywhere in either repo. The
 **one confirmed, explicitly documented hard ordering constraint** in the
 whole surface is a bootstrap precondition in `site.yml`: "ensure
 intentionally precedes verify — a factory-reset device has no APKs to
-verify until the normal deploy installs the immutable locks." The
-**one candidate for more** is the Android `fleet/fleet.yml` play's
-six-role chain (`termux_userland → shizuku_config → tailscale_vpn →
-play_store → app_privileges → ensure_apps`), which is implicit
-(bare list order, no declared dependencies, no comments justifying most
-transitions) and **has not been audited** — given every other role in the
-codebase turned out to be order-independent once actually checked, it is
-a live possibility most of this chain decomposes into promises too.
+verify until the normal deploy installs the immutable locks." **The Android chain audit (2026-08-13) came back negative.** The
+`fleet/fleet.yml` six-role chain (`termux_userland → shizuku_config →
+tailscale_vpn → play_store → app_privileges → ensure_apps`) was the one
+candidate for a real dependency graph. All six declare zero role
+dependencies, and every prerequisite that looks intra-chain is in fact
+satisfied by an earlier **playbook** in `site.yml`'s pipeline, not by an
+earlier role: `rish` extraction and the `localhost:5555` appops grant
+need the Shizuku APK and a running Shizuku daemon (stages 1 and 3,
+`ensure-bootstrap-apks` / `ensure-shizuku`); `tailscale_vpn` and
+`app_privileges` both carry comments naming a prerequisite that resolves
+to `bootstrap_apks` at stage 1. Five of the six are control-node
+`delegate_to: localhost` adb operations that share no execution context
+with each other at all.
 
-**Decision: do not build the Puppet-catalog compiler yet.** Hand-author
-the one confirmed bootstrap edge directly as a CFEngine
-`bundlesequence`/`depends_on` gate (small, doesn't need a second
-compiler). Audit the Android chain before deciding whether Puppet-catalog-
-JSON is needed at all — if the audit finds real hard constraints, that
-becomes the entire scope of the Puppet path: small and targeted, not a
-parallel general-purpose system built on spec.
+The chain also **contradicts its own only real rule**: `play_store` →
+`app_privileges` correctly installs before hardening, but `ensure_apps`
+installs *after* `app_privileges` runs, so an app added there goes
+unhardened for a full deploy cycle (filed as `stayturgid#288`). A list
+that encoded genuine dependencies would not disagree with itself; this is
+accreted order, not designed order.
 
-### 4.6 ncf/Rudder: reuse the code, not the project (D16, new)
+**Methodological caveat, load-bearing.** Reading the current playbooks
+answers "what works on already-provisioned devices," not "what a cold
+device requires" — convergent automation leaves no trace of any constraint
+that fails on run 1 and succeeds on run 2, and **no device in this fleet
+has ever been provisioned from factory reset by the automation.** Re-derived
+semantically from what the operations *do*, the real constraints sort into
+three kinds, and only one of them is even shaped like a dependency graph:
+
+- **Transport bootstrap — strictly sequential, unreorderable.** ADB
+  reachable → APKs installed → Termux foregrounded once (it unpacks
+  `$PREFIX` on first launch; `pkg`/`run-as` are unusable until then, and
+  this is handled today only as a best-effort *heal*, filed as
+  `stayturgid#290`) → `sshd` + keys delivered over ADB → Shizuku started
+  and port 5555 open. Six nodes, one path.
+- **Per-app chains — short, independent, non-interleaving.** `install →
+  configure → privileges → verify`, one per app, no cross-talk.
+- **Interlocks — not dependencies at all.** `always_on_vpn_lockdown` set
+  on a device whose Tailscale is unauthenticated severs every management
+  path to it; nothing in that codebase authenticates Tailscale, and only a
+  safe default (`lockdown: false`) prevents it today (filed as
+  `stayturgid#289`). This is a safety guard, not an edge in a resource
+  graph, and a catalog cannot express it.
+
+**Decision: do not build the Puppet-catalog compiler.** A strict six-node
+path is a `bundlesequence`, hand-authored — dependency resolution over it
+is machinery without a job. Independent per-app chains are expressible
+with CFEngine classes/`depends_on` directly; catalog compilation earns its
+keep only when chains interleave into a genuine DAG, and these do not.
+Interlocks need guarded promises, which is CFEngine's model rather than
+Puppet's. Puppet's real value — automatic resolution plus autorequire over
+a large heterogeneous graph — has no corresponding problem here.
+
+**Status: rejected on semantic analysis, pending confirmation by a real
+from-scratch provision.** Not closed outright: the negative verdict rests
+on reasoning about a cold path that has never been executed, and the
+three gaps found above were found by reasoning rather than by running it,
+so the list is very unlikely to be complete. Provisioning one device from
+factory reset is what settles this — and it is the correct forcing
+function for the transport-bootstrap and interlock designs regardless of
+how D16 lands. If that trial surfaces genuine interleaving dependencies,
+that becomes the entire scope of the Puppet path: small and targeted, not
+a parallel general-purpose system built on spec.
+
+### 4.6 ncf/Rudder: reuse the code, not the project (D17, new)
 
 Rudder — originally built directly on CFEngine as one of two execution
 backends (the other: PowerShell/DSC for Windows) — is real, substantial,
@@ -459,7 +506,7 @@ and Windows only — no macOS/launchd story, no Android/Termux story. The
 `serverapp_*` launchd-plist-and-brew pattern was always fleetopia-original
 work regardless of this decision.
 
-### 4.7 Local-first reporting: per-device SQLite is the record of truth (D17, new)
+### 4.7 Local-first reporting: per-device SQLite is the record of truth (D18, new)
 
 The centralized-shipping design (ship every promise outcome to the
 existing Vector/OpenObserve/VictoriaMetrics/Grafana stack, treat that as
@@ -504,7 +551,7 @@ Syncing a subset of local SQLite to the existing Vector/OpenObserve/
 Grafana stack is an optional, best-effort push **from** the device when
 reachable, never the record of truth.
 
-### 4.8 Nix store locality (D18, new)
+### 4.8 Nix store locality (D20, new)
 
 Wherever a real Nix store is used (the Termux artifact builder, §6; the
 Mac if nix-darwin is adopted, §5.2) — **never point `NIX_STORE_DIR` or
@@ -513,7 +560,7 @@ written by more than one host.** This is not a hypothetical risk: it is
 Nix's own documented failure mode (NixOS/nix#378 and related issues) —
 the store metadata DB is fine as a local, single-writer-per-host file
 (its normal, default behavior) and corrupts under concurrent multi-host
-writes. This is the same single-writer-per-node principle behind D17's
+writes. This is the same single-writer-per-node principle behind D18's
 local SQLite design, applied to Nix's own store rather than reinvented —
 keep every store strictly local to the host that owns it.
 
@@ -1127,10 +1174,11 @@ unresolved, it should write a question doc and stop, not improvise.
 | D13 (new) | Ansible removal / service owner | **Ansible is fully removed — from service ownership AND host-baseline/bootstrap.** CFEngine (promises) + mise (toolchains only) replace it everywhere, all platforms, superseding D1 (§5.3, §5.1). The original Ansible-over-CFEngine blockers (no Android binaries, SSH/push incompatibility, needing dedicated policy-server infra, GPLv3) were an earlier analyst's unvalidated assumptions, corrected 2026-08-13 — not real constraints. Purely on theoretical fit (Promise Theory/Couch's algebra vs. no comparable formal grounding for Ansible), CFEngine was always the better answer; D1 reflected an unchecked practicality objection, not a considered rejection. |
 | D14 (new) | CFEngine deployment shape | **Git-distributed policy, `cf-serverd` on every client, no dedicated central policy host, no push/SSH requirement** (§4.4, §7.4). Push (via `cf-runagent`/`just cf-run`) and pull (each host's own convergence schedule) are both first-class, same mechanism. |
 | D15 (new) | Nix→CFEngine compile target | **CFEngine's native Augments layer (`def.json`/`host_specific.json`), not raw `.cf` synthesis** (§4.4). Merging happens once, in Nix, before render — CFEngine's `mergedata()` is not used for this, to avoid a second, divergent merge engine. |
-| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON stays narrow and deferred** (§4.5) — not built until the `fleet/fleet.yml` Android chain is actually audited. The one confirmed hard dependency (ensure-precedes-verify APK bootstrap) is hand-authored directly as a CFEngine `bundlesequence`/`depends_on` gate, no second compiler needed for it alone. |
+| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected pending confirmation by a real from-scratch provision** — the verdict reasons about a cold path that has never been executed, so it is not closed outright. |
 | D17 (new) | ncf/Rudder reuse            | **Vendor and adapt individual generic-method bundle bodies as a reference corpus, strip Rudder's reporting scaffolding** (§4.6). Not a dependency — `ncf` is archived, folded into the Rudder monorepo, no independent release to track. Zero coverage for macOS/Android; that work was always fleetopia-original. |
 | D18 (new) | Local-first reporting        | **Per-device SQLite (owned by `stayturgid-agent`) is the authoritative record, not the central observability stack** (§4.7). Populated from CFEngine's local promise-outcome log; ncf's outcome-state vocabulary retained; sync to Vector/OpenObserve/Grafana is optional and best-effort, never required for local debugging. Rudder's own Postgres-backed compliance DB is explicitly not adopted (no SQLite path exists; its hub-and-spoke topology is the wrong shape here). |
-| D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `fleetopia`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap is an **open question**, not yet resolved — needs a decision before Step 0 work touches release tooling. Nix store locality (§4.8, single-writer-per-host, never shared/network storage) applies to every flake `packages` build. |
+| D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `fleetopia`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap is an **open question**, not yet resolved — needs a decision before Step 0 work touches release tooling. Nix store locality (D20, §4.8) applies to every flake `packages` build. |
+| D20 (new) | Nix store locality             | **Never point `NIX_STORE_DIR` or the store's `db.sqlite` at shared/network storage written by more than one host** (§4.8). Single-writer-per-host is Nix's own default and its documented failure mode under multi-host writes (NixOS/nix#378). Same principle as D18's local-first SQLite, applied to Nix's own store. Previously recorded only as an aside inside D19; promoted to its own row 2026-08-13. |
 
 Silence = proceed from Step 0. Objections amend this register, not the
 archived documents.
@@ -1159,9 +1207,9 @@ archived documents.
   semantic/verifiable plan split, the role-mesh-is-consensus flag, and the
   model/vendor notes all graduated into this document.
 
-### 16.1 Prior-art bibliography (D13–D19 research, 2026-08-13 session)
+### 16.1 Prior-art bibliography (D13–D20 research, 2026-08-13 session)
 
-Not archived as separate documents — captured here so the D13–D19 decisions
+Not archived as separate documents — captured here so the D13–D20 decisions
 aren't re-derived from scratch by a future reader. Full citations and the
 research trail live in the session transcript; key names, for follow-up:
 
