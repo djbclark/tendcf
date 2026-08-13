@@ -4,6 +4,17 @@
 > header: this is *not* an edit to that file. It is the "new review doc"
 > route that header specifies. Nothing here is adopted until the operator
 > says so — see `djbclark/fleetopia#1`.
+>
+> **Correction, 2026-08-13 (same day, before adoption):** items 1, 3, and 4
+> originally cited specific numbers that did not survive checking against
+> the primary source directly (rather than search-summary paraphrase). Item
+> 1's "100% vs 91.7%, 14% drop" and item 3's "0.66–0.82 to 0.22–0.39" are
+> **withdrawn** — not supported by the papers they were attributed to. Item
+> 4's claimed benefit is **reversed** — the actual dedicated study found no
+> general benefit and a cost increase. Item 2's "2.7x" figure is retained
+> but downgraded from academic-weight to its real source (an industry blog
+> post). All four are corrected in place below; nothing citing these numbers
+> should be copied elsewhere until reading the corrected version.
 
 ## Why this doc exists
 
@@ -32,12 +43,15 @@ grounding than what motivated them originally.
 
 - **Canonical example co-located with schema.** `nix2cf/examples/*.yml`
   sits directly next to `nix2cf/schema/*.schema.json`, one fixture per
-  schema. A study on documentation retrieval for code generation found
-  removing worked examples from documentation drops generation accuracy
-  from 0.66–0.82 to 0.22–0.39 — the single largest effect size found in this
-  entire search. `nix2cf`'s pairing already does the thing the literature
-  says matters most. (Only follow-on below: make the pairing itself
-  machine-checked, item 3.)
+  schema. Wang & Zhang (arXiv:2509.19931) found, for planning-language
+  generation, that "examples consistently outperform descriptions," and
+  that documentation bundling both dramatically outperforms either alone
+  (for one model tested, correctness went from 0% with only descriptions or
+  only examples to near-100% with the full documentation). That is weaker
+  than the specific ablation number this doc originally claimed
+  (corrected above) but still supports the same conclusion: `nix2cf`'s
+  example/schema pairing is doing real work, not just tidiness. (Only
+  follow-on below: make the pairing itself machine-checked, item 3.)
 - **§7.5's IaC-generation caution** (arXiv 2404.00227: generation is
   well-studied, correctness verification is thin) is corroborated and
   sharpened by a more recent error taxonomy — see item 6 below for the
@@ -49,7 +63,7 @@ grounding than what motivated them originally.
 
 ## New items
 
-### 1. JSON over YAML for the Site Model's actual current authoring path
+### 1. A canonicalizing check for the Site Model's actual current authoring path (not a JSON-over-YAML claim)
 
 §4.3 states the Site Model's "canonical, at-rest representation" is JSON,
 with Nix-module authoring as the preferred frontend and "plain YAML/JSON...
@@ -59,33 +73,44 @@ the only path**: `nix2cf/examples/services.yml`, `roles.yml`, and
 doesn't exist yet (that's Step 3+). Any agent drafting a Site Model instance
 right now is writing YAML by hand.
 
-A controlled study on structured-output formats (arXiv 2408.02442) found
-JSON reaches 100% parse validity against YAML's 91.7%, and YAML shows
-roughly a 14% drop in generation accuracy despite using ~30% fewer tokens.
-The YAML failures cluster exactly where CFEngine/Ansible-adjacent config
-tends to bite: incorrect alias/anchor use, inconsistent indentation, and
-unescaped colons inside long strings — not coincidentally, close cousins of
-the "Structural Deficit" category in item 6's taxonomy.
+**Correction:** this item originally claimed a controlled study
+(arXiv:2408.02442) found JSON reliably beats YAML for LLM generation
+(100% vs. 91.7% parse validity, ~14% accuracy gap). Checked directly
+against the paper: that is not what it shows. Format performance there
+varies by model and task with no consistent winner — in one case (Claude-3-
+Haiku on GSM8K) YAML actually had *fewer* parsing errors than JSON. The
+LLM-specific reliability claim is **withdrawn**.
 
-**Proposal:** either (a) make JSON the primary fallback-authoring format
-ahead of Nix (YAML demoted to "also accepted, canonicalized on write"), or
-(b) if YAML stays primary for human ergonomics, add a cheap canonicalizing
-pre-commit step — parse, re-serialize, diff against the original — that
-catches anchor/indentation/colon-ambiguity drift before `schema_lint.py`
-ever sees it. Either is small; (b) is smaller and doesn't touch the
-authoring experience.
+What still stands, independent of any LLM-specific study: YAML's own spec
+has well-documented structural footguns regardless of who or what is
+authoring it — implicit type coercion (unquoted `no`/`yes`/`on`/`off`
+parsing as booleans, the "Norway problem"), indentation sensitivity, and
+alias/anchor ambiguity. These are exactly the shape of the (verified, item
+6) "Structural Deficit" category — small in aggregate (1.5%) but real, and
+JSON has strictly less syntax available to get wrong.
+
+**Proposal, softened:** don't switch the authoring format on the strength
+of an LLM-specific study — the evidence doesn't support that. Do add a
+cheap canonicalizing pre-commit step (parse, re-serialize, diff against the
+original) for the YAML fallback path, justified on the format's own known
+ambiguity classes rather than a comparative LLM-reliability claim. Smaller
+ask than the original proposal, still worth doing.
 
 ### 2. Registry lookups as a tool call, not a file to read
 
 R13's local-knowledge rule shrinks what an agent must read, but a registry
 check ("is port 8080 free," "does this role exist") still means opening
-`ports.yml`/`roles.yml` in full today. Two independent findings point the
-same direction: a comparison of context-stuffing against retrieval-as-a-tool
-found context stuffing costs ~2.7x the tokens, ~2x the latency, and ~2.7x
-the cost for the same answer quality; and a paper on documentation
-retrieval for planning-language generation found retrieving just the
-relevant fragment (vs. dumping the whole spec) improved generation
-directly, not just cost.
+`ports.yml`/`roles.yml` in full today. Two things point the same direction,
+at different evidence weights: a widely-cited industry benchmark (not a
+peer-reviewed source — flagging that plainly, unlike this doc's original
+framing) reports context stuffing costing roughly 2.7x the tokens and cost
+of retrieval-as-a-tool for equivalent answer quality; and Wang & Zhang
+(arXiv:2509.19931, academic, the same paper reused in item 3) found
+retrieving just the relevant documentation fragment — not the whole spec —
+improved planning-language generation directly, not merely cost. The
+academic result supports the *direction* (targeted retrieval beats dumping
+the whole file); the specific 2.7x multiplier is an industry figure, cited
+as such.
 
 **Proposal:** a `nix2cf registry check <domain> <field> <value>` CLI (or
 equivalent) that answers a single lookup without the agent reading the
@@ -108,24 +133,39 @@ matching `examples/*.yml` (or vice versa) — turning a good habit into a
 checked invariant, at near-zero cost since the lint tooling and the pairing
 both already exist.
 
-### 4. `AGENTS.md` at repo root, once there's code to point at
+### 4. `AGENTS.md`: adoption-convention value only — the performance claim is reversed
 
-`AGENTS.md` was formalized as an open cross-tool spec in 2025 (OpenAI,
-Google, Cursor, Factory) and donated to the Linux Foundation's Agentic AI
-Foundation in December 2025; by early 2026 it's read natively by Claude
-Code, Codex CLI, Cursor, Aider, Devin, Copilot, Gemini CLI, Windsurf, and
-Amazon Q, with a 2026 study across 138 repos finding developer-written
-`AGENTS.md` files raise agent task success ~4% and cut agent-introduced
-bugs 35–55%. `architecture-DEFINITIVE-v2.md` §0 already *is* this content —
-"read this first," six numbered orientation points, explicit protection
-notice — but it lives at a path no tool discovers automatically; an agent
-has to already know to look for it.
+**Correction:** this item originally claimed a 2026 138-repo study found
+`AGENTS.md` files raise task success ~4% and cut bugs 35–55%. That is
+**wrong, and the actual finding is close to the opposite.** The dedicated
+study (Gloaguen et al., ETH Zürich, "Evaluating AGENTS.md: Are
+Repository-Level Context Files Helpful for Coding Agents?," arXiv:2602.11988,
+Feb 2026) found context files — **both** LLM-generated and
+developer-written — "do not generally improve task success rates," and
+increase inference cost by over 20% on average. LLM-generated files
+specifically *reduced* success versus no context file at all. The one
+positive note: "instructions... are well followed," but "repository
+overviews... are not helpful" even though every LLM-generated file in the
+study included one.
 
-**Proposal:** once Step 0 lands real code (not yet — both `fleetopia` and
-`nix2cf` are docs/schema-only today), add a thin root `AGENTS.md` per repo
-that points to §0 as the authoritative orientation rather than duplicating
-it — a pointer, so it can't drift out of sync with the source of truth the
-way a second copy would. Low priority; there's nothing to orient into yet.
+`AGENTS.md` is still real as a cross-tool *discovery* convention — it was
+formalized as an open spec in 2025 (OpenAI, Google, Cursor, Factory) and
+donated to the Linux Foundation's Agentic AI Foundation in December 2025,
+and is read natively by Claude Code, Codex CLI, Cursor, Aider, Devin,
+Copilot, Gemini CLI, Windsurf, and Amazon Q. That's a real, verifiable fact
+about tooling interop. It is not, on current evidence, a performance
+intervention.
+
+**Proposal, reversed:** do not adopt this on a performance rationale — there
+isn't one. If a root `AGENTS.md` is added at all, the only defensible
+reason is discoverability (a stranger's tool finds it without being told
+where to look), and the study's actual finding argues for the opposite of
+what was originally proposed: **keep it minimal and hand-curated, not
+LLM-generated** (the study's LLM-generated files were the ones that hurt),
+skip generic repository-overview content entirely (found unhelpful even
+though universally included), and don't budget effort against R12
+expecting a performance return, because the best current evidence says
+there isn't one.
 
 ### 5. Turn the DEFINITIVE doc's own protection notice into a machine check
 
@@ -275,24 +315,35 @@ GPLv3/plugin-exception situation D17 already worked through).
 
 ## Sources (additional to the paper's §3.1 references)
 
-- Tang, X. et al. *Let Me Speak Freely? A Study on the Impact of Format
-  Restrictions on Performance of Large Language Models.* arXiv:2408.02442,
-  2024. (JSON vs. YAML parse validity and generation accuracy.)
-- *Documentation Retrieval Improves Planning Language Generation.*
-  arXiv:2509.19931, 2025. (Worked-example removal drops accuracy from
-  0.66–0.82 to 0.22–0.39; retrieval-as-tool beats context-stuffing for
-  planning-language generation specifically.)
-- *RAG vs. Context Stuffing* (industry writeup summarizing multiple 2025/26
-  benchmarks) and related agentic-RAG-vs-context-window comparisons:
-  ~2.7x token/cost and ~2x latency overhead for context stuffing at equal
-  answer quality.
-- AGENTS.md specification and adoption data — Linux Foundation Agentic AI
-  Foundation donation (Dec 2025); 2026 138-repo study on task-success and
-  bug-rate effects.
+- Tam, Z. R., Wu, C.-K., Tsai, Y.-L., Lin, C.-Y., Lee, H., Chen, Y.-N. *Let
+  Me Speak Freely? A Study on the Impact of Format Restrictions on
+  Performance of Large Language Models.* arXiv:2408.02442, 2024. **Item 1
+  correction:** checked directly — this paper does *not* show a consistent
+  JSON-over-YAML advantage; format performance varies by model/task with no
+  overall winner. Cited here only for that corrective finding, not for the
+  withdrawn 100%/91.7%/14% claim.
+- Wang, R., Zhang, L. *Documentation Retrieval Improves Planning Language
+  Generation.* arXiv:2509.19931, 2025. (Confirmed: "examples consistently
+  outperform descriptions"; full documentation dramatically outperforms
+  either alone. Does *not* support the withdrawn 0.66–0.82 → 0.22–0.39
+  ablation number in item 3's original text — corrected.)
+- *RAG vs. Context Stuffing*, MarkTechPost, Feb 2026 — an industry
+  benchmark writeup, not a peer-reviewed source, reporting ~2.7x
+  token/cost and ~2x latency overhead for context stuffing. Cited as
+  industry-weight evidence only (item 2); the directional claim is also
+  independently supported by Wang & Zhang above.
+- Gloaguen, T., Mündler, N., Müller, M., Raychev, V., Vechev, M.
+  *Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for
+  Coding Agents?* ETH Zürich, arXiv:2602.11988, Feb 2026. **Item 4
+  correction:** the actual finding — context files (LLM-generated *and*
+  developer-written) do not generally improve task success and increase
+  inference cost 20%+. Replaces a withdrawn, incorrectly-positive claim.
 - Citation-grounding literature (e.g. arXiv:2606.00898 and related 2026
   work on citation-grounded generation) — forcing citation to source
   reduces unsupported claims relative to free generation from the same
-  facts.
+  facts. Cited for the general mechanism (item 7); the specific paper is
+  about legal citations, not configuration management — the generalization
+  is mine, not the paper's claim.
 - Park, K., Zhou, T., D'Antoni, L. *Flexible and Efficient
   Grammar-Constrained Decoding.* arXiv:2502.05111, 2025. (Already in the
   paper's §3.1 references as [14]; reused here for item 8's specific
