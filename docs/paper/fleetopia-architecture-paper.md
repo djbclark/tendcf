@@ -1,6 +1,7 @@
 # fleetopia: A Configuration Management Architecture for AI-Authored Configuration
 
 **Draft for review — not published, not submitted.**
+Daniel Joseph Barnhart Clark (djbclark@mit.edu).
 Prepared 2026-08-13 for Narayan Desai. Sections are numbered so comments can
 cite them.
 
@@ -9,9 +10,9 @@ cite them.
 ## Abstract
 
 We describe the architecture of `fleetopia`, a configuration management
-system for a small, heterogeneous personal fleet — Apple Silicon macOS,
-Linux on x86_64 and aarch64, and Android devices running Termux — built on
-an explicit premise: **most of this system's configuration will be written
+system for a heterogeneous, intermittently-connected fleet — Apple Silicon
+macOS, Linux on x86_64 and aarch64, and Android devices running Termux —
+built on an explicit premise: **most of this system's configuration will be written
 by AI agents rather than by hand.** We treat that premise as a first-order
 design constraint and derive a decision rule from it: prefer designs whose
 correctness follows from information *local* to the file being edited over
@@ -37,26 +38,66 @@ weakest.
 
 ## 1. Motivation
 
-The site is a personal fleet, not a data center: one Apple Silicon laptop
-that is also the operator's daily driver, Linux hosts on two architectures,
-and a set of Android devices managed through Termux, a forked Shizuku, and a
-local agent. Three people hold root on the shared portion of it. There is no
-deadline, no paying user, and no operational SLA. The project's stated goals
-are to extend software freedom to configuration glue — the generic layer is
-published, and a person should be able to clone it, supply their own facts,
-and run it — and to give the eventual users of managed devices the ability
-to *understand and refuse* a proposed change to their own computer.
+The site is heterogeneous rather than uniform — Apple Silicon macOS, Linux
+across at least two architectures, and Android devices reached through
+Termux, a forked Shizuku, and a local agent — and it is held by more than one
+trusted operator rather than administered by a single authority. The design's
+stated goals are to extend software freedom to configuration glue — the
+generic layer is publishable, and an adopter should be able to supply their
+own facts and run it unmodified — and to give the eventual users of managed
+devices the ability to *understand and refuse* a proposed change to their own
+computer.
 
 That framing produces the usual requirements (portability, no permanent
 control node, a signed update path) and one unusual one.
 
 **The unusual requirement is who writes the configuration.** Here the answer
 is: AI agents, as the primary authorship model, with human authorship as the
-exception. This is not a prediction about the industry; it is a description
-of how this specific site is already being operated. The consequence we care
-about is that the *cost structure of a configuration language changes* when
-its principal author is a machine with a bounded context window, and several
-decisions that are settled under human authorship become live again.
+exception. This is not a prediction about the industry; it is the operating
+assumption this design is built under. The consequence we care about is that
+the *cost structure of a configuration language changes* when its principal
+author is a machine with a bounded context window, and several decisions that
+are settled under human authorship become live again.
+
+### 1.1 Scope, and where it stops applying
+
+Every design choice below is scoped to a specific envelope: a fleet small
+enough that no single role is dedicated to operating it, heterogeneous enough
+that no OS-native tool covers it alone, and connected intermittently enough
+that waiting on a reachable central server is not an option. Three
+theoretical ceilings follow from that envelope, and each names the point at
+which a different architecture — not a variant of this one — is the better
+choice.
+
+- **Local-first reporting (§2.4, §5.3) stops paying for itself once a
+  fleet-wide query becomes routine rather than exceptional.** A SQLite record
+  per device is free — CFEngine's local promise-outcome log must be captured
+  regardless — for as long as "did host X converge" is the dominant question.
+  Once "did the rollout land everywhere" (§8.6) needs an answer with bounded
+  staleness often enough to matter, the honest fix is the central statistics
+  spine Bcfg2 already builds, not a federation layer retrofitted onto a
+  local-first design.
+- **Derived dependency edges (§4.1, §5.1) stop being the cheaper mechanism
+  once role interleaving is the common case rather than the exception.**
+  §5.4's audit found no genuine cross-role DAG in the roles examined;
+  inference earns its keep precisely where explicit edges would otherwise be
+  rare, which is where roles are largely independent. A site where most
+  roles genuinely depend on several others has an ordering problem that has
+  become Puppet's catalog-compilation problem, and a design built to resolve
+  one true DAG deterministically is then the better fit.
+- **The signed-release-as-artifact model (§2.5, §5.2) stops being adequate
+  once changes must land on a bounded clock across the whole fleet** — an
+  active-incident patch under a compliance deadline, for instance.
+  Ahead-of-time rendering optimizes for devices that are routinely
+  unreachable at authoring time; a fleet whose devices are reliably reachable
+  and whose changes carry real time pressure is better served by Bcfg2's
+  render-on-request model (§5.2) or a push-capable policy server, where the
+  server's live knowledge of what each client needs is exactly what this
+  design gives up.
+
+None of these is a claim that the design fails outside its envelope — each is
+a claim about where a *different* design starts winning on its own terms,
+which is the comparison §5 and §8 return to throughout.
 
 The rest of the paper: §2 describes the architecture in enough detail to
 argue about; §3 the design rule we derive; §4 the two decisions it inverted;
@@ -191,6 +232,259 @@ eventual user-sovereignty feature — a person's own AI explaining a proposed
 change in plain language, and maintaining their divergence from upstream if
 they refuse it — sit on top of the trust layer without becoming part of it.
 
+### 2.6 Two worked examples: input to output
+
+The rest of §2 describes the pipeline in the abstract. This section shows it
+on two concrete Site Model records, chosen because they are the two
+mechanisms §4 and §6 argue hardest for: an inferred dependency edge with
+mandatory attribution, and an interlock.
+
+**A note on provenance, because it matters for how to read these.** The
+*inputs* below are verbatim excerpts from `nix2cf`'s
+[`examples/services.yml`](https://github.com/djbclark/nix2cf/blob/master/examples/services.yml)
+— a real fixture, schema-validated by `bin/schema_lint.py` against
+`schema/services.schema.json`, though still a fixture and not live site data
+(§7). The *outputs* — the CFEngine augments and the rendered promise text —
+are hand-authored by us to show the target shape, as is the Nix rendering of
+the same input shown partway through Example A. `nix2cf`'s render stage and
+its Nix authoring frontend do not exist yet (§6.5, §7), so nothing below
+except the YAML was produced mechanically, and the exact augments keys and
+MPF wiring are illustrative, not a claim about a validated binding to a
+running CFEngine instance.
+
+**Example A — an edge nobody wrote.** `caddy` and `litellm-proxy` are two
+records in the same `edge-http` bundle. `litellm-proxy` states only what it
+needs; nothing in either record says "start after caddy."
+
+```yaml
+# examples/services.yml — excerpt from the real, schema-validated fixture;
+# description/hosts/role/managed_by trimmed for space, values unchanged
+  - name: caddy
+    domain: macos-launchd-services
+    bundle: edge-http
+    platform: macos
+    runs_as: djbclark
+    command: ["/opt/homebrew/bin/caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+    launchd:
+      label: com.djbclark.caddy
+      run_at_load: true
+      keep_alive: true
+    provides:
+      - service:caddy
+      - port:443
+      - port:80
+    requires:
+      - path:/etc/caddy/Caddyfile
+      - service:tailscaled
+
+  - name: litellm-proxy
+    domain: macos-launchd-services
+    bundle: edge-http
+    platform: macos
+    runs_as: djbclark
+    command: ["/opt/homebrew/bin/litellm", "--config", "/etc/litellm/config.yaml"]
+    env:
+      LITELLM_MASTER_KEY: LITELLM_MASTER_KEY
+      OPENAI_API_KEY: OPENAI_API_KEY
+    launchd:
+      label: com.djbclark.litellm
+    provides:
+      - service:litellm
+      - port:4000
+    requires:
+      - service:caddy
+      - secret:LITELLM_MASTER_KEY
+```
+
+§2.1 states that the Site Model may instead be authored through the Nix
+module system and rendered to the same JSON. That frontend does not exist
+yet either, so this is the same illustrative-output caveat as the augments
+and plist below — but it shows what `caddy`'s record above would look like
+as typed options rather than as YAML, `mkOption`/`types.*` and all:
+
+```nix
+# site/services/edge-http.nix — the same caddy record via the Nix authoring
+# frontend §2.1 describes; would render to the identical YAML/JSON above.
+# ILLUSTRATIVE — the frontend is unbuilt (§6.5), values match the fixture.
+{ lib, ... }:
+let
+  inherit (lib) mkOption types;
+in
+{
+  options.siteModel.services.caddy = {
+    description = mkOption {
+      type = types.str;
+      default = "Site reverse proxy and HTTPS terminator";
+    };
+    domain = mkOption { type = types.str; default = "macos-launchd-services"; };
+    bundle = mkOption { type = types.str; default = "edge-http"; };
+    platform = mkOption {
+      type = types.enum [ "macos" "android" "linux" "any" ];
+      default = "macos";
+    };
+    runsAs = mkOption { type = types.str; default = "djbclark"; };
+    command = mkOption {
+      type = types.listOf types.str;
+      default = [ "/opt/homebrew/bin/caddy" "run" "--config" "/etc/caddy/Caddyfile" ];
+    };
+    launchd = {
+      label = mkOption { type = types.str; default = "com.djbclark.caddy"; };
+      runAtLoad = mkOption { type = types.bool; default = true; };
+      keepAlive = mkOption { type = types.bool; default = true; };
+    };
+    # provides/requires are typed the same way regardless of frontend (D16(b)):
+    # local knowledge lives in the option, not in which language declared it.
+    provides = mkOption {
+      type = types.listOf types.str;
+      default = [ "service:caddy" "port:443" "port:80" ];
+    };
+    requires = mkOption {
+      type = types.listOf types.str;
+      default = [ "path:/etc/caddy/Caddyfile" "service:tailscaled" ];
+    };
+  };
+}
+```
+
+The module system buys `mkIf`/`mkDefault`/`mkMerge` for authors who want
+them; nothing about §4's rule changes with the frontend, because the merge
+still happens once, in the compiler, before render (§2.2) — the priority
+algebra is a policy choice at that stage, not a second type system to keep
+in sync with the schema.
+
+`litellm-proxy`'s `requires: [service:caddy, ...]` matches `caddy`'s
+`provides: [service:caddy, ...]`. The compiler derives an ordering edge from
+that match alone — no author declared it — and §4.1 requires the edge to
+carry its own provenance rather than appear as a bare ordering fact:
+
+```jsonc
+// host_specific.json (host: mac) — ILLUSTRATIVE, hand-authored, not compiler output
+{
+  "data": {
+    "nix2cf_services": {
+      "caddy": {
+        "service_policy": "start",
+        "launchd_label": "com.djbclark.caddy",
+        "command": ["/opt/homebrew/bin/caddy", "run", "--config", "/etc/caddy/Caddyfile"],
+        "run_as": "djbclark"
+      },
+      "litellm-proxy": {
+        "service_policy": "start",
+        "launchd_label": "com.djbclark.litellm",
+        "command": ["/opt/homebrew/bin/litellm", "--config", "/etc/litellm/config.yaml"],
+        "run_as": "djbclark",
+        "env": { "LITELLM_MASTER_KEY": "@{secrets.LITELLM_MASTER_KEY}" }
+      }
+    }
+  },
+  "nix2cf_edges": [
+    {
+      "from": "litellm-proxy",
+      "to": "caddy",
+      "on": "service:caddy",
+      "origin": "inferred",
+      "rule": "requires-matches-provides",
+      "source": { "file": "services.yml", "service": "litellm-proxy", "field": "requires[0]" }
+    }
+  ]
+}
+```
+
+The generic bundle behind `nix2cf_services` is what materializes the actual
+on-device artifact — for `caddy`, the launchd plist CFEngine keeps present
+and loaded:
+
+```xml
+<!-- /Library/LaunchDaemons/com.djbclark.caddy.plist — rendered, not authored -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.djbclark.caddy</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/caddy</string>
+        <string>run</string>
+        <string>--config</string>
+        <string>/etc/caddy/Caddyfile</string>
+    </array>
+    <key>UserName</key>
+    <string>djbclark</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+```
+
+`nix2cf_edges[0]` is what §4.1 means by mandatory attribution: `origin` says
+this edge was never authored, `rule` names the mechanism that produced it,
+and `source` points at the exact `requires` entry responsible. If this edge
+turns out to be spurious, the question it presents is "does `rule` correctly
+apply to this pair" — a lookup — rather than "where did this ordering
+constraint come from" — a search.
+
+**Example B — an interlock, from schema to guard.** The `fleet-vpn` bundle
+carries the precondition §6.1 takes from Bcfg2 Actions: lockdown may not be
+enforced before Tailscale authenticates.
+
+```yaml
+# examples/services.yml — verbatim excerpt
+bundles:
+  fleet-vpn:
+    description: "VPN transport and the lockdown policy that depends on it"
+    domain: macos-launchd-services
+    interlocks:
+      - id: tailscale-authenticated-before-lockdown
+        description: >-
+          Tailscale must be authenticated before always-on VPN lockdown may be
+          enforced. Setting lockdown on a device whose Tailscale is
+          unauthenticated severs every management path to it (stayturgid#289).
+        pre_action:
+          command: ["tailscale", "status", "--json"]
+          expect_exit: 0
+          timeout_seconds: 15
+        defines_class: tailscale_authenticated
+        blocks: enclosing-bundle
+        report: true
+```
+
+`blocks` and `report` are `const` in the schema (§2.1's common definitions) —
+an author cannot narrow the blast radius or silence the report, so there is
+no branch in the render stage where it could either. The illustrative
+rendering:
+
+```cfengine
+# ILLUSTRATIVE — hand-authored CFEngine promise sketch, not compiler output
+bundle agent fleet_vpn
+{
+  classes:
+      "tailscale_authenticated"
+        expression => returnszero("/usr/local/bin/tailscale status --json", useshell);
+
+  methods:
+      "guard"
+        usebundle => report_if_missing_class("tailscale_authenticated",
+                       "fleet-vpn: blocked, Tailscale not authenticated");
+
+  services:
+      # every promise in this bundle carries the same guard —
+      # blast radius is the whole bundle, not a per-promise choice,
+      # because the schema fixed "blocks": "enclosing-bundle" as a const.
+      "tailscaled"
+        service_policy => "start",
+        ifvarclass => "tailscale_authenticated";
+}
+```
+
+The guard is attached once, at the bundle, and inherited by every promise in
+it — mechanically, because the schema gave the render stage no field to read
+a narrower scope from. That is the sense in which §6.1's claim ("an author
+who could narrow either one could reintroduce the bug the mechanism exists
+to close") is enforced by omission rather than by convention.
+
 ---
 
 ## 3. The design rule
@@ -249,7 +543,8 @@ local-knowledge mechanism: each type states only what it supplies and what
 it needs, answerable from inside one file by an agent that has never seen
 the rest of the system. So the compiler additionally *derives* edges;
 fixpoint remains the substrate and explicit `depends_on` remains available
-and authoritative.
+and authoritative. §2.6, Example A works this through on a real fixture
+pair, attribution and all.
 
 We have one piece of evidence, and it is not hypothetical, though it is worth
 being precise about what it evidences. The site's existing Android deploy
@@ -399,12 +694,12 @@ authoritative and any central view is an optional, best-effort push.
 
 We are aware this is the decision most likely to be wrong. The grounds are in
 §2.4, and the honest summary is that we currently have *no consumer* for a
-central copy — the telemetry spine that would have consumed it was dropped
-and there is no compliance UI requirement — so central-as-record would be
-infrastructure without a customer. But "no consumer yet" is exactly the
-reasoning that LISA '05 argues against elsewhere, which is why §6.4 records
-the same paper telling us to build reporting *early*. We may be applying one
-of its findings and ignoring another.
+central copy: no compliance requirement obliges a queryable fleet-wide view,
+so central-as-record would be infrastructure without a customer at this
+design's scale (§1.1). But "no consumer yet" is exactly the reasoning that
+LISA '05 argues against elsewhere, which is why §6.4 records the same paper
+telling us to build reporting *early*. We may be applying one of its findings
+and ignoring another.
 
 ### 5.4 A negative result we have not earned
 
@@ -459,7 +754,8 @@ grouping unit and the re-verification scope, also following Bcfg2 [4, §2.2.1].
 Because the blast radius and the reporting are the whole point, the schema
 encodes them as required constants rather than author-settable fields — an
 author who could narrow either one could reintroduce the bug the mechanism
-exists to close.
+exists to close. §2.6, Example B renders this one end to end, from the
+schema instance to the guard.
 
 ### 6.2 `buildfile`, which turned out to earn its place three times
 
@@ -477,8 +773,8 @@ converge on it:
   output for a device nobody touched is precisely the bug class this catches,
   and it needs no fleet to run against.
 - It is **decision transparency**, which LISA '05 identifies as what actually
-  buys administrator trust — directly applicable to a site with three
-  root-holding admins.
+  buys administrator trust — directly applicable to any site where more than
+  one administrator can act unilaterally on shared infrastructure.
 
 ### 6.3 Revision stamping
 
@@ -508,9 +804,9 @@ subsequent development went into information presentation.
 Two practices follow and we adopt both. Their production servers ran in
 dry-run nightly and mailed the resulting state to the responsible
 administrator, auto-apply reserved for workstations; we make dry-run the
-standing posture for the first platform we bring under management, which
-happens to be the operator's own laptop — the one machine that cannot easily
-be reimaged. And "deploy reporting early, not last" reframes our local SQLite
+standing posture for the first platform class brought under management: the
+primary workstation, which is also the machine that cannot easily be
+reimaged. And "deploy reporting early, not last" reframes our local SQLite
 plus a trivial "what changed, what is dirty, what am I converged to" view as
 an **adoption requirement rather than an observability nicety** — which is
 the argument against sequencing it last because nothing consumes it yet.
@@ -559,7 +855,10 @@ the compiler, which we had not applied to the compiler's own tooling.
 adapters, the signed release path, the ChangePlan executor, the consent
 surface. **Nothing is deployed.** No device has been provisioned from factory
 reset by this automation. We have no deployment time, no effort figure, no
-managed/unmanaged ratio, and no failure data.
+managed/unmanaged ratio, and no failure data. The worked examples in §2.6
+are therefore hand-authored to show the target rendering, not compiler
+output — the render stage that would produce them mechanically is on the
+list above, unbuilt.
 
 That gap is not incidental to how this paper should be read. The Bcfg2 papers
 report deployment experience with numbers — four months, one person, roughly
@@ -591,9 +890,10 @@ bug?
 
 **8.3 Do `not-yet-migrated` counts actually get ground down, or accumulate?**
 The Bcfg2 deployment ground 2308 unmanaged entries down over months with a
-person whose job that was. Ours is a personal fleet with no such person. If
-the count only ever rises, the metric is decoration and default-on
-comprehensiveness is a permanent tax with no payoff.
+person whose job that was. A fleet within this design's envelope (§1.1) has
+no such role by construction. If the count only ever rises, the metric is
+decoration and default-on comprehensiveness is a permanent tax with no
+payoff.
 
 **8.4 Is per-domain the right granularity for comprehensiveness?** Bcfg2's is
 per-client and by convention. We chose per-domain to make partial adoption
@@ -642,7 +942,10 @@ constraint, and deriving from it a rule — prefer local knowledge to global —
 that inverted two decisions we had already settled. The rest is composition:
 a data spine, a pure compiler into CFEngine's own data layer, per-device
 local records, and a signed plan the executor may not exceed, with four of
-its load-bearing ideas taken from Bcfg2 and credited above.
+its load-bearing ideas taken from Bcfg2 and credited above. We do not claim
+that composition itself as novel, only as uncommon: compiling into an
+existing tool's native data layer, rather than shipping a new client, is not
+the path most configuration-management projects take.
 
 We think §4's rule is right and §5.1's departure is the honest cost of it.
 We would rather be told otherwise now, while the schemas are two days old and
@@ -652,8 +955,7 @@ nothing is deployed, than after a fleet is running on it.
 
 ## Acknowledgements
 
-Thanks to Narayan Desai for reviewing this paper as the hole-finder it was
-written for. Thanks to Desai and his co-authors on the four Bcfg2 papers this
+Thanks to Narayan Desai and his co-authors on the four Bcfg2 papers this
 work draws from — Andrew Lusk, Rick Bradshaw, Rémy Evard, Scott Matott,
 Sandra Bittner, Susan Coghlan, Cory Lueninghoener, Ti Leggett, John-Paul
 Navarro, Gene Rackow, Craig Stacey, Tisha Stacey, and Joey Hagedorn — whose
