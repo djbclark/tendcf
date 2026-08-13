@@ -1,6 +1,7 @@
 # AI pre-reviews of the architecture paper (2026-08-13)
 
-Three machine reviews of `../fleetopia-architecture-paper.md`, run before
+Three machine reviews of `../tendcf-architecture-paper.md` (reviewed under
+its prior name, `fleetopia-architecture-paper.md`), run before
 sending it to a human reviewer. Two prompts (operator-supplied, ICLR/
 OpenReviewer style and PaperAudit-Bench style) against two model families.
 

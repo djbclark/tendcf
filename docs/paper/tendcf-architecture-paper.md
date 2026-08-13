@@ -1,4 +1,4 @@
-# fleetopia: A Configuration Management Architecture for AI-Authored Configuration
+# tendcf: A Configuration Management Architecture for AI-Authored Configuration
 
 **Draft for review — not published, not submitted.**
 Daniel Joseph Barnhart Clark (djbclark@mit.edu).
@@ -9,7 +9,7 @@ cite them.
 
 ## Abstract
 
-We describe the architecture of `fleetopia`, a configuration management
+We describe the architecture of `tendcf`, a configuration management
 system for a heterogeneous, intermittently-connected fleet — Apple Silicon
 macOS, Linux on x86_64 and aarch64, and Android devices running Termux —
 built on an explicit premise: **most of this system's configuration will be written
@@ -164,8 +164,9 @@ definitions, so that adopting the Nix module system's priority algebra
 (`mkDefault`/`mkForce`/`mkOverride`) later is a policy change at one stage
 and not a schema redesign.
 
-Because the render is a pure function of the Site Model, "show me exactly
-what device X would receive, without touching device X" is nearly free. We
+Because the render is a pure function of the Site Model — the same purity
+Nix's own build model is named for [27] — "show me exactly what device X
+would receive, without touching device X" is nearly free. We
 plan to build that affordance *first*, before the pipeline is finished, and
 §6.2 explains why it earns its place three separate times over.
 
@@ -233,7 +234,7 @@ Each device owns a SQLite database, populated from CFEngine's local
 promise-outcome log, and *that* is the authoritative record of what
 converged. Any central or shared view is optional and eventually consistent.
 
-The grounds are narrower than the local-first literature's, and one of them
+The grounds are narrower than the local-first literature's [25], and one of them
 is an operational fact about this fleet rather than a principle. On CFEngine
 Community the local capture must be built regardless, so local-as-record is
 the null option and central-as-record is a second system to keep complete and
@@ -261,9 +262,9 @@ allowlist and **mechanically refuses any effect outside the declared set**.
 The distinction we are drawing is between "apply this bundle because its
 hash is signed" and "apply only these operations, on these resources,
 because the plan says so." The first authenticates the author; only the
-second constrains the effect. Signing itself is an unremarkable TUF subset
-sized for one operator, plus a durable per-client high-water mark so replay,
-freeze, and downgrade are closed.
+second constrains the effect. Signing itself is an unremarkable TUF [26]
+subset sized for one operator, plus a durable per-client high-water mark so
+replay, freeze, and downgrade are closed.
 
 Layered on the verifiable plan is a *semantic* layer — generated, cached,
 and written for a language model to read: "this bumps a TLS library across a
@@ -606,7 +607,7 @@ cannot see, not syntax it cannot produce.
 Grounding the rule in prior work (§3.1) answers whether the idea is
 defensible. It does not show whether it pays for itself in a real design.
 Extending the same search past this paper's own claims, into the
-architecture document `fleetopia` is built from, surfaced nine concrete
+architecture document `tendcf` is built from, surfaced nine concrete
 applications of §3's rule, each checked directly against its cited source
 rather than a summary of it.
 
@@ -703,7 +704,12 @@ small amount of raw, low-level configuration text by hand, for cases the
 higher-level schema does not yet cover — and that surface is already
 flagged elsewhere as the design's least-verified corner, precisely because
 there is no schema there to check the output against, unlike everywhere
-else machine authorship touches this system. A recent line of work makes
+else machine authorship touches this system — the same gap the broader
+LLM-for-IaC literature has at the field level, where verification is
+generally thin, evaluated by textual similarity to a reference rather than
+by semantic or idempotence correctness [28], which is exactly why we do
+not trust an agent to freehand policy text here on the grounds that it
+looks right. A recent line of work makes
 it practical to constrain what a model can generate, token by token, to a
 formal grammar, efficiently enough for production use rather than only as
 a research demonstration [14] (§3.1). That line of work did not exist in
@@ -1319,21 +1325,16 @@ hub-and-spoke deployment) and installation/bootstrap documentation
 [24] balena. *Offline Updates: Update balena Devices Without Internet.*
 https://blog.balena.io/offline-updates-make-it-easier-to-update-balena-devices-without-the-internet/
 
-[9] M. Kleppmann, A. Wiggins, P. van Hardenberg, and M. McGranaghan.
+[25] M. Kleppmann, A. Wiggins, P. van Hardenberg, and M. McGranaghan.
 *Local-first software: you own your data, in spite of the cloud.* Onward!
 2019.
 
-[10] J. Samuel, N. Mathewson, J. Cappos, and R. Dingledine. *Survivable Key
+[26] J. Samuel, N. Mathewson, J. Cappos, and R. Dingledine. *Survivable Key
 Compromise in Software Update Systems.* ACM CCS 2010. (The Update Framework.)
 
-[11] E. Dolstra. *The Purely Functional Software Deployment Model.* PhD
+[27] E. Dolstra. *The Purely Functional Software Deployment Model.* PhD
 thesis, Utrecht University, 2006.
 
-[12] K. G. Srivatsa, S. Mukhopadhyay, G. Katrapati, and M. Shrivastava.
+[28] K. G. Srivatsa, S. Mukhopadhyay, G. Katrapati, and M. Shrivastava.
 *A Survey of using Large Language Models for Generating Infrastructure as
 Code.* arXiv:2404.00227, 2024.
-Background for §3: the field is weighted toward *generation* with correctness
-verification left thin — evaluated largely by textual similarity to a
-reference rather than by semantic or idempotence correctness. This is the
-empirical basis for not trusting an agent to freehand policy text on the
-grounds that it looks right.
