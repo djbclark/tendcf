@@ -533,6 +533,36 @@ device pulling and applying its own signed policy locally is the same
 shape already planned for consent-driven Android deploys, just universal
 instead of Android-specific.
 
+**The no-control-node property traces to Promise Theory, not to this
+design; what departs from CFEngine's own norm is narrower (D33, new).**
+Autonomous agents that never receive push instructions from a controller
+are Promise Theory's founding premise (Burgess, checked directly against
+his own restatements) — the paragraph above already cites this as the
+reason CFEngine was chosen, and it should not be read as this design's own
+invention. What CFEngine's own documentation prescribes as its *standard*
+deployment, checked directly, is hub-and-spoke: one policy server, every
+client pulling from it (`docs.cfengine.com`, "Client server
+communication"). "Every host runs its own `cf-serverd`" is not that
+default; it is real and legitimate because CFEngine ships a documented
+self-bootstrap primitive — a host becomes its own policy hub
+(`am_policy_hub`/`policy_server`) when its declared policy-server address
+is itself — applied here fleet-wide off a shared git-synced source, which
+is also not CFEngine's textbook case. The closest prior art for that
+specific combination is GitOps (coined by Weaveworks; Flux, its reference
+implementation, open-sourced 2016 and donated to the CNCF in 2019): an
+in-cluster agent pulling desired state from git, no push, no externally-
+reachable control plane holding credentials — structurally the same shape,
+here applied to CFEngine promises across a heterogeneous OS/Android fleet
+instead of Kubernetes manifests across clusters. For the often-off-device
+half specifically, `balenaCloud` is the closest working system solving the
+same problem (documented "Offline Updates" mode, heartbeat-based
+connectivity-degradation tracking) — with one real architectural
+difference: it is centralized, devices phone home to a hosted service,
+which is exactly what this design has no equivalent of. Local clones:
+`~/src/config-mgmt-prior-art/{flux2,rudder}` and
+`~/src/config-mgmt-prior-art/README.md`. Full citations:
+`prior-art-review-2026-08-13.md`.
+
 **Compile target: CFEngine's own Augments layer, not raw `.cf` synthesis.**
 CFEngine has shipped a native JSON data-injection layer since 3.7
 (`def.json`/`host_specific.json`, moved into the core agent at 3.8.1),
@@ -555,6 +585,29 @@ happens entirely in Nix (`mkDefault`/`mkForce`/`mkMerge`) before render;
 CFEngine's own `mergedata()` is not used for this to avoid the same
 "two type systems diverge" risk already called out for the JSON Schema in
 §4.3 — one merge engine, one source of truth.
+
+**This compile-to-native-format shape is not new; the pairing appears to
+be (D32, new).** A typed/module authoring language compiling to an
+existing execution engine's native format is an established pattern, and
+the closest examples use the same authoring language this design does:
+NixOS's own module system compiles to `systemd` unit files
+(`nixos/modules/system/boot/systemd.nix`) the same way this design
+compiles the Site Model to CFEngine Augments, and `nix-darwin` compiles
+Nix modules to `launchd` agents and macOS `defaults` — already a planned
+dependency of this same design, for the Mac substrate (§5.2). The Cloud
+Development Kit family generalizes the same move past Nix: `cdk8s`
+synthesizes typed code into Kubernetes YAML (active); `cdktf` did the same
+into Terraform JSON before HashiCorp deprecated it, checked directly,
+December 10, 2025. **Checked and not found: a real prior combination of
+Nix specifically with CFEngine specifically** — one inactive personal Gist
+experiment, nothing resembling an active project. The mechanism is common;
+this specific pairing does not appear to have prior art. What's actually
+different, once the mechanism is credited elsewhere: the target (CFEngine,
+chosen for Promise Theory's fit to disconnected, multi-owner operation —
+see D33 below — not the compile mechanism itself) and the reason (R13's
+AI-authorship premise). Local clones:
+`~/src/config-mgmt-prior-art/{nix-darwin,cdk8s,terraform-cdk}`. Full
+citations: `prior-art-review-2026-08-13.md`.
 
 **Required CLI affordance: render exactly what a named device would
 receive, without touching it** (Bcfg2's `bcfg2-info buildfile`,
@@ -1861,6 +1914,8 @@ unresolved, it should write a question doc and stop, not improvise.
 | D29 (new) | Semantic-layer generation discipline | **Template-fill the ChangePlan's semantic layer from the verifiable IR's typed fields wherever a template covers the case; free generation must quote/reference the specific IR fields it describes** (§7.3). "Never authorizes" bounds the blast radius, not the harm — a hallucinated claim can still mislead the human or their advisor AI, which is the sovereignty guarantee §9 actually depends on. |
 | D30 (new) | Grammar-constrained decoding for the CFEngine escape hatch | **Check for or write a formal CFEngine promise-body grammar before defaulting to lint-only for `commands`-type freehand text** (§7.5) — grammar-constrained decoding is now efficient enough for production use, turning "no schema to check against" into a real option. Not urgent; this surface isn't exercised until later build-order steps. |
 | D31 (new) | Front-or-back positional convention, named | **Critical information goes at the very start or very end of any agent-facing artifact, never buried mid-document** (§0 rule 7). Already practiced here (§0 is "read this first"); apply deliberately to rendered outputs (`def.json`/`host_specific.json`, the ChangePlan) going forward. |
+| D32 (new) | `nix2cf` prior art | **Compile-to-native-format is an established pattern (NixOS→systemd, `nix-darwin`→launchd, the CDK family→cloud APIs); the Nix+CFEngine pairing appears to have none** (§4.4). No novelty claim rests on the compiler mechanism itself; the target (CFEngine, for Promise Theory's fit) and the motivation (R13) are what's actually different. |
+| D33 (new) | Decentralization prior art | **The no-control-node property is Promise Theory's, not this design's** (§4.4). CFEngine's documented default is hub-and-spoke; the fleet-wide self-bootstrap-via-git pattern is real (a documented CFEngine primitive) but atypical. GitOps (Flux/CNCF) is the closest structural analog; balenaCloud the closest problem-space analog, with a real architectural difference (centralized vs. not). |
 
 **D23–D31 provenance:** proposed in `ai-optimization-review-2026-08-13.md`
 (literature review, requested by the operator to find further concrete
@@ -1903,6 +1958,15 @@ to the same answer.
   Full rationale, citations, and the correction history (four claims
   fixed same-day after direct source verification) live there; not
   duplicated here.
+- `prior-art-review-2026-08-13.md` — the literature pass behind D32 and
+  D33 (above): prior art for the `nix2cf` compile-to-native-format
+  pattern and the decentralized/often-off-device deployment shape.
+  **Adopted in full by operator decision 2026-08-13.** Local reference
+  clones of everything it cites live at `~/src/config-mgmt-prior-art/`
+  (a symlink farm into sibling `~/src/<name>` checkouts — see that
+  directory's own `README.md` for what's there and why); not code this
+  project depends on, code checked for patterns before claiming none
+  existed.
 - **This file** — authoritative architecture + build order. Start here.
 - `architecture-final-v1.md` — prior synthesis; superseded where they differ.
 - `architecture-proposal-v1.md` — Claude's detailed §7–8/§12 (manifest/consent
