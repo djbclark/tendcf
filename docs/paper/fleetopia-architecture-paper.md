@@ -169,6 +169,25 @@ what device X would receive, without touching device X" is nearly free. We
 plan to build that affordance *first*, before the pipeline is finished, and
 §6.2 explains why it earns its place three separate times over.
 
+**This compile-to-native-format shape is not new; the pairing is what we
+could not find elsewhere.** A typed or module-based authoring language
+compiling to an existing execution engine's native format is an established
+pattern, and the closest examples use the same authoring language we do:
+NixOS's own module system compiles down to `systemd` unit files the same
+way we compile the Site Model to CFEngine Augments [18], and `nix-darwin`
+compiles Nix modules to `launchd` agents and macOS `defaults` [19] — a
+dependency this design already adopts elsewhere, for the Mac substrate,
+in the architecture document this paper summarizes. The Cloud
+Development Kit family generalizes the same move past Nix entirely: `cdk8s`
+synthesizes typed code into Kubernetes YAML [20], and `cdktf` did the same
+into Terraform JSON before HashiCorp deprecated it in December 2025 [21].
+What we searched for and did not find is a prior combination of Nix
+specifically with CFEngine specifically — one inactive personal
+experiment, nothing resembling an active project. The mechanism is common;
+the target is, as far as we can tell, not one anyone has paired it with
+before, and the reason for that target is CFEngine's fit to disconnected,
+multi-owner operation (§2.3), not the compiler mechanism itself.
+
 ### 2.3 Deployment shape: no policy server, no push requirement
 
 Every host runs its own `cf-serverd` and reads policy synced via git as part
@@ -184,6 +203,29 @@ beliefs were wrong, and had entered the design as an analyst's unvalidated
 assumptions rather than as checked constraints. We record it because it
 changed the answer: once the practical objections dissolved, CFEngine was
 the better fit on its own terms, not an acceptable substitute.
+
+**The no-control-node property is CFEngine's own, not ours.** Promise
+Theory was formalized as a model of autonomous agents specifically to rule
+out client-server protocols that push data to a controller [6]; nothing
+about "no control node" is this paper's invention, and it is the actual
+reason §2 chooses CFEngine over the alternatives. What CFEngine's own
+documentation prescribes as its standard deployment, though, is not this:
+it is hub-and-spoke, one policy server, clients pulling from it [23]. What
+makes "every host runs its own `cf-serverd`" a real option rather than a
+misreading is a documented CFEngine primitive for exactly this — bootstrap
+sets a host as its own policy hub when its declared server address is
+itself [23] — applied here fleet-wide, off a shared git-synced source,
+which is not CFEngine's textbook case either. The closest prior art for
+that specific combination — an in-place agent pulling desired state from
+git, no push, no reachable control plane holding credentials — is GitOps,
+coined by Weaveworks and carried forward by Flux under the CNCF since 2019
+[22], structurally the same shape applied here to CFEngine promises across
+a heterogeneous OS/Android fleet instead of to Kubernetes manifests across
+clusters. For the often-off-device half specifically, balenaCloud is the
+closest working system solving the same problem — offline-tolerant
+updates, connectivity-degradation tracking [24] — with one real
+architectural difference from what we do: it is centralized, and devices
+phone home to it; this design has no equivalent to phone home to at all.
 
 ### 2.4 The record of truth is local
 
@@ -1253,6 +1295,29 @@ Performance of Large Language Models.* arXiv:2408.02442, 2024.
 [17] T. Gloaguen, N. Mündler, M. Müller, V. Raychev, and M. Vechev.
 *Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for
 Coding Agents?* ETH Zürich, arXiv:2602.11988, 2026.
+
+[18] NixOS project. Module system compiling to `systemd` unit files
+(`nixos/modules/system/boot/systemd.nix`). https://github.com/NixOS/nixpkgs
+
+[19] `nix-darwin` project. Nix module system compiling to `launchd` agents
+and macOS `defaults`. https://github.com/nix-darwin/nix-darwin
+
+[20] `cdk8s` project. Typed-language synthesis to Kubernetes YAML.
+https://github.com/cdk8s-team/cdk8s
+
+[21] HashiCorp. *CDK for Terraform (cdktf).*
+https://github.com/hashicorp/terraform-cdk — deprecated December 10, 2025.
+
+[22] Flux / GitOps Toolkit (Weaveworks; CNCF since 2019). Pull-based,
+git-synced deployment with no push and no externally-reachable control
+plane. https://github.com/fluxcd/flux2
+
+[23] CFEngine documentation. "Client server communication" (standard
+hub-and-spoke deployment) and installation/bootstrap documentation
+(self-bootstrap to policy hub). https://docs.cfengine.com
+
+[24] balena. *Offline Updates: Update balena Devices Without Internet.*
+https://blog.balena.io/offline-updates-make-it-easier-to-update-balena-devices-without-the-internet/
 
 [9] M. Kleppmann, A. Wiggins, P. van Hardenberg, and M. McGranaghan.
 *Local-first software: you own your data, in spite of the cloud.* Onward!
