@@ -1224,6 +1224,12 @@ archived documents.
   `linux/arm64` are first-class FOSS build targets — but it fills D14's
   transport slot, not D13's convergence slot. Gated on an unrun Termux test.
   Notes that **D18 now has no surviving stated rationale**.
+- `site-pika-requirement-change-2026-08-13.md` — **read this before the other
+  two umbrella docs**, it supersedes their site-pika assumptions. Three
+  root-trusted admins, no GUI ⇒ **Rudder drops out entirely** and the
+  "two systems" conclusion reverses to one. D16 narrows to a
+  composition-only question; blast radius and multi-author composition
+  survive, authorization and tenancy do not.
 - `ideas-dump-claude.md` — unprotected; the two-agent-consent control, the
   semantic/verifiable plan split, the role-mesh-is-consensus flag, and the
   model/vendor notes all graduated into this document.
