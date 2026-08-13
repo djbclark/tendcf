@@ -7,7 +7,7 @@ chain: [standalone-3fd9]
 repo: fleetopia
 workspace: main
 branch: master
-head_sha: 7b2a5406952258bd48db52b17b8efcaf30c9989d
+head_sha: 94018b4fd874b712650d3ab7fd7aadc9b4099c3a
 created_at: 2026-08-13T16:37:14-0400
 writer: claude-code
 ---
@@ -23,15 +23,20 @@ paper's actual origin, and keep the paper's novelty claim narrow and honest.
 
 ## Where We Are
 
-**Working tree is dirty and UNCOMMITTED.** `git status -s` shows only
-`M docs/paper/fleetopia-architecture-paper.md`. HEAD is still
-`7b2a540` (the "Fold in AI review findings..." commit from the *previous*
-session/handoff, c174) — none of this session's edits are committed. The
-operator has not asked for a commit; per repo convention (`only commit when
-asked`), it was left uncommitted. Diff stat: 339 insertions / 37 deletions.
-Word count grew from 6083 (session start) → 6934 (after §2.6) → 7666+ words
-(after the §1.1 rewrite and the Nix example) — flagged to the operator once,
-not yet resolved either way (see Open Questions).
+**Committed and clean.** All of this session's paper edits landed in one
+commit, `94018b4` ("docs: worked examples, formal scope register, and a
+corrected acknowledgement"), on top of `7b2a540` (the "Fold in AI review
+findings..." commit from the *previous* session/handoff, c174). This was
+committed proactively per the standing `auto-commit-at-checkpoints`
+instruction (site-private memory, granted 2026-08-13) — commit automatically
+at natural checkpoints, don't wait to be asked. **It has not been pushed**:
+fleetopia declares no memory-is-data exception, so per that same instruction
+("pushing is a separate question from committing") it's a local commit
+waiting for the operator to push whenever they want. Diff stat: 339
+insertions / 37 deletions. Word count grew from 6083 (session start) → 6934
+(after §2.6) → 7666+ words (after the §1.1 rewrite and the Nix example) —
+flagged to the operator once, not yet resolved either way (see Open
+Questions).
 
 This session started via `/baton` → `resume` → chain-discovery fallback
 (cwd was the bare `~/src` home directory, not inside any resolvable
@@ -220,25 +225,18 @@ being updated to say so. That drift is now closed by this handoff.
 
 ## Where We're Going
 
-1. **Ask the operator two things before further editing:** (a) whether to
-   commit this session's paper changes — nothing here has been committed,
-   deliberately, per "only commit when asked"; (b) how to handle length —
-   the paper is now ~7666 words against an operator decision (recorded in
-   the parent handoff, c174) to keep it near ~5800 rather than cut toward
-   ~3000, and the growth since then is entirely the new worked examples and
-   §1.1. Trim elsewhere to compensate, leave it, or a new target now that
-   concrete examples exist — operator's call, flagged twice this session
-   without an answer yet.
-2. **Write a `feedback`-type memory entry** (not covered by this repo's
-   handoff mechanism — this is cross-session behavioral guidance, not
-   project state) at `~/ops/site-private/memory/`, capturing: don't
-   speculate about a real named person's future reactions/opinions in
-   conversation or in documents; past-tense factual credit is fine,
-   characterizing unstated current/future mindset is not. Follow the
-   memory-writing protocol in `~/CLAUDE.md` (`just ops-memory-sync` first,
-   memory-only commit, push immediately, one-fact-per-file). Does not need
-   the operator's input first — do this whenever convenient, independent of
-   item 1.
+1. **Ask the operator to resolve the word-count question** — the paper is
+   now ~7666 words against an operator decision (recorded in the parent
+   handoff, c174) to keep it near ~5800 rather than cut toward ~3000, and
+   the growth since then is entirely the new worked examples and §1.1. Trim
+   elsewhere to compensate, leave it, or a new target now that concrete
+   examples exist — operator's call, flagged twice this session without an
+   answer yet. Whether to `git push` the local commit (`94018b4`, fleetopia
+   has no memory-is-data exception so it wasn't pushed automatically) is a
+   smaller open item that can be folded into the same check-in.
+2. ~~Write a `feedback`-type memory entry~~ **DONE** this session:
+   `feedback_no_speculation_about_real_people.md`, committed and pushed to
+   site-private under its memory-is-data exception. No action needed.
 3. **Re-read the full paper end to end** before the next substantive edit —
    several sections were touched piecemeal (§1, §1.1, §2.6, §4.1, §5.3,
    §6.1, §6.2, §6.4, §7, §8.3, §9, Acknowledgements) across two different
@@ -254,12 +252,11 @@ being updated to say so. That drift is now closed by this handoff.
 
 ```bash
 cd ~/src/fleetopia
-git status -s                              # confirm still just the paper, dirty
-git diff docs/paper/fleetopia-architecture-paper.md | less   # review this session's edits
+git log --oneline -3                       # confirm 94018b4 is HEAD, tree clean
+git show --stat 94018b4                    # review this session's committed edits
 wc -w docs/paper/fleetopia-architecture-paper.md              # current length
 grep -n '^## \|^### ' docs/paper/fleetopia-architecture-paper.md  # re-map section lines
 ```
 
-Then: ask the operator about commit + word-count (Where We're Going #2–3)
-before making further edits, and write the memory entry (#1) whenever
-convenient — it does not require the operator's input first.
+Then: ask the operator about word-count and whether to push (Where We're
+Going #1) before making further edits.
