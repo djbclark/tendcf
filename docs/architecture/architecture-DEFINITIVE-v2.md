@@ -487,6 +487,28 @@ CFEngine's own `mergedata()` is not used for this to avoid the same
 "two type systems diverge" risk already called out for the JSON Schema in
 §4.3 — one merge engine, one source of truth.
 
+**Required CLI affordance: render exactly what a named device would
+receive, without touching it** (Bcfg2's `bcfg2-info buildfile`,
+`bcfg2-papers-2026-08-13.md` §2). Because the render is a pure function of
+the Site Model, this is nearly free for `nix2cf` — the same evaluation that
+produces `def.json` for a deploy, parameterized by hostname and run
+locally. It is worth building **first**, before the pipeline is complete,
+for three separate reasons that happen to converge:
+
+- **It is the agent self-check loop (R13).** An agent that can ask "what
+  does this change actually do to device X" can verify its own work
+  locally instead of guessing or deploying to find out — which is the
+  cheapest possible form of catching mistakes automatically rather than by
+  review.
+- **It is the regression test for the compiler itself.** Bcfg2 used the
+  `buildall` variant to diff every client's rendered output across server
+  upgrades. A `nix2cf` change that alters output for a device nobody
+  touched is exactly the bug class this catches, and it needs no fleet to
+  run against.
+- **It is decision transparency, which LISA '05 identifies as what
+  actually buys administrator trust** — the binding constraint on their
+  adoption, and directly applicable to site-pika's three admins.
+
 Only promise types MPF's stock library doesn't cover need actual `.cf`
 text, and even that is templated from typed Nix option values, not
 synthesized. **Guard, matching §4.3.1's `types.package`/`types.derivation`
@@ -835,6 +857,46 @@ same adoptability instinct behind D6.
 Syncing a subset of local SQLite to the existing Vector/OpenObserve/
 Grafana stack is an optional, best-effort push **from** the device when
 reachable, never the record of truth.
+
+#### 4.7.1 Two schema requirements from the Bcfg2 papers (2026-08-13)
+
+Both are recorded here rather than left to `nix2cf`'s future repo for the
+same reason the §4.1 fields were: they are **schema**, and schema is
+cheapest to get right before there are rows to migrate. Neither needs
+`nix2cf` to exist.
+
+- **Every row carries the release that produced it, and the device
+  records which release it is currently converged to** (LISA '06's
+  revision-stamping, `bcfg2-papers-2026-08-13.md` §3). Bcfg2 stamps every
+  generated client configuration with the repository revision and carries
+  it into every statistics upload; we already have the identifier —
+  `ops-vMAJOR.MINOR.PATCH` and `ops-release.json` — so this is one column,
+  not an integration. What it buys: the desired state of any device at any
+  past time becomes reconstructible, "did this break after the last
+  release" becomes a query rather than an argument, and "which devices
+  were exposed, over what window, and when were they actually patched"
+  becomes answerable. Given a fleet whose devices are routinely
+  unreachable (ground 2 above), the reconstructibility is worth more here
+  than it was in the paper's always-on cluster.
+- **A managed/unmanaged counter per domain, not just a list of
+  discrepancies.** §4.5.1(d) makes extra entries detectable; this makes
+  the *ratio* a first-class recorded quantity, which is what turns
+  comprehensiveness from a lint into a progress metric. Bcfg2's first
+  client run reports `Total managed entries: 0 / Unmanaged entries: 2308`
+  and the whole deployment story is grinding that second number down. Keep
+  `not-yet-migrated` and `deliberately-unmanaged` counted **separately** —
+  conflating them is what makes the number stop meaning anything, since
+  one is backlog and the other is permanent by design.
+
+**One reframing that follows, and it bears on ground 1 above.** D18's
+first surviving ground is that central-as-record has no consumer. LISA
+'05's deployment finding cuts the other way for the *local* store:
+reporting deployed early was their explicit tip, and administrator trust —
+not tool correctness — was the binding constraint on adoption for
+precisely the multi-admin situation site-pika is in. So the local SQLite
+plus a trivial "what changed, what is dirty, what am I converged to" view
+is an **adoption requirement, not an observability nicety**, and it should
+not be sequenced last on the grounds that nothing consumes it yet.
 
 ### 4.8 Nix store locality (D20, new)
 
@@ -1390,10 +1452,13 @@ because it de-risks the reference target that everything else depends on.
   nearly every domain to start at `not-yet-migrated`, which is the normal
   day-one state (Bcfg2's first client run reports 0 managed / 2308
   unmanaged), and that count is the progress metric from here on. Lint in
-  CI + pre-commit; automate the worktree provenance gate (§8.1). Coherent
-  stop: same system, now with a truthful data spine and a provenance gate.
-  _Also the cheapest possible agent work — good first task under the
-  budget._
+  CI + pre-commit; automate the worktree provenance gate (§8.1). Settle
+  D18's row schema here too (§4.7.1) even though nothing writes rows yet —
+  the release stamp and the separated managed/`not-yet-migrated`/
+  `deliberately-unmanaged` counters are one column each now and a migration
+  later. Coherent stop: same system, now with a truthful data spine and a
+  provenance gate. _Also the cheapest possible agent work — good first task
+  under the budget._
 - **Step 1 — Ubuntu reference path.** mise `bootstrap` + CFEngine promises
   render a real Ubuntu host from the Site Model. This is the adoptability
   keystone; do it early even before you own a VPS, by rendering + dry-running
@@ -1406,12 +1471,15 @@ because it de-risks the reference target that everything else depends on.
   definitions exist on **two** platforms. Inference rules invented ahead of
   the types they range over encode guesses; two adapters is the minimum
   that exposes which provides/requires relations are general and which were
-  Ubuntu-shaped. Order within the step: (1) conflict check as a distinct
-  compiler stage over already-merged declarations — never fused into the
-  type definitions, so the Nix priority algebra can be adopted later as a
-  policy change rather than a schema redesign; (2) extra-entry reporting,
-  which needs no inference and starts paying immediately; (3) the
-  AutoEdges-style inference stage with mandatory edge attribution.
+  Ubuntu-shaped. Order within the step: (0) the `buildfile`-style
+  render-what-device-X-receives CLI (§4.4) — first, because it is the
+  self-check loop and the compiler's own regression test, so everything
+  after it is cheaper to verify; (1) conflict check as a distinct compiler
+  stage over already-merged declarations — never fused into the type
+  definitions, so the Nix priority algebra can be adopted later as a policy
+  change rather than a schema redesign; (2) extra-entry reporting, which
+  needs no inference and starts paying immediately; (3) the AutoEdges-style
+  inference stage with mandatory edge attribution.
   Coherent stop: the Site Model compiles, conflicts fail the build with
   resolvable messages, and skew is visible — with or without inference
   finished.
