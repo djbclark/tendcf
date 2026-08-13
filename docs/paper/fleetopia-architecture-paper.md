@@ -902,11 +902,17 @@ authoritative and any central view is an optional, best-effort push.
 We are aware this is the decision most likely to be wrong. The grounds are in
 §2.4, and the honest summary is that we currently have *no consumer* for a
 central copy: no compliance requirement obliges a queryable fleet-wide view,
-so central-as-record would be infrastructure without a customer at this
-design's scale (§1.1). But "no consumer yet" is exactly the reasoning that
-LISA '05 argues against elsewhere, which is why §6.4 records the same paper
-telling us to build reporting *early*. We may be applying one of its findings
-and ignoring another.
+so building one out would be infrastructure without a customer at this
+design's scale (§1.1) — not that one is unbuildable. A path to a fleet-wide
+view already exists and costs nothing new to stand up: a subset of each
+device's local SQLite pushes, best-effort and eventually consistent, into
+the observability stack (Vector/OpenObserve/Grafana) this fleet already
+runs for other purposes. What makes the device the record of truth is that
+this path is optional and never authoritative, not that it is absent. "No
+consumer yet" is exactly the reasoning that LISA '05 argues against
+elsewhere, which is why §6.4 records the same paper telling us to build
+reporting *early*. We may be applying one of its findings and ignoring
+another.
 
 ### 5.4 A negative result we have not earned
 
@@ -1111,16 +1117,21 @@ one hides drift inside itself just as effectively as opting out would.
 central copy today, but "no consumer yet" is precisely the reasoning LISA '05
 warns against, and we are taking one of its findings while declining another.
 
-**8.6 Can an agent ever get a fleet-wide answer, given §2.4/§5.3's
-local-first record?** §3's rule pushes correctness toward information local
-to one file; §2.4 and §5.3 push the record of what happened toward one
-SQLite database per device with no fleet-wide view. Those pull in the same
-direction until someone needs to ask a question that is global by nature —
-"did the security rollout land everywhere?" is not answerable from any one
-device's local record, and the architecture as described has no place to ask
-it. §8.5 discusses local-first from the angle of having no consumer for a
-central copy; that is a different problem from having no way to construct
-one when a genuinely global question arrives.
+**8.6 Is the fleet-wide view good enough when a genuinely global question
+arrives, given §2.4/§5.3's local-first record?** §3's rule pushes
+correctness toward information local to one file; §2.4 and §5.3 push the
+record of what happened toward one SQLite database per device as the
+authoritative copy. There is a place to ask "did the security rollout land
+everywhere?" — the best-effort Vector/OpenObserve/Grafana sync described in
+§5.3 — but that view is explicitly not authoritative and is incomplete for
+exactly the devices most likely to matter during the window they are
+unreachable. The open question is not whether a fleet-wide view exists but
+whether an eventually-consistent, best-effort one is *sufficient* for a
+question with a real yes/no answer, or whether answering it correctly
+requires querying reachable devices directly and treating the rest as
+unknown rather than trusting a stale aggregate. §8.5 discusses local-first
+from the angle of having no consumer driving that view's completeness; this
+is the sharper version of the same gap once a consumer exists.
 
 **8.7 Does spurious-edge provenance actually work?** We claim attribution
 turns "why is this waiting?" into a query. Nobody has run it. If it does not
