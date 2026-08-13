@@ -20,7 +20,7 @@ nothing, with what's actually different stated precisely.
 
 ## Part 1: `nix2cf` — compiling an authoring language into an execution engine's native format
 
-**The general pattern is well established, and fleetopia's own ecosystem
+**The general pattern is well established, and tendcf's own ecosystem
 already contains the closest examples.** "Author in a typed/module
 language, compile to the format a separate execution engine already reads
 natively" is not new:
@@ -33,8 +33,8 @@ natively" is not new:
   engine's native format out — just targeting `systemd` instead of
   CFEngine's Augments layer.
 - **`nix-darwin` does the same thing to `launchd`**, on the same platform
-  fleetopia's Step 1 targets first. Nix modules render to launchd agents and
-  macOS `defaults`, activated via `launchctl`. fleetopia's own architecture
+  tendcf's Step 1 targets first. Nix modules render to launchd agents and
+  macOS `defaults`, activated via `launchctl`. tendcf's own architecture
   document already plans to adopt `nix-darwin` for the Mac *substrate*
   (§5.2) — meaning the design already depends on this exact pattern
   elsewhere in the same system, for a different target (substrate, not
@@ -83,25 +83,25 @@ Promise Theory (Burgess, formalized from 2004) is explicitly a theory of
 could be no client-server protocols that pushed data... the agent does not
 receive instructions from a controller." This is not adjacent prior art —
 it is the stated reason §2.3/§4.4 give for choosing CFEngine at all. Nothing
-about "no control node" or "no push" is fleetopia's invention; it is
+about "no control node" or "no push" is tendcf's invention; it is
 CFEngine's foundational design philosophy, in place two decades before this
 project. Where the paper credits Bcfg2 explicitly (§6) and Burgess/Bergstra
 generally (reference [6]), it does not spell out that the decentralization
-property specifically traces to Promise Theory rather than to a fleetopia
+property specifically traces to Promise Theory rather than to a tendcf
 design choice — worth making explicit for the same reason §3.1 now credits
 Tratt.
 
 **What CFEngine's own documentation actually prescribes as standard is not
-what fleetopia does, though — checked directly.** CFEngine's documented
+what tendcf does, though — checked directly.** CFEngine's documented
 default deployment is hub-and-spoke: "hosts fetch their policies from one
 central distribution point... every client machine contacts the policy
 server and downloads these updates." That is a real central policy server,
 which is exactly what §2.3/§4.4 say this design does *not* have. What makes
-fleetopia's "every host runs its own `cf-serverd`" claim real rather than
+tendcf's "every host runs its own `cf-serverd`" claim real rather than
 invented is a genuine CFEngine primitive, also checked directly: bootstrap
 sets `am_policy_hub`/`policy_server` when a host's declared policy-server
 address is its own — a documented mechanism for standalone/single-host
-use, not something fleetopia is grafting on. What is atypical is applying
+use, not something tendcf is grafting on. What is atypical is applying
 that single-host primitive **fleet-wide**, with consistency coming from a
 shared git-synced source rather than a hub — that combination is not
 CFEngine's documented common case, and is worth stating as the actual
@@ -124,14 +124,14 @@ manifests across clusters. This is a strong citation to add; nothing about
 it needed correcting.
 
 **balenaCloud is the closest prior art for the *often-off-device* half
-specifically, and the architectural difference from fleetopia is real, not
+specifically, and the architectural difference from tendcf is real, not
 just asserted.** balenaCloud manages fleets of intermittently-connected IoT
 devices with a documented "Offline Updates" mode (preload/reflash a device
 with no network at all) and heartbeat-based "Reduced Functionality"
 tracking for degraded connectivity. It is real, working, and squarely the
 same problem (heterogeneous, sometimes-offline device fleets). It is also
 architecturally centralized: devices phone home to balenaCloud's hosted
-service, which is the thing fleetopia's design specifically avoids (§2.3's
+service, which is the thing tendcf's design specifically avoids (§2.3's
 "no dedicated central policy host" and §5.3's device-as-authoritative-
 record). Worth citing as the nearest working system for the problem this
 design solves differently, not as evidence the problem itself is unsolved

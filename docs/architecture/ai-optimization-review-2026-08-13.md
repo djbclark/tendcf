@@ -3,7 +3,7 @@
 > **Proposal doc, not a decision.** Per `architecture-DEFINITIVE-v2.md`'s own
 > header: this is *not* an edit to that file. It is the "new review doc"
 > route that header specifies. Nothing here is adopted until the operator
-> says so — see `djbclark/fleetopia#1`.
+> says so — see `djbclark/tendcf#1`.
 >
 > **Correction, 2026-08-13 (same day, before adoption):** items 1, 3, and 4
 > originally cited specific numbers that did not survive checking against
@@ -22,7 +22,7 @@ R13 (§2, §0 rule 6) already made AI authorship a first-order design
 constraint and derived "prefer local knowledge over global" and "prefer
 machine-checkable over conventional" from it — argued in `architecture-
 DEFINITIVE-v2.md` itself, and independently corroborated after the fact (see
-`fleetopia-architecture-paper.md` §3.1, added this session: Tratt's
+`tendcf-architecture-paper.md` §3.1, added this session: Tratt's
 concurrent blog post, the region-logic lineage, and empirical LLM-IaC
 literature). The operator asked, separately, whether reading more of that
 literature surfaces further concrete optimizations — not just grounding for

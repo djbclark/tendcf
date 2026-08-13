@@ -1,10 +1,10 @@
-# fleetopia — Final Architecture & Build Order (v2, definitive)
+# tendcf — Final Architecture & Build Order (v2, definitive)
 
 > **🔒 PROTECTED DOCUMENT — AI agents: DO NOT MODIFY without explicit,
 > specific human (operator) approval for a named change.** Blanket
 > instructions ("fix docs", "update stale refs", "reconcile with the
 > latest") do NOT authorize edits here. Propose changes as a _new_ review
-> doc or a comment on djbclark/fleetopia#1. This binds every agent —
+> doc or a comment on djbclark/tendcf#1. This binds every agent —
 > Claude Code, Codex, Hermes, Ralph controllers, `agy`, and whatever comes
 > next. If you are an AI reading this to do implementation work: this file
 > is your map, not your worksheet. Read §0 first.
@@ -17,7 +17,7 @@
 - **Author:** Claude (Anthropic, Claude Fable 5), holding the full operator
   dialogue plus every review pass. This is the apex-context document; later
   AIs will have less. See §0.
-- **Tracker:** djbclark/fleetopia#1.
+- **Tracker:** djbclark/tendcf#1.
 
 ---
 
@@ -910,7 +910,7 @@ outcome-class naming) — not an external dependency, but not free either.
 reference corpus — years of hardened CFEngine idiom for common file/
 package/service operations, worth lifting rather than re-deriving — while
 stripping the Rudder-specific reporting scaffolding and replacing it with
-fleetopia's own (§4.7). Not a dependency to track upstream (no
+tendcf's own (§4.7). Not a dependency to track upstream (no
 independent release exists anymore); a one-time, per-method adaptation.
 
 **What this decision does NOT rest on (rationale corrected 2026-08-13):**
@@ -927,7 +927,7 @@ no-independent-release status. Full correction:
 `rudder-as-umbrella-evaluation-2026-08-13.md` §4.
 **Zero coverage for the actual hardest part:** ncf/Rudder targets Linux
 and Windows only — no macOS/launchd story, no Android/Termux story. The
-`serverapp_*` launchd-plist-and-brew pattern was always fleetopia-original
+`serverapp_*` launchd-plist-and-brew pattern was always tendcf-original
 work regardless of this decision.
 
 ### 4.7 Local-first reporting: per-device SQLite is the record of truth (D18, new)
@@ -1207,12 +1207,12 @@ All are Site Model inventory entries + artifacts, not new architecture.
 
 ### 6.1 Nix Flakes + flake-parts (D19, new)
 
-**One flake per repo, not a monorepo.** `fleetopia`, `stayturgid`,
+**One flake per repo, not a monorepo.** `tendcf`, `stayturgid`,
 `site-djbclark`, and `site-private` stay separate git repos, coordinated
 by matching `ops-vX.Y.Z` tags (unchanged, R11). Each declares its own
 `flake.nix`; `stayturgid`/`site-djbclark`/`site-private` declare
-`fleetopia` as a flake input (`inputs.fleetopia.url =
-"github:djbclark/fleetopia?ref=<tag>"`), pinned exactly by `flake.lock` —
+`tendcf` as a flake input (`inputs.tendcf.url =
+"github:djbclark/tendcf?ref=<tag>"`), pinned exactly by `flake.lock` —
 which doubles as machine-readable cross-repo provenance for a release,
 close to free reproducibility documentation on top of what
 `ops-release.json` already tracks. **Answered 2026-08-13
@@ -1225,12 +1225,12 @@ which flake inputs (a DAG) cannot encode. The release check gains one
 line (verify each repo's `flake.lock` is committed and clean at tag
 time); nothing else changes.
 
-**fleetopia's flake is the one the others import, not the reverse.** The
+**tendcf's flake is the one the others import, not the reverse.** The
 Site Model module-system _type definitions_ (D12/§4.3) live in
-fleetopia's flake outputs (`fleetopia.lib.siteModel` or equivalent) —
+tendcf's flake outputs (`tendcf.lib.siteModel` or equivalent) —
 public, generic, holds nobody's facts, same split as `freeops/` vs.
 `site-<n>` (§4.2). The concrete _values_ (site-specific facts) live in
-each site repo, supplying data through the module system fleetopia
+each site repo, supplying data through the module system tendcf
 defines.
 
 **Concrete flake outputs:**
@@ -1243,7 +1243,7 @@ defines.
   built once, content-addressed, shipped as ordinary files. The
   least controversial use — this is what Nix is for, no store-free
   tricks needed since builds happen on a Linux builder, never on-device.
-- **A Site-Model-rendering output** (e.g. `fleetopia.siteModel`) — the
+- **A Site-Model-rendering output** (e.g. `tendcf.siteModel`) — the
   actual D12/§4.4 compile step, `nix eval --json`, via `--store dummy://`
   (§4.3.2) so it runs anywhere without a real store, including CI.
 - **`checks`** — `nix flake check` as the CI hook for the JSON-Schema/
@@ -1895,9 +1895,9 @@ unresolved, it should write a question doc and stop, not improvise.
 | D14 (new) | CFEngine deployment shape | **Git-distributed policy, `cf-serverd` on every client, no dedicated central policy host, no push/SSH requirement** (§4.4, §7.4). Push (via `cf-runagent`/`just cf-run`) and pull (each host's own convergence schedule) are both first-class, same mechanism. |
 | D15 (new) | Nix→CFEngine compile target | **CFEngine's native Augments layer (`def.json`/`host_specific.json`), not raw `.cf` synthesis** (§4.4). Merging happens once, in Nix, before render — CFEngine's `mergedata()` is not used for this, to avoid a second, divergent merge engine. Still unprototyped as of 2026-08-13; the augments-load-under-standalone-`cf-agent -f` precondition (`research-answers-and-corrections-2026-08-13.md`) is **assumed satisfied by operator decision 2026-08-13** — verifying it stays on the task list as validation, not as a gate. |
 | D16 (new) | Order-dependent operations | **Puppet-catalog-JSON rejected — do not build it** (§4.5). The gating `fleet/fleet.yml` Android-chain audit (2026-08-13) came back negative: all six roles declare zero dependencies, every apparent intra-chain prerequisite is satisfied by an earlier `site.yml` playbook, and the chain contradicts its own install-before-harden rule (`stayturgid#288`). Re-derived semantically, the real cold-device constraints are a strictly sequential six-node transport bootstrap (a `bundlesequence`), independent non-interleaving per-app chains (CFEngine classes/`depends_on`), and safety interlocks that a catalog cannot express at all (`stayturgid#289`, `#290`). **Rejected; semantic verdict accepted as a working assumption by operator decision 2026-08-13** — a real from-scratch provision remains the validation step (and the right forcing function for the bootstrap/interlock designs) but is no longer a gate on proceeding. The surviving **multi-writer composition** half is fully decided (§4.5.1, operator 2026-08-13; schema consequences in §4.1, build-order consequences in §12 Step 0 and Step 3): **(a)** same-resource conflict is a compile-time error carrying enough detail for a human to resolve it, with the Nix priority algebra explicitly reserved as a later policy change rather than a schema redesign; **(c)** the bundle is the collective re-verify unit and interlocks are a first-class Site Model field compiling to a CFEngine guard class with bundle-scoped refusal (Bcfg2 Actions' semantics — closes `stayturgid#289` structurally); **(d)** per-domain comprehensiveness is **default-on with explicit, reasoned opt-out** (revised from opt-in on R13 grounds), making out-of-band and cross-writer skew visible as extra entries; opt-out reasons split `not-yet-migrated` (backlog, countable, the build order's progress metric) from `deliberately-unmanaged` (permanent, rare). **(b)** `nix2cf` builds an AutoEdges-style dependency-inference stage, in v1, sequenced after the first two platform adapters (macOS then Android, per the 2026-08-13 platform sequence — §12 Steps 1–2); fixpoint stays the substrate and explicit `depends_on` stays authoritative, with mandatory edge attribution (authored vs inferred) and authored-wins on collision. Decided on **R13** grounds: explicit ordering is a global-knowledge mechanism and inference is a local-knowledge one, which inverts the cost analysis under AI authorship — `stayturgid#288` is the confirming instance of hand-authored global ordering failing. **D16's composition half is now fully decided.** |
-| D17 (new) | ncf/Rudder reuse            | **Vendor and adapt individual generic-method bundle bodies as a reference corpus, strip Rudder's reporting scaffolding** (§4.6). Not a dependency — `ncf` is archived, folded into the Rudder monorepo, no independent release to track. Zero coverage for macOS/Android; that work was always fleetopia-original. **Rationale corrected 2026-08-13:** the licence is *not* what limits Rudder use — GPLv3 restricts deriving from Rudder's code, not running it or authoring techniques for it, and Rudder grants a plugin-licence exception; the platform matrix and ncf's archived status are the real limits (§4.6, `rudder-as-umbrella-evaluation-2026-08-13.md` §4). |
+| D17 (new) | ncf/Rudder reuse            | **Vendor and adapt individual generic-method bundle bodies as a reference corpus, strip Rudder's reporting scaffolding** (§4.6). Not a dependency — `ncf` is archived, folded into the Rudder monorepo, no independent release to track. Zero coverage for macOS/Android; that work was always tendcf-original. **Rationale corrected 2026-08-13:** the licence is *not* what limits Rudder use — GPLv3 restricts deriving from Rudder's code, not running it or authoring techniques for it, and Rudder grants a plugin-licence exception; the platform matrix and ncf's archived status are the real limits (§4.6, `rudder-as-umbrella-evaluation-2026-08-13.md` §4). |
 | D18 (new) | Local-first reporting        | **Per-device SQLite (owned by `stayturgid-agent`) is the authoritative record, not the central observability stack** (§4.7). **Re-decided 2026-08-13 on new grounds** — the original rationales are off the record (Postgres objection void per operator; local-first debuggability withdrawn as a hard requirement). Surviving grounds: the local capture must exist anyway on CFEngine Community, so local-as-record is the null option while central-as-record is a second system with no remaining consumer (Choria telemetry spine dropped, no site-pika compliance UI); only the local copy is guaranteed complete across this fleet's real unreachability windows; single-writer-per-node symmetry with D20; SQLite's weight class fits Termux. Sync to Vector/OpenObserve/Grafana stays optional and best-effort. |
-| D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `fleetopia`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap **answered 2026-08-13: parallel, keep both** — `ops-release.json` is a suite-coherence marker across co-equal repos, which `flake.lock` (a DAG of inputs under one root) structurally cannot express; the release check gains one line (§6.1, `research-answers-and-corrections-2026-08-13.md` §3). Nix store locality (D20, §4.8) applies to every flake `packages` build. |
+| D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `tendcf`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap **answered 2026-08-13: parallel, keep both** — `ops-release.json` is a suite-coherence marker across co-equal repos, which `flake.lock` (a DAG of inputs under one root) structurally cannot express; the release check gains one line (§6.1, `research-answers-and-corrections-2026-08-13.md` §3). Nix store locality (D20, §4.8) applies to every flake `packages` build. |
 | D20 (new) | Nix store locality             | **Never point `NIX_STORE_DIR` or the store's `db.sqlite` at shared/network storage written by more than one host** (§4.8). Single-writer-per-host is Nix's own default and its documented failure mode under multi-host writes (NixOS/nix#378). Same principle as D18's local-first SQLite, applied to Nix's own store. Previously recorded only as an aside inside D19; promoted to its own row 2026-08-13. |
 | D21 (new) | Site Model schema/instance boundary | **Schemas belong to `nix2cf` as its public contract; instances live in the fleet/site repos** (§4.2, §6.1). The module-system type definitions and the JSON Schema they validate against are the compiler layer's interface — versioned and released with `nix2cf`; concrete site data (including site-pika's) is supplied through that interface from each site repo. Decided 2026-08-13 (recorded 2026-08-13; `nix2cf` remains the working name until naming is finalized). |
 
@@ -1945,7 +1945,7 @@ LLM-generated files specifically *reduced* success versus no context file
 at all (`ai-optimization-review-2026-08-13.md` item 4, corrected in place
 2026-08-13). **Decision: do not add one on the strength of a performance
 argument, because there isn't one.** If a root `AGENTS.md` is ever added —
-`fleetopia`/`nix2cf`/eventually the site repos, once Step 0+ lands real
+`tendcf`/`nix2cf`/eventually the site repos, once Step 0+ lands real
 code — the only defensible reason is discoverability, and it must be
 minimal and hand-curated pointing to §0, never LLM-generated boilerplate or
 a repository-overview dump (the study's specific failure mode). Recorded
@@ -2097,5 +2097,5 @@ research trail live in the session transcript; key names, for follow-up:
   in place, 2026-08-13, commit `3cfd3fa` on `feature/stayturgid-2.0`) and
   `docs/research/evaluations/bcfg2-evaluation-2026-07-12.md`.
 
-_Filed under djbclark/fleetopia#1. Amend via this register; treat the
+_Filed under djbclark/tendcf#1. Amend via this register; treat the
 archived reviews as immutable record._
