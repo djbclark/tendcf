@@ -54,7 +54,7 @@ you touch anything:
    but build it.
 
 4. **The spine is data, not any one tool.** Facts live in the Site Model
-   (§4). Every config tool — Ansible, mise, Nix-for-builds — is a replaceable
+   (§4). Every config tool — CFEngine, mise, Nix-for-builds — is a replaceable
    consumer of that data. When in doubt about where something goes: facts and
    intent → Site Model; behavior → generic publishable code; never mix a
    hostname or secret into the generic layer.
@@ -85,14 +85,14 @@ and the operator will often have several of these threads open at once.
                   │  consumed by (never authored by) ↓
    ┌──────────────┼───────────────┬──────────────────┬────────────┐
    ▼              ▼               ▼                  ▼            ▼
- Ansible       mise           Nix (builds        Android       generic
- adapters      bootstrap      only, §5) —        stack         code =
- (services,    (host          NEVER bare-metal   (Termux,      "freeops"
- all           baseline,      OS; artifacts,     Shizuku,      publishable
- platforms)    toolchains)    dev shells,        agent,        layer (§11)
-               THE Ubuntu     hermetic signed    CFEngine)
-               reference      builds
-               path
+ CFEngine      mise           Nix (builds        Android       generic
+ promises      bootstrap      only, §5) —        stack         code =
+ (services,    (toolchains    NEVER bare-metal   (Termux,      "freeops"
+ all           only — D1      OS; artifacts,     Shizuku,      publishable
+ platforms —   superseded,    dev shells,        agent,        layer (§11)
+ D13, git-     Ansible fully  hermetic signed    CFEngine)
+ distributed   removed)       builds
+ policy)
    └──────────────┴───────────────┴──────────────────┴────────────┘
                   │  every change ships as ↓
   ┌───────────────────────────────────────────────────────────────┐
@@ -205,11 +205,13 @@ edit small data files, not a sprawling config tree — cheap to read).
 ### 4.2 Placement & consumption
 
 Site Model lives in `site-<n>` (site data). Generic code lives fact-free
-under `freeops/` (§11). Ubuntu/mise reads the model via a small generator;
-Ansible reads it as vars it already understands; Nix (for builds only) reads
-it via `builtins.fromJSON`. A stranger adopting the project fills in _their_
-Site Model and runs the same generic code — that is the whole portability
-story.
+under `freeops/` (§11). Ubuntu/mise reads the model via a small generator
+(toolchains/baseline only); CFEngine reads it via rendered Augments
+(`def.json`/`host_specific.json`, §4.4 — this is now the primary consumer
+for everything that used to be an Ansible task); Nix (for builds only)
+reads it via `builtins.fromJSON`. A stranger adopting the project fills in
+_their_ Site Model and runs the same generic code — that is the whole
+portability story.
 
 ### 4.3 Optional authoring frontend: the Nix module system (D12, new)
 
@@ -218,7 +220,7 @@ story.
 _runtime substrate_ on target hosts. It says nothing about what language an
 operator uses to _write_ the Site Model. The Site Model's canonical, at-rest
 representation stays exactly what §4.1 already specifies: plain JSON,
-schema-validated. Every consumer — Ansible, mise, generic code, a stranger's
+schema-validated. Every consumer — CFEngine, mise, generic code, a stranger's
 non-Nix fork — keeps reading that same JSON, unchanged.
 
 On top of that unchanged wire format, the Site Model MAY be authored as Nix
@@ -261,7 +263,7 @@ it's used, not _whether_ it's required anywhere new.
 The Site Model has to describe plenty of facts that are **not** fully
 Nix-buildable: a Termux `pkg` package (not reproducible, no derivation), a
 CFEngine promise that converges over time with retries, a service that's
-"desired: running" but reconciled by Ansible on its own schedule. This is
+"desired: running" reconciled on its own convergence schedule. This is
 not a problem for Nix-the-language, only for Nix-the-build-system —
 and D12 only invokes the former.
 
@@ -283,8 +285,8 @@ tapping a button on a phone. The determinism lives entirely in **what
 state is being described**, never in **how or when it's reached** — the
 same separation Kubernetes makes between a deterministic desired-state
 manifest and its genuinely non-deterministic, eventually-consistent
-controller loop. Site Model authoring is the manifest; Ansible/mise/
-CFEngine/the Android agent are the controllers.
+controller loop. Site Model authoring is the manifest; mise/CFEngine/the
+Android agent are the controllers.
 
 **One real constraint this implies:** don't use the nixpkgs-derived option
 types that assume a buildable output (`types.package`, `types.derivation`)
@@ -321,6 +323,201 @@ rebuild` as a side effect of authoring the model, and never touch
 `/nix/store` for anything beyond the evaluator's own transient scratch
 space.
 
+### 4.4 Compile target: CFEngine promises via Augments (D13/D14, new)
+
+**Ansible is fully removed (D13).** CFEngine — already present in the
+architecture as the self-heal/verification layer (R11, §5.4) — is now the
+sole service owner and executor on every platform, superseding D1. This
+isn't a downgrade of the trust story: CFEngine's promise model
+(Promise Theory — Burgess & Bergstra) is the only one of the candidates
+evaluated (Ansible, Puppet, bcfg2, CFEngine) whose formal theory was
+purpose-built for exactly this architecture's actual operating condition —
+autonomous agents, partial specification, non-deterministic convergence,
+open (incompletely-known) systems. Couch's convergence algebra ("On the
+Algebraic Structure of Convergence," DSOM 2003) formalizes why: if every
+promise is idempotent, the fleet reaches the same fixed point regardless
+of execution order or how much of a given device's state is unknown at
+deploy time — which is the actual shape of a heterogeneous, sometimes-
+offline Android fleet, not a hypothetical.
+
+**Deployment shape: git-distributed policy, a `cf-serverd` on every
+client, no central policy host.** This was previously scoped out on the
+belief that CFEngine needed dedicated policy-server infrastructure and an
+SSH/push model incompatible with stayturgid's architecture — both
+corrected 2026-08-13 (see `djbclark/stayturgid`
+`docs/research/evaluations/cfengine-evaluation-2026-07-12.md`, corrected
+in place). Neither constraint is real: there is no SSH/push requirement,
+and CFEngine is lightweight enough that each device runs its own
+`cf-serverd` reading policy synced via git (the same signed-release
+mechanism as everything else, §7) — no dedicated central policy host, no
+push, no SSH dependency at all. This is a **better** fit for §9's
+sovereignty model than Ansible's push-from-a-host approach ever was: each
+device pulling and applying its own signed policy locally is the same
+shape already planned for consent-driven Android deploys, just universal
+instead of Android-specific.
+
+**Compile target: CFEngine's own Augments layer, not raw `.cf` synthesis.**
+CFEngine has shipped a native JSON data-injection layer since 3.7
+(`def.json`/`host_specific.json`, moved into the core agent at 3.8.1),
+and its standard library (the Masterfiles Policy Framework, MPF) is
+already largely data-driven on top of it (`services/autorun` self-
+registers class-tagged bundles from data). This means the Nix→CFEngine
+compiler does **not** need to generate bundle/promise text for the common
+case — it renders the Site Model straight into the Augments JSON shape
+CFEngine already defines and MPF-style generic bundles already consume:
+
+```
+nix eval --store dummy:// --json .#cfengineAugments > def.json
+```
+
+A generic bundle (see §4.6) reads a `serverapps` (or equivalent) data
+structure and handles "ensure this package is present and pinned, these
+directories exist, this service is loaded" for **any** entry in the data —
+written once, not once per service. Merging (site → role → host layers)
+happens entirely in Nix (`mkDefault`/`mkForce`/`mkMerge`) before render;
+CFEngine's own `mergedata()` is not used for this to avoid the same
+"two type systems diverge" risk already called out for the JSON Schema in
+§4.3 — one merge engine, one source of truth.
+
+Only promise types MPF's stock library doesn't cover need actual `.cf`
+text, and even that is templated from typed Nix option values, not
+synthesized. **Guard, matching §4.3.1's `types.package`/`types.derivation`
+warning:** any module option that bottoms out in CFEngine's `commands`
+escape hatch (an arbitrary shell invocation, CFEngine's equivalent of
+Ansible's `shell`/`command` modules) must be flagged, not treated as safe
+merely because it came from a typed schema — rendering from Nix makes
+authorship deterministic, it does not make the underlying operation
+idempotent.
+
+### 4.5 Narrow, deferred: Puppet-catalog-JSON for genuinely ordered operations (D15, new)
+
+Not every operation reduces to an order-independent promise. Puppet's
+catalog compiler (formal semantics: µPuppet, ECOOP 2017) solves a
+**different, stronger** problem — resolve into one deterministic, provably
+ordered plan — which is the right tool exactly where a real sequencing
+constraint exists and the wrong default everywhere else (over-specifying
+order nothing requires).
+
+**The practical audit (2026-08-13) found this surface is small.** Checked
+every service-owning role across `stayturgid` and `site-djbclark` (14
+roles: `control_node`, 8 `serverapp_*`, `goose`, `hindsight`, `litellm`,
+`open_webui`, `site_agents`): **all 14 declare zero Ansible role
+dependencies** (`meta/dependencies: []` on every one) and are invoked as
+independent, single-role playbooks by an external orchestrator — already
+order-independent by construction, with zero use of Ansible's own
+ordering primitives (`notify`/`handlers`) anywhere in either repo. The
+**one confirmed, explicitly documented hard ordering constraint** in the
+whole surface is a bootstrap precondition in `site.yml`: "ensure
+intentionally precedes verify — a factory-reset device has no APKs to
+verify until the normal deploy installs the immutable locks." The
+**one candidate for more** is the Android `fleet/fleet.yml` play's
+six-role chain (`termux_userland → shizuku_config → tailscale_vpn →
+play_store → app_privileges → ensure_apps`), which is implicit
+(bare list order, no declared dependencies, no comments justifying most
+transitions) and **has not been audited** — given every other role in the
+codebase turned out to be order-independent once actually checked, it is
+a live possibility most of this chain decomposes into promises too.
+
+**Decision: do not build the Puppet-catalog compiler yet.** Hand-author
+the one confirmed bootstrap edge directly as a CFEngine
+`bundlesequence`/`depends_on` gate (small, doesn't need a second
+compiler). Audit the Android chain before deciding whether Puppet-catalog-
+JSON is needed at all — if the audit finds real hard constraints, that
+becomes the entire scope of the Puppet path: small and targeted, not a
+parallel general-purpose system built on spec.
+
+### 4.6 ncf/Rudder: reuse the code, not the project (D16, new)
+
+Rudder — originally built directly on CFEngine as one of two execution
+backends (the other: PowerShell/DSC for Windows) — is real, substantial,
+shipping-for-a-decade prior art for exactly this design's shape: a
+higher-level declarative layer (Rudder Language, plus a no-code Technique
+Editor built on **ncf**, a library of parameterized "generic methods")
+compiled down to CFEngine promises. It validates the Nix-module→generic-
+bundle pattern independently of anything built here.
+
+**Degree of reuse, checked directly:** `ncf` as an independent project is
+gone — archived, folded into the Rudder monorepo
+(`Normation/rudder/tree/master/policies/lib`), GPLv3 (not a concern per
+operator). Its generic-method bundles (`package_present`, file/line
+management, symlink management, service state — a broad, hardened
+catalog) are **ordinary CFEngine** — standard `files:`/`classes:` promise
+types, runnable under plain `cf-agent` with no Rudder server, GUI, or
+database required. But every bundle body has Rudder's own reporting
+convention woven directly into the promise logic (`_log_v3`, canonicalized
+`class_prefix`, standardized `<method>_<param>_{success|repaired|error}`
+outcome-class naming) — not an external dependency, but not free either.
+
+**Decision:** vendor and adapt individual generic-method bundles as a
+reference corpus — years of hardened CFEngine idiom for common file/
+package/service operations, worth lifting rather than re-deriving — while
+stripping the Rudder-specific reporting scaffolding and replacing it with
+fleetopia's own (§4.7). Not a dependency to track upstream (no
+independent release exists anymore); a one-time, per-method adaptation.
+**Zero coverage for the actual hardest part:** ncf/Rudder targets Linux
+and Windows only — no macOS/launchd story, no Android/Termux story. The
+`serverapp_*` launchd-plist-and-brew pattern was always fleetopia-original
+work regardless of this decision.
+
+### 4.7 Local-first reporting: per-device SQLite is the record of truth (D17, new)
+
+The centralized-shipping design (ship every promise outcome to the
+existing Vector/OpenObserve/VictoriaMetrics/Grafana stack, treat that as
+the record) is the wrong default for this fleet specifically: the
+documented operational history (Fire OS boot-recovery failures, flaky
+ADB-over-wireless, the peer-help mesh for offline devices) means a device
+is often unreachable from any hub exactly when its own debug history
+matters most. The relevant framing is **local-first software**
+(Kleppmann, Hardy, Kaffman & van Hardenberg, Ink & Switch 2019): each
+device holds its own authoritative copy, works fully offline, and any
+central/shared view is optional and eventually-consistent, never required
+for the device's own operation. (Same theoretical family as Couch's
+algebra and Promise Theory — convergent, order-independent state, not a
+new pattern.)
+
+**Design:** `stayturgid-agent` owns a local SQLite database per device as
+the authoritative record, populated from CFEngine's local promise-outcome
+log. On CFEngine Enterprise this is close to free — every promise outcome
+already writes to `$(sys.statedir)/promise_log.jsonl` automatically since
+3.9.0. On CFEngine **Community** (the edition actually in scope — GPLv3,
+matching D13/D14's licensing posture; Enterprise's COSL license was never
+part of this design), that local capture isn't automatic and needs a small
+piece of glue — a local syslog receiver or a thin `reports:` wrapper
+around the generic-method bundles' outcome logging (§4.6) that appends a
+structured line to a local file for `stayturgid-agent` to ingest. Keep
+ncf's outcome-state vocabulary (`success`/`repaired`/`error`/`n-a`,
+enforce mode; `compliant`/`noncompliant`/`error`/`n-a`, audit mode) — it's
+a well-tested structured vocabulary independent of where the output goes;
+only the sink changes.
+
+Rudder's own compliance database (PostgreSQL, no SQLite path — checked
+directly, no documented alternative-backend support) is **not** adopted
+even as a pattern-to-imitate-in-full: its per-node/per-directive/per-
+component report shape and its rule-compliance-as-a-query-over-raw-events
+model are worth keeping; its centralized root-server-plus-Postgres
+topology is structurally hub-and-spoke, the opposite of what this section
+decides. SQLite is also the right weight class for Termux specifically —
+no server process, already trivially available — consistent with the
+same adoptability instinct behind D6.
+
+Syncing a subset of local SQLite to the existing Vector/OpenObserve/
+Grafana stack is an optional, best-effort push **from** the device when
+reachable, never the record of truth.
+
+### 4.8 Nix store locality (D18, new)
+
+Wherever a real Nix store is used (the Termux artifact builder, §6; the
+Mac if nix-darwin is adopted, §5.2) — **never point `NIX_STORE_DIR` or
+the store's SQLite metadata DB (`db.sqlite`) at shared/network storage
+written by more than one host.** This is not a hypothetical risk: it is
+Nix's own documented failure mode (NixOS/nix#378 and related issues) —
+the store metadata DB is fine as a local, single-writer-per-host file
+(its normal, default behavior) and corrupts under concurrent multi-host
+writes. This is the same single-writer-per-node principle behind D17's
+local SQLite design, applied to Nix's own store rather than reinvented —
+keep every store strictly local to the host that owns it.
+
+
 ---
 
 ## 5. Platform layers (Nix everywhere except bare metal)
@@ -330,13 +527,16 @@ space.
 - **Base OS:** Ubuntu Server LTS, installed normally. No NixOS, no
   nixos-anywhere, no bare-metal Nix. A stranger clones the project onto their
   existing Ubuntu box and it works.
-- **Host baseline** (packages, users, ssh, tailscale, firewall, systemd
-  units for services): **mise `bootstrap` + Ansible adapters.** mise renders
-  packages and host baseline from the Site Model; Ansible adapters render
-  services (Vector/Caddy/etc.) — the already-debugged path. This was the
-  "exit adapter" in v1; it is now the _main_ adapter. `comin` stays rejected
-  (generic git-pull activation with no signed-update protocol — the trust
-  layer §7 replaces it properly).
+- **Host baseline and services** (packages, users, ssh, tailscale, firewall,
+  services like Vector/Caddy/etc.): **mise `bootstrap` (toolchains only) +
+  CFEngine promises (everything else — D13/D14, §4.4).** Ansible is fully
+  removed (D13): it owned this split in v1/v2-draft; CFEngine's promises,
+  rendered from the Site Model via Augments, now own both host baseline and
+  services on every platform, closing the "two adapters, one boundary" shape
+  Ansible/mise used to require. `comin` stays rejected (generic git-pull
+  activation with no signed-update protocol — the trust layer §7 replaces it
+  properly; CFEngine's git-distributed policy, §4.4, is signed and typed
+  where `comin` was neither).
 - **Nix on these boxes** is optional and _additive_: install multi-user Nix
   if you want it for building artifacts or dev shells, exactly as a stranger
   might `apt install` a tool. Never required for the runtime.
@@ -349,23 +549,46 @@ shell, dotfiles, defaults, declarative Homebrew) because generations and
 rollback genuinely help on the one machine you can't easily reimage, and
 because it's interesting. **[NEEDS FABLE-5 / MULTI-AI — see §14.1]:** whether
 to go nix-darwin on the Mac at all, given that keeping the Mac on the same
-mise+Ansible path as Ubuntu maximizes code sharing and keeps _one_ mental
+mise+CFEngine path as Ubuntu maximizes code sharing and keeps _one_ mental
 model. This is a real fork — the fun answer (nix-darwin, learn the tech) and
-the coherence answer (mise everywhere) diverge, and the operator said go the
-interesting route, so the default is **nix-darwin on the Mac** unless a
-review pass shows it fractures the Site Model. Services on the Mac stay
-Ansible-owned regardless (§6).
+the coherence answer (mise+CFEngine everywhere) diverge, and the operator
+said go the interesting route, so the default is **nix-darwin on the Mac**
+unless a review pass shows it fractures the Site Model. Services on the Mac
+stay CFEngine-owned regardless (§5.3) — nix-darwin, if adopted, owns
+substrate only, exactly as it would have owned substrate-only alongside
+Ansible before D13.
 
-### 5.3 Services — Ansible owns them, everywhere, permanently (D1, upheld)
+### 5.3 Services — CFEngine owns them, everywhere, permanently (D1 superseded by D13)
 
-Production services (`com.stayturgid.*`, `com.djbclark.*` and their systemd
-twins) are rendered by Ansible adapters from `services.yml`, on every
-platform. This is the panel's D1 decision and it survives the Ubuntu pivot
-_more_ strongly: with Ubuntu as reference, services must render on a
-vanilla-distro path anyway, so Ansible-owns-services is now the only
-sensible answer, not a compromise. nix-darwin (if adopted) owns Mac
-_substrate_, never services. The `launchd-writers.yml` lint enforces the
-boundary.
+**Production services (`com.stayturgid.*`, `com.djbclark.*` and their
+systemd twins) are rendered as CFEngine promises from `services.yml`, on
+every platform — Linux, macOS, and Android.** This replaces the panel's
+original D1 (Ansible, permanently). D1 is not "wrong, corrected" so much
+as it was decided before CFEngine's actual practical blockers were
+checked: the original disqualifiers (no Android binaries, SSH/push
+incompatibility, needing dedicated policy-server infrastructure) were
+never real requirements for this project, only unvalidated assumptions in
+an earlier evaluation, corrected 2026-08-13. Once cleared, CFEngine is
+the theoretically better fit on its own terms (§4.4) — not merely an
+acceptable substitute for Ansible.
+
+**Deployment shape (§4.4):** each host runs its own `cf-serverd`, reading
+policy synced via git as part of the normal signed-release mechanism
+(§7) — no dedicated central policy host, no push, no SSH dependency. The
+Site Model renders to Augments (`def.json`/`host_specific.json`); MPF-
+style generic bundles (§4.6) consume it. nix-darwin (if adopted, §5.2)
+owns Mac _substrate_, never services — the same boundary Ansible used to
+respect, now enforced by CFEngine instead. The `launchd-writers.yml` lint
+still enforces the writer-namespace boundary, unchanged by this decision.
+
+**What does not change:** CFEngine's role as the self-heal/last-ditch
+recovery layer (R11) — that role now merges with its role as primary
+service owner, since both are the same convergent-promise mechanism
+rather than two separate systems (previously: Ansible deploys, CFEngine
+independently verifies underneath it; now: CFEngine's own promises are
+both the deploy mechanism and their own verification, closing a
+previously-real gap where the verify layer could drift from the deploy
+layer, §4.7).
 
 ### 5.4 Android — unchanged stack, plus the artifact lane (R4/R6)
 
@@ -373,8 +596,9 @@ Termux, Shizuku fork, stayturgid-agent, CFEngine, FIRERPA, SSH CA, Tailscale
 — all unchanged. Two additions:
 
 - **Artifact lane:** Nix cross-builds static aarch64/Termux-target binaries
-  on a builder; they deploy as ordinary files via Ansible, content-addressed,
-  hash recorded in the manifest. Zero on-device Nix. Use selectively (pin a
+  on a builder; they deploy as ordinary files via CFEngine's pull (§4.4),
+  content-addressed, hash recorded in the manifest. Zero on-device Nix. Use
+  selectively (pin a
   fussy tool fleet-wide; ship what Termux `pkg` lacks — and note `pkg` is not
   reproducible, which is the actual justification).
 - **stayturgid-agent 2.0** grows the **consent/sovereignty surface** (§9) and
@@ -415,6 +639,79 @@ architecture.
   actually can't be substituted.
 - **Explicitly rejected:** `nix.linux-builder` VM; Docker as build/run
   substrate; emulation builds in the deploy path.
+
+### 6.1 Nix Flakes + flake-parts (D19, new)
+
+**One flake per repo, not a monorepo.** `fleetopia`, `stayturgid`,
+`site-djbclark`, and `site-private` stay separate git repos, coordinated
+by matching `ops-vX.Y.Z` tags (unchanged, R11). Each declares its own
+`flake.nix`; `stayturgid`/`site-djbclark`/`site-private` declare
+`fleetopia` as a flake input (`inputs.fleetopia.url =
+"github:djbclark/fleetopia?ref=<tag>"`), pinned exactly by `flake.lock` —
+which doubles as machine-readable cross-repo provenance for a release,
+close to free reproducibility documentation on top of what
+`ops-release.json` already tracks. **Open question, not yet resolved:**
+whether `flake.lock` can replace part of what `ops-release.json` tracks,
+or should stay a parallel, separately-maintained pin — needs a decision
+before Step 0 work on this touches release tooling.
+
+**fleetopia's flake is the one the others import, not the reverse.** The
+Site Model module-system _type definitions_ (D12/§4.3) live in
+fleetopia's flake outputs (`fleetopia.lib.siteModel` or equivalent) —
+public, generic, holds nobody's facts, same split as `freeops/` vs.
+`site-<n>` (§4.2). The concrete _values_ (site-specific facts) live in
+each site repo, supplying data through the module system fleetopia
+defines.
+
+**Concrete flake outputs:**
+
+- **`devShells`** — pinned toolchains for every task workspace under
+  `~/src/ops-worktrees/`, replacing the per-worktree `.venv-test`/
+  `node_modules` drift already flagged in prior research
+  (`dashboard-framework-evaluation`, tooling-review threads).
+- **`packages`** — the Termux cross-build artifact lane (§5.4/§6):
+  built once, content-addressed, shipped as ordinary files. The
+  least controversial use — this is what Nix is for, no store-free
+  tricks needed since builds happen on a Linux builder, never on-device.
+- **A Site-Model-rendering output** (e.g. `fleetopia.siteModel`) — the
+  actual D12/§4.4 compile step, `nix eval --json`, via `--store dummy://`
+  (§4.3.2) so it runs anywhere without a real store, including CI.
+- **`checks`** — `nix flake check` as the CI hook for the JSON-Schema/
+  lint gates already planned (the `registry_lint.py` pattern, §4.1):
+  schema validation, the "two type systems must not diverge" check
+  (§4.3, §4.4), and eventually idempotence property tests, so `nix flake
+  check` is the single command that gates whether a Site Model change is
+  safe to sign into a release.
+
+**Structural choice: flake-parts for the flake's own internal
+composition** — consistent with leaning on the module-system idiom
+everywhere else in this design (D12, the Site Model itself), rather than
+hand-rolled `outputs = { self, nixpkgs, ... }: { ... }` boilerplate.
+Community guidance worth following deliberately: keep `flake.nix` thin,
+do the real logic in plain importable `.nix` files the flake wraps — the
+Site Model module system should not need to know or care that it's being
+invoked from a flake at all.
+
+**Status:** flakes remain formally "experimental" upstream, no committed
+stabilization timeline, but stable in practice since 2021 with few
+breaking CLI changes; Determinate Nix (already referenced, §5.1) ships
+them as stable. Not a bet on unreleased functionality.
+
+**Known gotchas, worth documenting before they cost debugging time:**
+flake evaluation is sandboxed to git-tracked files only (a new file must
+be `git add`ed before `nix eval` inside the flake sees it); pure
+evaluation disables `currentTime`/`currentSystem` and ambient filesystem
+access — correct behavior for a reproducible renderer, but anything
+needing wall-clock time (release-expiry windows, §7.2) must be passed in
+explicitly, never read ambiently; `flake.lock` updates
+(`nix flake update`) should go through the same review/consent gate as
+any other Site Model change (§7/§8), not be a silent side effect of
+running a command.
+
+**Nix store locality (§4.8) applies here too:** wherever `packages`
+outputs actually build (the Linux `builder` role, or the Mac if
+nix-darwin is adopted), the store stays strictly local to that host —
+never shared/network storage across builders.
 
 ---
 
@@ -466,10 +763,12 @@ may touch — checked against the registries), `target` (bound to the host's
 public key), `rollback`, `expiry`, `nonce`. The **executor on each platform
 mechanically refuses any effect outside the declared set**:
 
-- **Ansible/Ubuntu+macOS:** a wrapper that maps declared capabilities to an
-  allowlist of modules/paths; a task touching an undeclared port/path/unit
-  fails closed. (Not "run the playbook because its hash is signed" — that is
-  RT-03.)
+- **CFEngine/Ubuntu+macOS+Android:** a wrapper that maps declared
+  capabilities to an allowlist of promise types/classes/paths; a promise
+  touching an undeclared port/path/unit fails closed. (Not "apply the
+  bundle because its hash is signed" — that is RT-03, and it applies
+  identically to CFEngine's bundle/promise surface as it did to Ansible's
+  task surface.)
 - **Android agent:** operations map to a closed set of agent verbs; anything
   outside is refused; Shizuku actions are individually enumerated, never
   "run this APK."
@@ -483,19 +782,70 @@ across a CVE and restarts the public proxy"). The semantic layer briefs the
 user and their advisor AI; it never authorizes — only the verifiable layer,
 checked by the executor, authorizes.
 
-### 7.4 Push and pull (both first-class)
+### 7.4 Push and pull (both first-class, both now CFEngine — D13)
+
+Post-D13, push and pull are two modes of the **same** mechanism (CFEngine's
+own convergence), not two separate systems as in the Ansible-push /
+CFEngine-verify-underneath split this section previously described:
 
 - **Push:** from any host holding a `deploy-origin` role (plural — R2), via
-  Ansible entry points and (on any Nix-artifact steps) content-addressed
-  fetch. This is the **v1 path** and it is safe with §7.2–7.3 alone.
-- **Pull:** a small converge agent (systemd/launchd timer) — **CLOSE-BY-SCOPE
-  until the full §7.2 client protocol + resource quotas exist** (red-team
-  RT-07 DoS). A fleet where every host pulls and none pushes _is_ the
-  no-control-node end state, reached by editing `roles.yml`. Build it, gated.
-- **CFEngine** stays beneath both. **But its remote-exec channel is both the
-  recovery path and an attack surface** (tooling review): authenticate,
-  authorize, and rate-limit `cf-runagent`; prefer SSH-mediated `just cf-run`
-  over an open channel.
+  `cf-runagent` (or the `just cf-run` wrapper around it) to trigger an
+  immediate convergence run on a target instead of waiting for its next
+  periodic pull, plus (on any Nix-artifact steps) content-addressed fetch.
+  This is the **v1 path** and it is safe with §7.2–7.3 alone. **The
+  remote-exec channel is both the recovery path and an attack surface**
+  (tooling review, unchanged from the earlier assessment): authenticate,
+  authorize, and rate-limit `cf-runagent`; prefer SSH-mediated `just
+  cf-run` over an open channel.
+- **Pull:** each host's own `cf-serverd`/`cf-execd` on its normal
+  convergence schedule, reading policy synced via git (§4.4) —
+  **CLOSE-BY-SCOPE until the full §7.2 client protocol + resource quotas
+  exist** (red-team RT-07 DoS). A fleet where every host pulls and none is
+  ever pushed _is_ the no-control-node end state, reached by editing
+  `roles.yml`. Build it, gated.
+- **Latency caveat (§4.7):** CFEngine's default convergence interval
+  (~5 min) is fine for most facts, wrong for anything time-critical (e.g.
+  a signed emergency revocation) — that needs the explicit push path
+  above, not "wait for the next cycle."
+
+### 7.5 AI-authorship guardrails for the compile targets (D13/D14, new)
+
+Relevant finding: a survey of LLM-generated infrastructure-as-code
+(arXiv 2404.00227) found the field heavily weighted toward *generation*
+(natural language → Ansible YAML, e.g. Ansible Lightspeed) with
+*correctness verification* left thin — evaluated mostly by textual
+similarity to a reference (BLEU, CodeBERTScore), not semantic/idempotence
+correctness. Load-bearing conclusion: **don't trust an AI to freehand
+policy text and assume it's fine because it looks right** — the same
+caution that already applies to AI-authored `shell`/`command` Ansible
+tasks applies at least as strongly to CFEngine's `commands` escape hatch
+(§4.4), since it's newer, less-reviewed surface with no equivalent
+history of production scrutiny.
+
+**Good fits for AI, because the output is mechanically checkable:**
+
+- Drafting Nix module option schemas from an existing example (e.g. "here's
+  `serverapp_grafana`'s Ansible tasks, draft the equivalent typed
+  options") — checkable against `nix eval` succeeding and the JSON Schema
+  validating.
+- The §4.5 dependency audit (classifying `fleet.yml`'s role transitions as
+  real dependencies or habit) — tedious for a human, mechanical for an AI,
+  falsifiable by testing whether a role actually breaks without its
+  predecessor.
+- Generating idempotence test harnesses ("apply twice, assert the second
+  application is a no-op") for a rendered promise or generic method —
+  checkable pass/fail output, mirroring the academic idempotence-testing
+  literature.
+- A static gate scanning proposed module additions for the escape-hatch
+  trap (`commands`-type promises, `types.package`/`types.derivation`
+  misuse per §4.3.1) before merge — bounded pattern-matching, not
+  open-ended generation.
+
+**Poor fit without heavy guardrails:** freehand-authoring `.cf` text for a
+genuinely novel promise type MPF/ncf (§4.6) doesn't already cover — no
+schema to check against, no formal semantics to verify against (unlike
+Puppet's µPuppet fragment, §4.5), and exactly the category the empirical
+IaC-bug literature identifies as where idempotence bugs concentrate.
 
 ---
 
@@ -507,7 +857,7 @@ Do not open a capability before its gate.
 
 | Capability                                      | Gate (all must hold)                                                                                                                                                                                               |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Signed push to operator hosts** (v1 baseline) | TUF-subset root + targets/snapshot + high-water marks + typed ChangePlan executor enforcing on Ansible + source-to-signing hygiene (§8.1)                                                                          |
+| **Signed push to operator hosts** (v1 baseline) | TUF-subset root + targets/snapshot + high-water marks + typed ChangePlan executor enforcing on CFEngine + source-to-signing hygiene (§8.1)                                                                          |
 | **Autonomous pull (timers)**                    | above + timestamp role + converge resource quotas/backoff/kill-switch + hostile-mirror tests                                                                                                                       |
 | **Consented devices**                           | above + device-key-bound, single-use, expiring consent grants + capability-enforcing agent executor + **Android artifact provenance** (dep locks, SBOM, signing-cert pin; independent rebuild for privileged APKs) |
 | **Private cache / builder scale-out**           | separated build/upload/serve/release authorities + NAR-digest verification before activation + revocable-without-fleet-reinstall                                                                                   |
@@ -669,7 +1019,7 @@ because it de-risks the reference target that everything else depends on.
   (§8.1). Coherent stop: same system, now with a truthful data spine and a
   provenance gate. _Also the cheapest possible agent work — good first task
   under the budget._
-- **Step 1 — Ubuntu reference path.** mise `bootstrap` + Ansible adapters
+- **Step 1 — Ubuntu reference path.** mise `bootstrap` + CFEngine promises
   render a real Ubuntu host from the Site Model. This is the adoptability
   keystone; do it early even before you own a VPS, by rendering + dry-running
   against a throwaway box or container-like target. Coherent stop: the
@@ -681,12 +1031,12 @@ because it de-risks the reference target that everything else depends on.
   it and the Mac/fleet are unchanged.
 - **Step 3 — Signed releases (push-only) + typed executor.** TUF-subset root
   ceremony; manifest + ChangePlan generation in `ops-release-*`; the
-  capability-enforcing executor on Ansible (§7.3, §8). Push-only, operator
+  capability-enforcing executor on CFEngine (§7.3, §8). Push-only, operator
   hosts. Coherent stop: every deploy is a signed, execution-constrained plan;
   no autonomous anything yet.
 - **Step 4 — Mac substrate (the interesting, optional Nix step).** If §14.1
   resolves toward nix-darwin: bring the Mac substrate under nix-darwin +
-  home-manager, services still Ansible. Fully reversible (`darwin-rebuild
+  home-manager, services still CFEngine. Fully reversible (`darwin-rebuild
 --rollback`). Coherent stop: Mac substrate is declarative; nothing depends
   on it that couldn't run on the mise path.
 - **Step 5 — Pull convergence.** Converge agent with the full §7.2 client
@@ -764,9 +1114,9 @@ unresolved, it should write a question doc and stop, not improvise.
 
 | #         | Decision                 | Resolution                                                                                                                                                                                         |
 | --------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1        | Production service owner | **Ansible, permanently, all platforms.** Strengthened by R5.                                                                                                                                       |
+| D1        | Production service owner | **SUPERSEDED by D13 (2026-08-13).** Was: Ansible, permanently, all platforms.                                                                                                                      |
 | D2        | Site Model formality     | Schemas at Step 0; generation gradual; writer-lint immediate.                                                                                                                                      |
-| D3        | Ubuntu reference path    | **mise baseline + Ansible services is the PRIMARY Linux path** (promoted from "exit").                                                                                                             |
+| D3        | Ubuntu reference path    | **mise baseline (toolchains) + CFEngine services is the PRIMARY Linux path** (revised by D13; promoted from "exit" originally).                                                                    |
 | D5        | Literate scope           | **Widened** (§10); token cost no longer the limiter.                                                                                                                                               |
 | D6        | Nix on bare metal        | **NO — hard fact.** Nix for builds/dev-shells/Mac-substrate only.                                                                                                                                  |
 | D8 (new)  | Trust layer disposition  | **Build it, gated (§8).** The "defer indefinitely" option is rejected — sovereignty is the point.                                                                                                  |
@@ -774,6 +1124,13 @@ unresolved, it should write a question doc and stop, not improvise.
 | D10 (new) | Task runner              | **Keep `just`** as the human verb surface; start using its dependency support; mise stays scoped to toolchains/baseline. Both reviewers concurred; a real DAG need is the only trigger to revisit. |
 | D11 (new) | Trust-layer scope cuts   | Per the defensive pass: FIX-IN-V1 the root/executor/high-water/secret-monitor; CLOSE-BY-SCOPE consent/cache/failover/APK-provenance behind §8 gates; never automate local-fix.                     |
 | D12 (new) | Site Model authoring language | **Nix module system MAY author the Site Model** (§4.3), rendered to the same schema-validated JSON everything already consumes. Distinct from D6: this is about the authoring frontend, not the runtime substrate — D6's "no bare-metal Nix" is unchanged. Non-Nix JSON/YAML authoring stays a supported fallback for adoptability. |
+| D13 (new) | Ansible removal / service owner | **Ansible is fully removed — from service ownership AND host-baseline/bootstrap.** CFEngine (promises) + mise (toolchains only) replace it everywhere, all platforms, superseding D1 (§5.3, §5.1). The original Ansible-over-CFEngine blockers (no Android binaries, SSH/push incompatibility, needing dedicated policy-server infra, GPLv3) were an earlier analyst's unvalidated assumptions, corrected 2026-08-13 — not real constraints. Purely on theoretical fit (Promise Theory/Couch's algebra vs. no comparable formal grounding for Ansible), CFEngine was always the better answer; D1 reflected an unchecked practicality objection, not a considered rejection. |
+| D14 (new) | CFEngine deployment shape | **Git-distributed policy, `cf-serverd` on every client, no dedicated central policy host, no push/SSH requirement** (§4.4, §7.4). Push (via `cf-runagent`/`just cf-run`) and pull (each host's own convergence schedule) are both first-class, same mechanism. |
+| D15 (new) | Nix→CFEngine compile target | **CFEngine's native Augments layer (`def.json`/`host_specific.json`), not raw `.cf` synthesis** (§4.4). Merging happens once, in Nix, before render — CFEngine's `mergedata()` is not used for this, to avoid a second, divergent merge engine. |
+| D16 (new) | Order-dependent operations | **Puppet-catalog-JSON stays narrow and deferred** (§4.5) — not built until the `fleet/fleet.yml` Android chain is actually audited. The one confirmed hard dependency (ensure-precedes-verify APK bootstrap) is hand-authored directly as a CFEngine `bundlesequence`/`depends_on` gate, no second compiler needed for it alone. |
+| D17 (new) | ncf/Rudder reuse            | **Vendor and adapt individual generic-method bundle bodies as a reference corpus, strip Rudder's reporting scaffolding** (§4.6). Not a dependency — `ncf` is archived, folded into the Rudder monorepo, no independent release to track. Zero coverage for macOS/Android; that work was always fleetopia-original. |
+| D18 (new) | Local-first reporting        | **Per-device SQLite (owned by `stayturgid-agent`) is the authoritative record, not the central observability stack** (§4.7). Populated from CFEngine's local promise-outcome log; ncf's outcome-state vocabulary retained; sync to Vector/OpenObserve/Grafana is optional and best-effort, never required for local debugging. Rudder's own Postgres-backed compliance DB is explicitly not adopted (no SQLite path exists; its hub-and-spoke topology is the wrong shape here). |
+| D19 (new) | Nix Flakes + flake-parts     | **Adopted** (§6.1) — one flake per repo, `fleetopia`'s flake as the shared module-system library the other three repos import, flake-parts for internal composition. `flake.lock` vs. `ops-release.json` overlap is an **open question**, not yet resolved — needs a decision before Step 0 work touches release tooling. Nix store locality (§4.8, single-writer-per-host, never shared/network storage) applies to every flake `packages` build. |
 
 Silence = proceed from Step 0. Objections amend this register, not the
 archived documents.
@@ -801,6 +1158,57 @@ archived documents.
 - `ideas-dump-claude.md` — unprotected; the two-agent-consent control, the
   semantic/verifiable plan split, the role-mesh-is-consensus flag, and the
   model/vendor notes all graduated into this document.
+
+### 16.1 Prior-art bibliography (D13–D19 research, 2026-08-13 session)
+
+Not archived as separate documents — captured here so the D13–D19 decisions
+aren't re-derived from scratch by a future reader. Full citations and the
+research trail live in the session transcript; key names, for follow-up:
+
+- **Convergence/promise theory:** Alva Couch & Yizhan Sun, "On the
+  Algebraic Structure of Convergence" (DSOM 2003); Mark Burgess & Jan
+  Bergstra, Promise Theory (formalized ~2005) — the formal grounding for
+  D13/D14.
+- **Formal semantics of config languages:** µPuppet (Edinburgh, ECOOP
+  2017; arXiv 1608.04999) — the bar CFEngine's `.cf` language doesn't
+  clear, why §4.5's Puppet-catalog path stays narrow rather than becoming
+  the default.
+- **Declarative-to-imperative deployment synthesis (harder, rejected as a
+  general approach):** Aeolus/Zephyrus/Zephyrus2 (Di Cosmo, Mauro,
+  Zacchiroli et al.), Engage (Fischer, Majumdar, Esmaeilsabzali), METIS —
+  academically real, never achieved broad practical traction; evidence for
+  why §4.4/§4.5 scope down instead of attempting general synthesis.
+- **Network-config synthesis (the version of this pattern that shipped in
+  production):** NetKAT (Foster, Kozen et al.), Merlin, Propane, Genesis —
+  worked because the target (flow tables, routing) is narrow and
+  algebraically clean, unlike general host config.
+- **Refinement calculus (the math-side ancestor):** Ralph-Johan Back
+  (1978); Carroll Morgan, *Programming from Specifications*.
+- **AI planning / IT-specific:** Bylander, "Computational Complexity of
+  Propositional STRIPS Planning" (PSPACE-complete, 1994); Erol/Hendler/Nau
+  HTN planning, SHOP2 — the paradigm actually matching hand-authored
+  Ansible-roles/CFEngine-bundles/Puppet-classes; Srivastava & Kambhampati,
+  "The Case for Automated Planning in Autonomic Computing" (ICAC 2005);
+  CHAMPS (Keller et al., IBM Research, NOMS 2004) — real deployment
+  planning system, framed the underlying problem as "mathematically
+  intractable," solved via domain-specific heuristics, not general search.
+- **Rudder/ncf (D17):** Rudder (Normation) — Technique Editor + Rudder
+  Language compiling to CFEngine (and PowerShell/DSC) promises; `ncf`
+  generic methods, archived into `Normation/rudder/tree/master/policies/
+  lib`; CFBS (CFEngine Build System) — JSON-based module composition,
+  official.
+- **Local-first (D18):** Kleppmann, Hardy, Kaffman & van Hardenberg,
+  "Local-first software: you own your data, in spite of the cloud" (Ink &
+  Switch, 2019).
+- **LLM-authored IaC risk profile (§7.5):** survey at arXiv 2404.00227 —
+  generation well-studied, correctness verification thin.
+- **Empirical IaC bug taxonomy (motivates §4.4's `commands`-escape-hatch
+  guard):** "When Your Infrastructure Is a Buggy Program: Understanding
+  Faults in Infrastructure as Code Ecosystems" (ACM PACMPL 2024).
+- **stayturgid's own corrected research:** `djbclark/stayturgid`
+  `docs/research/evaluations/cfengine-evaluation-2026-07-12.md` (corrected
+  in place, 2026-08-13, commit `3cfd3fa` on `feature/stayturgid-2.0`) and
+  `docs/research/evaluations/bcfg2-evaluation-2026-07-12.md`.
 
 _Filed under djbclark/fleetopia#1. Amend via this register; treat the
 archived reviews as immutable record._
