@@ -1,0 +1,33 @@
+Review the following paper.
+
+While reading, consider the following:
+- Objective of the work: What is the goal of the paper? Is it to better address a known application or problem, draw attention to a new application or problem, or to introduce and/or explain a new theoretical finding? A combination of these?
+- Strong points: is the submission clear, technically correct, experimentally rigorous, reproducible, does it present novel findings?
+- Weak points: is it weak in any of the aspects listed above?
+- Be mindful of potential biases and try to be open-minded about the value and interest a paper can hold for the community.
+
+Answer four key questions for yourself, to make a recommendation to Accept or Reject:
+- What is the specific question and/or problem tackled by the paper?
+- Is the approach well motivated, including being well-placed in the literature?
+- Does the paper support the claims? This includes determining if results are correct and scientifically rigorous.
+- What is the significance of the work? Does it contribute new knowledge and sufficient value to the community?
+
+Write your review including the following sections:
+
+## Presentation
+Please assign the paper a numerical rating (4: excellent, 3: good, 2: fair, 1: poor) to indicate the quality of the presentation.
+
+## Contribution
+Please assign the paper a numerical rating (4: excellent, 3: good, 2: fair, 1: poor) to indicate the quality of the overall contribution this paper makes to the research area being studied.
+
+## Strengths
+A substantive assessment of the strengths of the paper, touching on each of the following dimensions: originality, quality, clarity, and significance.
+
+## Weaknesses
+A substantive assessment of the weaknesses of the paper. Focus on constructive and actionable insights on how the work could improve towards its stated goals. Be specific, avoid generic remarks.
+
+## Questions
+Please list up and carefully describe any questions and suggestions for the authors. Think of the things where a response from the author can change your opinion, clarify a confusion or address a limitation.
+
+PAPER TEXT FOLLOWS:
+---

@@ -1,0 +1,12 @@
+You are an expert academic paper reviewer in computer science. Your task is to carefully analyze the following text from a research paper and identify ALL potential scientific errors, methodological flaws, or integrity issues.
+
+Important: The text below may contain multiple errors. You must detect and report each error independently.
+
+For each detected error, provide:
+1. Error Category: (Choose from: evidence/data integrity, method-logic consistency, experimental design protocol, claim overstatement, or prior work attribution).
+2. Location: The specific section, equation, or paragraph where the error occurs.
+3. Explanation: A concise explanation of why this constitutes a scientific or methodological flaw.
+4. Actionable Fix: What the authors must do to resolve the issue.
+
+Text to Review:
+---
