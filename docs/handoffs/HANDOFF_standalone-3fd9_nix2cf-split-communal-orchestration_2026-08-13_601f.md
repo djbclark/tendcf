@@ -406,14 +406,23 @@ release tooling *and* determines the cost of the nix2cf/fleet repo split.
 **5. Record the Site Model boundary decision** (schemas in nix2cf, instances in
 the fleet repo) in the architecture doc — decided this session, not yet written.
 
-**6. Secretspec extraction + upstreaming** (operator-queued, not started). Two
-pieces with different odds: the 1Password Service Account provider is a clean
-upstream candidate; the `_secretspec` privilege-separation exec wrapper is
-opinionated and may fit better as a documented pattern. **Ownership:**
-`control/lib/secretspec_exec.py` belongs to orc/secretspec-canon per the
-chain-`bfbf` handoff — coordinate, do not just extract. Check first whether its
-live regression (wrapper exec'ing all of `ansible-playbook` as `_secretspec`,
-whose `/var/empty` home is unwritable) was ever fixed.
+**6. Secretspec — DO NOT ACT ON THIS ITEM. Not ours.** (Corrected
+2026-08-13, after this handoff was first written.) **Hermes is the primary
+owner of the SecretSpec work** and has instructed that no SecretSpec edits or
+coordination happen from this chain. Direct any SecretSpec question to Hermes
+rather than acting.
+
+The operator's original queued request ("separate out our secretspec work,
+clean it up, try to get it upstream") is superseded as *this chain's* task —
+it belongs to the owner now.
+
+**Retracted:** an earlier version of this item recommended upstreaming a
+1Password Service Account provider. That recommendation was **wrong** — it
+assumed a provider path that is not part of the chosen architecture. Do not
+revive it. The architecture is Hermes's to describe; this document
+deliberately does not restate it, to avoid becoming a second, drifting copy.
+The durable memory `project_secretspec_onepassword_integration` is stale for
+the same reason and is flagged for the operator, not edited from here.
 
 **7. Triage stayturgid `#288`/`#289`/`#290`.** `#288` is a one-line fix.
 
