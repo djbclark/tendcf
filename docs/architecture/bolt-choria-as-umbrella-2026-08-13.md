@@ -1,5 +1,7 @@
 # Bolt or Choria as the umbrella — and what dropping local-first changes
 
+> **Archival (2026-08-13).** Snapshot of research as of that date. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins. Do not rewrite this file to bring it up to date.
+
 Operator follow-up, 2026-08-13, to `rudder-as-umbrella-evaluation-2026-08-13.md`.
 Two instructions: **local-first debuggability is no longer a hard
 requirement**, and: could everything live under the umbrella of one of the

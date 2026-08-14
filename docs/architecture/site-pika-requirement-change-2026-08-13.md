@@ -1,5 +1,7 @@
 # site-pika requirement change — three root-trusted admins, no GUI
 
+> **Archival (2026-08-13).** Snapshot of research as of that date. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins. Do not rewrite this file to bring it up to date.
+
 Operator, 2026-08-13, superseding the site-pika assumptions used in
 `rudder-as-umbrella-evaluation-2026-08-13.md` and
 `bolt-choria-as-umbrella-2026-08-13.md`.

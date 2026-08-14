@@ -1,5 +1,5 @@
 # Example instance — validates against schema/roles.schema.json.
-# Fixture, not site data (D21, §4.2).
+# Fixture, not site data (D21).
 
 contract_version: 1
 

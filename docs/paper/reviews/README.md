@@ -1,9 +1,13 @@
 # AI pre-reviews of the architecture paper (2026-08-13)
 
-Three machine reviews of `../tendcf-architecture-paper.md` (reviewed under
-its prior name, `fleetopia-architecture-paper.md`), run before
-sending it to a human reviewer. Two prompts (operator-supplied, ICLR/
-OpenReviewer style and PaperAudit-Bench style) against two model families.
+> **Archival.** Reviews of an earlier draft of the paper (then named
+> `fleetopia-architecture-paper.md`). Not current design. On conflict,
+> [`../tendcf-architecture-guide.md`](../tendcf-architecture-guide.md)
+> wins. Do not rewrite these files to bring them up to date.
+
+Three machine reviews of that earlier draft, run before sending it to a
+human reviewer. Two prompts (operator-supplied, ICLR/OpenReviewer style
+and PaperAudit-Bench style) against two model families.
 
 | File | Model | Prompt |
 | --- | --- | --- |

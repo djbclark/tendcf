@@ -1,5 +1,7 @@
 # "Just do Rudder, and extend it for Termux" — what that gains and loses
 
+> **Archival (2026-08-13).** Snapshot of research as of that date. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins. Do not rewrite this file to bring it up to date.
+
 Operator question, 2026-08-13, following the research leg in
 `orchestration-research-2026-08-13.md`. Evaluates the option of dropping
 the nix2cf/CFEngine-compile-target approach and instead standing up a

@@ -1,16 +1,23 @@
 # How tendcf works
 
-**A companion to the technical paper.** Same architecture, plainer language.
-This version describes the system as it is designed today, and what is
-planned next. It does not recount how the design was reached.
+**Vetted current-state description.** Same architecture as the technical
+paper, in plainer language. This version describes the system as it is
+designed today, and what is planned next. It does not recount how the
+design was reached.
+
+Where any other living document disagrees on the **current design**,
+**this guide wins**. Archival files (dated notes, briefs, handoffs,
+deprecated drafts, paper reviews) are snapshots; do not rewrite them to
+match — they lose on conflict.
 
 Draft for review — not published, not submitted.
 Daniel Joseph Barnhart Clark (djbclark@mit.edu).
-Prepared 2026-08-14; updated 2026-08-14 to match architecture v3.
+Prepared 2026-08-14.
 
-The living architecture (decisions, build order, protection rules) is
-[`architecture-DEFINITIVE-v3.md`](../architecture/architecture-DEFINITIVE-v3.md).
-The technical paper, with citations and open questions in research form, is
+The implementer map (decisions, build order, protection rules) is
+[`architecture-DEFINITIVE-v3.md`](../architecture/architecture-DEFINITIVE-v3.md)
+and must agree with this guide. The technical paper, with citations and
+open questions in research form, is
 [`tendcf-architecture-paper.md`](tendcf-architecture-paper.md).
 
 **Nothing described here is deployed.** Some data formats exist and are

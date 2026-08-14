@@ -1,5 +1,7 @@
 # PRE-MORTEM / SCOPE-REALISM BRIEF — fleetopia
 
+> **Archival.** Prompt that produced a now-deprecated draft. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins.
+
 ## Why this exists
 
 Every document in `docs/architecture/` is architecture. Not one asks the two questions

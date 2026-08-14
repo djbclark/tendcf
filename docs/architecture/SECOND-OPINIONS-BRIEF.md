@@ -1,5 +1,7 @@
 # SECOND-OPINIONS BRIEF — fleetopia architecture proposal
 
+> **Archival.** Prompt that produced a now-deprecated draft. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins.
+
 You are one of three independent AI architects asked for a second opinion.
 Work happens in this git worktree:
 `/Users/djbclark/src/fleetopia` (branch

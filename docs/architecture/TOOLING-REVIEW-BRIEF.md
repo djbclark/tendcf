@@ -1,5 +1,7 @@
 # TOOLING ASSUMPTIONS REVIEW BRIEF — fleetopia
 
+> **Archival.** Prompt that produced a now-deprecated draft. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins.
+
 ## Why this exists
 
 The 2026-08-08 architecture panel (4 AI proposals + 1 red-team, all in

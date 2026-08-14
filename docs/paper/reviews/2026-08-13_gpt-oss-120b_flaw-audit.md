@@ -1,3 +1,5 @@
+> **Archival (2026-08-13).** Review of an earlier paper draft. Not current design. On conflict, [`../tendcf-architecture-guide.md`](../tendcf-architecture-guide.md) wins.
+
 **Scientific‑error review of “fleetopia: A Configuration Management Architecture for AI‑Authored Configuration”**  
 
 Below is a **complete catalogue of flaws** detected in the draft. Each entry follows the required template:

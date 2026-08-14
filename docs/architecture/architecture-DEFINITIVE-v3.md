@@ -7,10 +7,13 @@
 > doc or a comment on djbclark/tendcf#1. This file is the map, not the
 > worksheet. Read §0 first.
 
-- **Status:** Definitive architecture. Supersedes
-  `deprecated/architecture-DEFINITIVE-v2.md` where they conflict (this
-  document wins). Numbered v1/v2 files, panel drafts, and the v2 trust
-  spec are archival — see `deprecated/README.md`.
+- **Status:** Implementer map (decisions, build order, protection).
+  Supersedes `deprecated/architecture-DEFINITIVE-v2.md` where they
+  conflict. The vetted current-state description is
+  `docs/paper/tendcf-architecture-guide.md`; where this file and that
+  guide disagree on the current design, **the guide wins**. Numbered
+  v1/v2 files, panel drafts, and the v2 trust spec are archival — see
+  `deprecated/README.md`.
 - **Date:** 2026-08-14
 - **Tracker:** djbclark/tendcf#1.
 
@@ -119,7 +122,7 @@ error**. Only site-private may bind a winner or a short name.
 
 ---
 
-## 3. On-disk and repo layout (D34, D35, D21 revised)
+## 3. On-disk and repo layout (D34, D35, D21)
 
 Git-repo count is not the composition mechanism. Layers are **roles**.
 Site-private holds a **lockfile** (flake-style inputs) that pins tendcf,
@@ -217,7 +220,7 @@ Optional Nix module frontend (`mkOption` / `mkIf` / `mkDefault`):
 renders to the same JSON. JSON Schema is generated from the module
 options; never hand-maintain both. Strangers need not know Nix.
 
-### 4.2 Token discovery (D40 — closes former open question 15.9)
+### 4.2 Token discovery (D40)
 
 Inference removes “you must already know the *edge*.” Naming the *thing*
 is a catalog, not a graph.
@@ -355,7 +358,7 @@ that holds that role). Bcfg2’s FSM is a **view** reconstructed from JSONL
 
 ---
 
-## 8. Local record (D18 revised)
+## 8. Local record (D18)
 
 The local capture must exist on CFEngine Community anyway. The device’s
 record is authoritative because devices go unreachable; a central copy
@@ -460,8 +463,7 @@ Each device carries a **local trust policy** in its signed release
 Peer actions (§7) check the **target’s** peer allowlist, not only “the
 helper has a capability.” Identity is the device public key.
 
-A label in inventory does not enforce this. The executor does. That was
-already a red-team finding; it still holds.
+A label in inventory does not enforce this. The executor does.
 
 Web-of-trust thresholds (“50% of people I trust have installed this”)
 live in the **advisor plug-in**, not in the executor.
@@ -592,7 +594,7 @@ Older “superseded by” archaeology lives in
 | D29 | Semantic layer | Template-fill from IR; free prose cites IR fields. |
 | D30 | `.cf` escape hatch | Prefer a grammar before lint-only, when that surface is exercised. |
 | D31 | Front or back | Critical fields at start or end of agent-facing artifacts. |
-| D32 | Compiler prior art | Mechanism common; Nix+CFEngine pairing not the novelty claim. |
+| D32 | Compiler prior art | Mechanism common; Site Model → CFEngine is the pairing, not a novel compiler mechanism. |
 | D33 | No control node | Promise Theory’s; GitOps is the closest shape. |
 | D34 | Repo layers | tendcf / site-shared / site-private / foreign / optional tool forks. Conflict-as-error; private binds. |
 | D35 | Inventory | Private by default; kinds, templates, explicit exports may be shared. |
@@ -609,35 +611,41 @@ Silence = proceed from Step 0. Objections amend this register.
 
 ## 16. Open questions (remaining)
 
+Same nine as the guide.
+
 1. Is inference justified, or is retry-until-stable already the local
    answer?
 2. Is the writing rule an argument or a hypothesis?
 3. Do `not-yet-migrated` counts get ground down without a dedicated role?
 4. Is per-domain the right granularity for comprehensiveness?
-5. When a global yes/no arrives, is querying reachable devices and
+5. Is local-first the wrong call? Network-wide reports are what bought
+   administrator trust in the Bcfg2 deployment.
+6. When a global yes/no arrives, is querying reachable devices and
    treating the rest as unknown enough?
-6. Does edge origin information actually turn “why is this waiting?”
+7. Does edge origin information actually turn “why is this waiting?”
    into a query?
-7. Does the ChangePlan capability list survive real operations without
+8. Does the ChangePlan capability list survive real operations without
    an escape hatch?
-8. If the real AI failure mode is plausible-looking output that types
+9. If the real AI failure mode is plausible-looking output that types
    do not catch, are we hardening the wrong surface?
 
-Token discovery (old 15.9) is **D40**, not open. Trust-tier-as-label
-(old confusion with full mesh) is **D38**.
+Token discovery is **D40**, not open. Trust-tier-as-label (confusion
+with full mesh) is **D38**.
 
 ---
 
 ## 17. Document map
 
-- **This file** — authoritative architecture + build order.
+- `docs/paper/tendcf-architecture-guide.md` — vetted current-state
+  description. Wins on conflict about the current design.
+- **This file** — implementer map (decisions, build order, protection).
+  Must agree with the guide.
 - `README.md` — pointer.
 - `deprecated/` — v1/v2 and panel drafts. Do not update them.
 - Dated `*-2026-08-13.md` research notes in this directory — evidence
-  trail for older decisions; v3 wins on conflict.
-- `docs/paper/tendcf-architecture-guide.md` — same architecture, plainer
-  language.
-- `docs/paper/tendcf-architecture-paper.md` — technical paper.
+  trail; the guide wins on conflict.
+- `docs/paper/tendcf-architecture-paper.md` — technical paper; the guide
+  wins on conflict.
 - `schema/`, `examples/`, `bin/schema_lint.py` — Site Model contract.
 - `djbclark/nix2cf` — compiler tool (Step 3). Consumes this contract.
 

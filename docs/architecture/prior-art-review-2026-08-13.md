@@ -1,5 +1,7 @@
 # Prior art review: the compiler pattern and the decentralization claim (2026-08-13)
 
+> **Archival (2026-08-13).** Snapshot of research as of that date. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins. Do not rewrite this file to bring it up to date.
+
 > **Research doc, not a decision.** Same status as
 > `ai-optimization-review-2026-08-13.md`: nothing here is adopted until the
 > operator says so. Every claim below was checked against a primary source

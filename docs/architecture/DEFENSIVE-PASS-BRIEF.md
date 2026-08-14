@@ -1,5 +1,7 @@
 # DEFENSIVE COUNTER-PASS BRIEF — hardened trust-layer v1
 
+> **Archival.** Prompt that produced a now-deprecated draft. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins.
+
 ## Why this exists
 
 The trust/deploy/consent layer has been **attacked once and defended zero

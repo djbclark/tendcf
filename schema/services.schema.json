@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/djbclark/tendcf/schema/services.schema.json",
-  "title": "Site Model — registry/services.yml",
-  "description": "One record per service. Every launchd plist, systemd unit, and Termux/mise agent is a rendering of one such record (§4.1). CFEngine owns services on every platform (D13/§5.3), so `managed_by` is `cfengine` for anything under management.",
+  "title": "Site Model — services",
+  "description": "One record per service. The host's supervisor adapter renders it to a launchd plist, systemd unit, runit service, Jobber job, or equivalent (guide §6; D13). `managed_by` is `cfengine` for anything under management.",
 
   "type": "object",
   "properties": {
@@ -86,14 +86,14 @@
         "working_dir": { "type": "string" },
         "env": { "$ref": "common.schema.json#/$defs/env_map" },
         "managed_by": {
-          "description": "Who writes this service's on-device definition. `cfengine` for anything under management (D13/§5.3); the others exist so reality can be transcribed truthfully before it is migrated.",
+          "description": "Who writes this service's on-device definition. `cfengine` for anything under management (D13); the others exist so reality can be transcribed truthfully before it is migrated.",
           "enum": ["cfengine", "mise", "nix", "external", "unmanaged"]
         },
         "launchd": {
           "type": "object",
           "properties": {
             "label": {
-              "description": "Must fall under a prefix declared in launchd-writers.yml — cross-checked by bin/schema_lint.py. This is the lint that makes Step 1 survivable on a live daily driver.",
+              "description": "Must fall under a prefix declared in the launchd unit-writers registry — cross-checked by bin/schema_lint.py. One writer per unit prefix; launchd is the first adapter of that generic rule.",
               "type": "string",
               "pattern": "^[a-z][a-z0-9]*(\\.[A-Za-z0-9][A-Za-z0-9_-]*)+$"
             },
@@ -132,7 +132,7 @@
           "if": { "properties": { "platform": { "const": "macos" } }, "required": ["platform"] },
           "then": {
             "required": ["launchd"],
-            "$comment": "A macOS service with no launchd label cannot be checked against launchd-writers.yml, which is the whole two-writers safety rail."
+            "$comment": "A macOS service with no launchd label cannot be checked against the launchd unit-writers registry (one writer per prefix)."
           }
         },
         {

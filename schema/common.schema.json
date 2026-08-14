@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/djbclark/tendcf/schema/common.schema.json",
   "title": "tendcf — shared Site Model definitions",
-  "description": "Definitions shared by every Site Model file. The three D16 fields (provides/requires, interlocks, comprehensive/opt_out_reason) live here because they are cross-cutting: docs/architecture/architecture-DEFINITIVE-v3.md §4. Schemas live in tendcf (D21); nix2cf is the compiler.",
+  "description": "Definitions shared by every Site Model file. The three D16 fields (provides/requires, interlocks, comprehensive/opt_out_reason) live here because they are cross-cutting. Schemas live in tendcf (D21); nix2cf is the compiler. Current-design facts follow docs/paper/tendcf-architecture-guide.md.",
 
   "$defs": {
     "contract_version": {
-      "description": "Bumped only when an EXISTING field is renamed, retyped, or removed. Adding a new optional field never needs a bump — same rule site-djbclark's registry/ports.yml already states.",
+      "description": "Bumped only when an EXISTING field is renamed, retyped, or removed. Adding a new optional field never needs a bump.",
       "type": "integer",
       "minimum": 1
     },
@@ -26,9 +26,10 @@
     },
 
     "release_stamp": {
-      "description": "A coordinated ops release, per docs/OPS-RELEASES.md. §4.7.1: every reporting row carries the release that produced it.",
+      "description": "Identifier of the signed release that produced this row. Every reporting row carries it (guide §8; D19). Not a sibling-repo lockstep tag.",
       "type": "string",
-      "pattern": "^ops-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "maxLength": 64
     },
 
     "capability_token": {
@@ -158,7 +159,7 @@
     },
 
     "outcome_enforce": {
-      "description": "ncf/Rudder's enforce-mode outcome vocabulary, kept verbatim (D17/§4.7 — reuse the vocabulary, change only the sink).",
+      "description": "ncf/Rudder's enforce-mode outcome vocabulary, kept verbatim (D17 — reuse the vocabulary, change only the sink).",
       "enum": ["success", "repaired", "error", "n-a"]
     },
 
@@ -168,11 +169,11 @@
     },
 
     "env_map": {
-      "description": "Environment for a service. Values are secretspec key NAMES, never secret values (§4.1) — the generic layer holds nobody's facts and no secrets (R10/§11).",
+      "description": "Environment for a service. Values are secretspec key NAMES, never secret values. The generic layer holds nobody's facts and no secrets.",
       "type": "object",
       "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" },
       "additionalProperties": {
-        "description": "A secretspec key name, resolved at run time by the reference monitor (§8.3).",
+        "description": "A secretspec key name, resolved at run time by secretspec.",
         "type": "string",
         "pattern": "^[A-Z][A-Z0-9_]*$"
       }

@@ -1,5 +1,5 @@
 # Example instance — validates against schema/launchd-writers.schema.json.
-# Fixture, not site data (D21, §4.2).
+# Fixture, not site data (D21).
 #
 # One writer per label prefix. bin/schema_lint.py rejects nested prefixes:
 # two writers over one namespace is the exact hazard this file prevents, and
@@ -15,7 +15,7 @@ domain:
 writers:
   - prefix: com.djbclark.*
     writer: cfengine
-    repo: site-djbclark
+    repo: site-shared
     note: "Site services. Rendered from services.yml via nix2cf."
 
   - prefix: org.tendcf.*
@@ -25,7 +25,7 @@ writers:
 
   - prefix: dev.mise.*
     writer: mise
-    note: "Toolchain shims only (D1 superseded — mise no longer owns services)."
+    note: "Toolchain shims only; mise does not own services (D13)."
 
   - prefix: org.nixos.*
     writer: nix-darwin

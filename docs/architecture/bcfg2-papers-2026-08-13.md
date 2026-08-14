@@ -1,5 +1,7 @@
 # What the Bcfg2 papers offer this architecture (2026-08-13)
 
+> **Archival (2026-08-13).** Snapshot of research as of that date. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins. Do not rewrite this file to bring it up to date.
+
 Source: `~/src/bcfg2/doc/papers/` — all four read end to end.
 
 - `bcfg-cluster2003.pdf` — Desai, Lusk, Bradshaw, Evard, CLUSTER '03. The

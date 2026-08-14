@@ -1,5 +1,7 @@
 # RED-TEAM BRIEF — fleetopia trust/deploy/consent layer
 
+> **Archival.** Prompt that produced a now-deprecated draft. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins.
+
 You are an adversarial security reviewer. Your ONLY job is to break the
 security design of the fleetopia architecture — specifically the
 deploy, release-signing, consent, builder-trust, pull-converge, and

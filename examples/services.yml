@@ -1,9 +1,9 @@
 # Example instance — validates against schema/services.schema.json.
 #
 # This is a FIXTURE, not site data. It holds no real facts: real instances
-# live in the site repos and are supplied through this contract (D21, §4.2).
-# It exists so the schema has a regression test and so a reader can see what
-# the three D16 fields look like in use.
+# live in site-private (facts) and site-shared (recipes), supplied
+# through this contract (D21). It exists so the schema has a regression
+# test and so a reader can see what the three D16 fields look like in use.
 
 contract_version: 1
 

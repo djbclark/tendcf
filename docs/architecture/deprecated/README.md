@@ -2,13 +2,16 @@
 
 These files are **archival**. They are not the current design.
 
-The living architecture is
-[`../architecture-DEFINITIVE-v3.md`](../architecture-DEFINITIVE-v3.md).
+The vetted current-state description is
+[`../../paper/tendcf-architecture-guide.md`](../../paper/tendcf-architecture-guide.md).
+The implementer map is
+[`../architecture-DEFINITIVE-v3.md`](../architecture-DEFINITIVE-v3.md)
+and must agree with that guide.
 
 Do not edit files in this directory to “bring them up to date.” If a fact
-here disagrees with v3, v3 wins. The papers and reviews in
-`docs/paper/` likewise describe whatever draft they were written against;
-correct the living docs, not these snapshots.
+here disagrees with the guide on the current design, the guide wins. The
+papers and reviews in `docs/paper/` likewise describe whatever draft they
+were written against; correct the living docs, not these snapshots.
 
 | File | What it was |
 | --- | --- |

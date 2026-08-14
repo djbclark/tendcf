@@ -1,5 +1,7 @@
 # Research answers, and two corrections
 
+> **Archival (2026-08-13).** Snapshot of research as of that date. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins. Do not rewrite this file to bring it up to date.
+
 Operator session, 2026-08-13, continuing from
 `site-pika-requirement-change-2026-08-13.md`. Answers the four research
 items the operator selected (Tier 2 #3, Tier 3 #5/#6/#8) and corrects two

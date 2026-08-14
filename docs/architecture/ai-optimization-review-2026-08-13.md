@@ -1,5 +1,7 @@
 # Further AI-authorship optimization: a literature-grounded review (2026-08-13)
 
+> **Archival (2026-08-13).** Snapshot of research as of that date. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins. Do not rewrite this file to bring it up to date.
+
 > **Proposal doc, not a decision.** Per `architecture-DEFINITIVE-v2.md`'s own
 > header: this is *not* an edit to that file. It is the "new review doc"
 > route that header specifies. Nothing here is adopted until the operator

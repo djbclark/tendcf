@@ -1,5 +1,7 @@
 # fleetopia — Loose Ideas Dump (low-effort, unpolished)
 
+> **Archival.** Dump, not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins.
+
 > **Not a proposal. Not protected.** This is a deliberately low-effort brain
 > dump captured because the 2026-08-08 architecture session is the most
 > concentrated context on this system's design that's likely to exist for a

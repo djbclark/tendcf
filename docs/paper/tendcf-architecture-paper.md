@@ -6,11 +6,12 @@ Prepared 2026-08-13 for Narayan Desai; facts checked against the vetted
 current-state guide on 2026-08-14. Sections are numbered so comments can
 cite them.
 
-The living architecture is
-[`docs/architecture/architecture-DEFINITIVE-v3.md`](../architecture/architecture-DEFINITIVE-v3.md).
-The vetted current-state description — last fully read and approved — is
-[`tendcf-architecture-guide.md`](tendcf-architecture-guide.md). Where this
-paper and that guide disagree on the current design, the guide wins.
+The vetted current-state description is
+[`tendcf-architecture-guide.md`](tendcf-architecture-guide.md). The
+implementer map is
+[`docs/architecture/architecture-DEFINITIVE-v3.md`](../architecture/architecture-DEFINITIVE-v3.md)
+and must agree with that guide. Where this paper and the guide disagree
+on the current design, the guide wins.
 
 ---
 

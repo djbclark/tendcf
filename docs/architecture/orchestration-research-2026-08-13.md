@@ -1,5 +1,7 @@
 # Orchestration research — non-VM site management, dependency ordering, and the hard constraints
 
+> **Archival (2026-08-13).** Snapshot of research as of that date. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins. Do not rewrite this file to bring it up to date.
+
 Session of 2026-08-13 (continued). Completes the research leg opened in
 handoff `601f` and left half-done: the Rudder RBAC question, the Bolt and
 Choria licensing checks, and the open-ended "site orchestration that isn't
