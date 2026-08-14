@@ -117,8 +117,8 @@ moving the facts.
 
 **Schemas and types live in tendcf**, not in the compiler. A schema change
 is an interface change. A hostname change is site data. They do not move
-together. (JSON Schema files still sit in [`nix2cf`](https://github.com/djbclark/nix2cf)
-until that move finishes; they belong here.)
+together. The files are [`schema/`](../../schema/) and
+[`examples/`](../../examples/) in this repository.
 
 **Inventory is private by default.** Site-shared may ship device *kinds*,
 example inventories, and **explicit exports** (public endpoints, role
@@ -622,8 +622,8 @@ not “don’t require names.”
 
 ## 16. Two walkthroughs
 
-The inputs below are excerpts from `nix2cf`’s
-[`examples/services.yml`](https://github.com/djbclark/nix2cf/blob/master/examples/services.yml)
+The inputs below are excerpts from
+[`examples/services.yml`](../../examples/services.yml)
 — a fixture, schema-validated, not live site data. The outputs
 (CFEngine JSON, the launchd plist, the promise sketch) are hand-authored
 to show the target shape. The compiler’s render stage does not exist yet,
@@ -832,7 +832,7 @@ variant of this one — is the better choice.
 
 **Built today**
 
-- Site Model schemas (currently in nix2cf; specified to live in tendcf),
+- Site Model schemas in this repository (`schema/`, `examples/`),
   including `provides` / `requires` per type, `interlocks` per bundle, and
   `comprehensive` plus `opt_out_reason` per domain.
 - The report-row schema (release stamp, separate managed /
@@ -854,7 +854,7 @@ coherent, describable state):
 
 | Step | What | Notes |
 | --- | --- | --- |
-| 0 | Schemas in tendcf | provides/requires, interlocks, peer_actions, comprehensive, trust-policy shape, report-row. Lint, examples, lookup stub, YAML canonicalize. Transcribe reality (`not-yet-migrated` is the correct day-one state). |
+| 0 | Schemas in tendcf | Existing contract is `schema/` + `examples/` + `bin/schema_lint.py`. Remaining: peer_actions, trust-policy shape, generic unit-writers, lookup stub, YAML canonicalize. Transcribe reality (`not-yet-migrated` is the correct day-one state). |
 | 1 | macOS services adapter | Render services as CFEngine promises from `services.yml` via the launchd adapter. Dry-run default. Not in this step: nix-darwin. |
 | 2 | Android under the Site Model | Same vocabulary. Agent owns JSONL+SQLite in app-private storage. |
 | 3 | `nix2cf` compiler | “What would device X receive?” first, then conflict check, extra-entry reporting, then inference. Inference waits until types exist on two platforms. |

@@ -137,9 +137,9 @@ checkouts that must share one tag.
 | **tool forks** | sudo-secretspec, Shizuku, … | Optional |
 
 **Schemas live in tendcf**, not in nix2cf. A schema change is a tendcf
-interface change. An instance change is site data. Until Step 0 finishes
-the move, JSON Schema files still sit in the nix2cf repo as a temporary
-home; they are specified here and belong here.
+interface change. An instance change is site data. The JSON Schema files,
+fixtures, and lint are `schema/`, `examples/`, and `bin/schema_lint.py`
+in this repository.
 
 **Inventory is private by default (D35).** Site-shared ships:
 
@@ -527,7 +527,7 @@ Each step leaves a coherent system. Not a schedule.
 
 | Step | What |
 | --- | --- |
-| 0 | Schemas in **tendcf** (provides/requires, interlocks, peer_actions, comprehensive, trust-policy shape, report-row). Lint, examples, lookup stub, YAML canonicalize. Transcribe reality (`not-yet-migrated` is the correct day-one state). |
+| 0 | Schemas in **tendcf** (`schema/`, `examples/`, `bin/schema_lint.py` — provides/requires, interlocks, comprehensive, report-row). Remaining: peer_actions, trust-policy shape, generic unit-writers, lookup stub, YAML canonicalize. Transcribe reality (`not-yet-migrated` is the correct day-one state). |
 | 1 | macOS services adapter. Dry-run default. No nix-darwin. |
 | 2 | Android under the Site Model; Termux types; agent owns JSONL+SQLite. |
 | 3 | nix2cf: `buildfile` first, conflict, extra-entry, then inference (needs steps 1–2). |
@@ -638,7 +638,7 @@ Token discovery (old 15.9) is **D40**, not open. Trust-tier-as-label
 - `docs/paper/tendcf-architecture-guide.md` — same architecture, plainer
   language.
 - `docs/paper/tendcf-architecture-paper.md` — technical paper.
-- `djbclark/nix2cf` — compiler tool. Schemas are specified here and
-  belong in tendcf.
+- `schema/`, `examples/`, `bin/schema_lint.py` — Site Model contract.
+- `djbclark/nix2cf` — compiler tool (Step 3). Consumes this contract.
 
 Local prior-art clones (not dependencies): `~/src/config-mgmt-prior-art/`.

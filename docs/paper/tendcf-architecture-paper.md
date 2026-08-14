@@ -139,9 +139,9 @@ hold any role. Unit-writer registries declare exactly one writer per
 unit-name prefix for every supervisor, killing a two-writers hazard at the
 source. launchd is one adapter, not the model.
 
-Schemas and types belong in tendcf. The compiler (`nix2cf`) is a tool; it
-is not the home of the contract. JSON Schema files currently live in the
-nix2cf repository until that move finishes. Inventory is private by default;
+Schemas and types belong in tendcf (`schema/`, `examples/`,
+`bin/schema_lint.py`). The compiler (`nix2cf`) is a tool; it is not the
+home of the contract. Inventory is private by default;
 site-shared may ship device kinds, templates, and explicit exports only.
 Composition is a private-site lockfile pinning inputs; the signed release is
 the deploy artifact. Same identity from two peer inputs is a compile error;
@@ -313,8 +313,8 @@ mechanisms §4 and §6 argue hardest for: an inferred dependency edge with
 mandatory attribution, and an interlock.
 
 **A note on provenance, because it matters for how to read these.** The
-*inputs* below are verbatim excerpts from `nix2cf`'s
-[`examples/services.yml`](https://github.com/djbclark/nix2cf/blob/master/examples/services.yml)
+*inputs* below are verbatim excerpts from
+[`examples/services.yml`](../../examples/services.yml)
 — a real fixture, schema-validated by `bin/schema_lint.py` against
 `schema/services.schema.json`, though still a fixture and not live site data
 (§7). The *outputs* — the CFEngine augments and the rendered promise text —
@@ -663,8 +663,8 @@ description as a way of telling a generator what correct output looks like
 concrete, validated example file with every schema it defines — a
 convention adopted before this literature search, for ordinary
 documentation reasons, that turns out to be exactly the intervention the
-literature says matters most. Those files currently live in the compiler
-repository; they belong in tendcf. The gap this closes is not that the pairing
+literature says matters most. The pairing lives in this repository
+(`schema/` next to `examples/`). The gap this closes is not that the pairing
 is missing; it is that nothing currently stops the pairing from silently
 lapsing as new schemas are added. Making the build fail when a schema
 arrives without its paired example is the same move §3 makes generally:
@@ -1132,7 +1132,8 @@ problem `/etc/hosts` versus `/etc/inet/hosts` was.
 
 ## 7. Status and validation
 
-**Implemented:** the Site Model schemas, including the fields §4 argues for
+**Implemented:** the Site Model schemas in this repository (`schema/`,
+`examples/`, `bin/schema_lint.py`), including the fields §4 argues for
 (`provides`/`requires` per type, `interlocks` per bundle, `comprehensive`
 plus `opt_out_reason` per domain) and the report-row schema of §6.3. A lint
 carries the cross-file rules JSON Schema cannot state alone — reference
