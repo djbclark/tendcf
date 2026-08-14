@@ -1,0 +1,10 @@
+- row_type: converged
+  device: mac
+  recorded_at: '2026-08-13T14:02:11-04:00'
+  release: release-1.0.0
+  domain: macos-launchd-services
+  bundle: edge-http
+  entry: caddy
+  mode: enforce
+  outcome: repaired
+  message: launchd label com.djbclark.caddy reloaded after config change

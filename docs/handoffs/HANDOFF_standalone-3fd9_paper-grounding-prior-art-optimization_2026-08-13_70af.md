@@ -4,7 +4,7 @@ handoff_id: 70af
 parent_handoff_ids: [c4be]
 lineage: deterministic
 chain: [standalone-3fd9]
-repo: fleetopia
+repo: tendcf
 workspace: main
 branch: master
 head_sha: 3f60ab8ebc13ce760604218f2251a3f18bb5383a
@@ -16,7 +16,7 @@ writer: claude-code
 
 ## The Goal
 
-Continue improving `docs/paper/fleetopia-architecture-paper.md` (the
+Continue improving `docs/paper/tendcf-architecture-paper.md` (the
 architecture paper for Narayan Desai) and its source,
 `docs/architecture/architecture-DEFINITIVE-v2.md` (the protected build
 plan). Four asks arrived across this session, each building on the last:
@@ -41,21 +41,21 @@ existed; operator picked `standalone-3fd9` (this one) over
 `standalone-bfbf` (release 132/secretspec), `standalone-ecc2` (hermes
 gateway RCA), `standalone-0c41` (orc/orc-meta), and the already-closed
 `standalone-cbd5`. Staleness check found both workspaces
-(`~/src/fleetopia`, `~/src/nix2cf`) clean and matching the logged
+(`~/src/tendcf`, `~/src/nix2cf`) clean and matching the logged
 `head_sha` exactly — the Tier 1 log was fresh. Starting point: `3c45a04`,
 paper at 6083→7666 words per the prior session's own progression (see
 parent handoff `c4be`).
 
 **Now: committed and clean at `3f60ab8`, ten new commits this session**
 (`ea0f452` through `3f60ab8`, all on top of `3c45a04`), all local — not
-pushed. `fleetopia` declares no memory-is-data exception, so per the
+pushed. `tendcf` declares no memory-is-data exception, so per the
 standing `auto-commit-at-checkpoints` instruction ("pushing is a separate
 question from committing"), committing happened proactively at each
 natural checkpoint; pushing was never asked for.
 
 Four files changed, 1144 insertions total:
 
-- `docs/paper/fleetopia-architecture-paper.md` — now **10,792 words** (was
+- `docs/paper/tendcf-architecture-paper.md` — now **10,792 words** (was
   7666 at session start; word count was explicitly deprioritized by the
   operator mid-session, see Operator Feedback). New §3.1, §3.2; edits to
   §2.2, §2.3, §5.3, §8.6; references grew from [1]–[8] to [1]–[24].
@@ -153,7 +153,7 @@ a genuinely global question, not whether one exists. Commit `5978f65`.
 - `nix2cf`'s compile-to-native-format pattern is not new: NixOS's own
   module system compiles to `systemd` units; `nix-darwin` compiles Nix
   modules to `launchd`/macOS `defaults` (and is already a planned
-  `fleetopia` dependency, for the Mac substrate); the CDK family
+  `tendcf` dependency, for the Mac substrate); the CDK family
   generalizes the pattern past Nix (`cdk8s` active, `cdktf` **deprecated
   by HashiCorp December 10, 2025**, verified directly against HashiCorp's
   own docs and independently corroborated via `gh repo view` showing
@@ -162,7 +162,7 @@ a genuinely global question, not whether one exists. Commit `5978f65`.
   inactive personal Gist, nothing resembling an active project.
 - The decentralization/no-control-node property traces to CFEngine's own
   Promise Theory (Burgess, 2004+ — autonomous agents, no push controller),
-  not to `fleetopia`. CFEngine's own *documented default* deployment,
+  not to `tendcf`. CFEngine's own *documented default* deployment,
   checked directly against `docs.cfengine.com`, is actually hub-and-spoke
   (one policy server, clients pull from it) — the opposite of what the
   design assumed CFEngine's norm to be. What makes "every host runs its
@@ -285,7 +285,7 @@ already uses.
    this session alone touched §2.2, §2.3, §3.1, §3.2, §5.3, §8.6, and the
    full reference list, on top of `c4be`'s own multi-section pass. No
    single read has covered the whole paper as it now stands.
-   `cd ~/src/fleetopia && cat docs/paper/fleetopia-architecture-paper.md`
+   `cd ~/src/tendcf && cat docs/paper/tendcf-architecture-paper.md`
 2. **Decide whether to push the local commits to origin.** Ten new commits
    this session, all local (`ea0f452` through `3f60ab8`). Never asked;
    small, not blocking further work.
@@ -304,12 +304,12 @@ already uses.
 ## Quick Start
 
 ```bash
-cd ~/src/fleetopia
+cd ~/src/tendcf
 git log --oneline -12                              # confirm 3f60ab8 is HEAD, tree clean
 git show --stat 3f60ab8 938d841 0d863ea 5978f65     # this session's prior-art pass
 git show --stat 883e459 db44bc7 1793830 1dfeabe acac7ab ea0f452  # the earlier passes
-wc -w docs/paper/fleetopia-architecture-paper.md    # 10792 as of this handoff
-grep -n '^## \|^### ' docs/paper/fleetopia-architecture-paper.md  # re-map section lines
+wc -w docs/paper/tendcf-architecture-paper.md    # 10792 as of this handoff
+grep -n '^## \|^### ' docs/paper/tendcf-architecture-paper.md  # re-map section lines
 ls ~/src/config-mgmt-prior-art/                     # the new symlink-farm index
 cat ~/src/config-mgmt-prior-art/README.md
 ```

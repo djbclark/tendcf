@@ -1,7 +1,6 @@
 # AI pre-reviews of the architecture paper (2026-08-13)
 
-> **Archival.** Reviews of an earlier draft of the paper (then named
-> `fleetopia-architecture-paper.md`). Not current design. On conflict,
+> **Archival.** Reviews of an earlier draft of the paper. Not current design. On conflict,
 > [`../tendcf-architecture-guide.md`](../tendcf-architecture-guide.md)
 > wins. Do not rewrite these files to bring them up to date.
 

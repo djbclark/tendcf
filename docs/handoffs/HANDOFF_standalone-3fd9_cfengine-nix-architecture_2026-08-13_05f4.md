@@ -4,7 +4,7 @@ handoff_id: 05f4
 parent_handoff_ids: []
 lineage: none
 chain: [standalone-3fd9]
-repo: fleetopia
+repo: tendcf
 workspace: N/A (plain repo checkout, not an ops-worktrees task workspace)
 branch: master
 head_sha: befffefd0834da30b9b644c602fa9560bbf894df
@@ -12,16 +12,16 @@ created_at: 2026-08-13T11:23:24+0000
 writer: claude-code
 ---
 
-# Handoff — fleetopia founding session: repo creation, rename, and CFEngine/Nix-Flakes architecture pivot
+# Handoff — tendcf founding session: repo creation, rename, and CFEngine/Nix-Flakes architecture pivot
 
 ## The Goal
 
 Two things happened in one long session, in order:
 
 1. **Rename and relocate** the project previously called "stayturgid 2.0"
-   (developed inside the `stayturgid` repo under `docs/2.0/`) to **fleetopia**,
-   in its own new repo, because "Fleetopia" the codename collided with a real
-   UK fleet-management/leasing company (`fleetopia.co.uk`) in the same
+   (developed inside the `stayturgid` repo under `docs/2.0/`) to **tendcf**,
+   in its own new repo, because "tendcf" the codename collided with a real
+   UK fleet-management/leasing company (`tendcf.co.uk`) in the same
    semantic space as the project (fleet management), making it unlikely to be
    trademarkable in the US.
 2. **Deep-research and then commit** a major architecture pivot in
@@ -37,15 +37,15 @@ concrete follow-ups were explicitly deferred (see "Where We're Going").
 
 ## Where We Are
 
-- **Repo:** `djbclark/fleetopia` — public, local checkout `~/src/fleetopia`
+- **Repo:** `djbclark/tendcf` — public, local checkout `~/src/tendcf`
   (a plain repo, deliberately **not** under `~/src/ops-worktrees/` — it's not
   part of the ops-djbclark suite). Working directly on `master` per operator
   instruction ("for now we can just work directly on master").
 - **Repo settings:** GitHub Actions disabled, no branch protection, Issues
   enabled, default branch `master`.
-- **Issues:** `djbclark/fleetopia#1` is the tracker (transferred from
+- **Issues:** `djbclark/tendcf#1` is the tracker (transferred from
   `djbclark/stayturgid#272`, retitled/annotated for the rename).
-  `djbclark/fleetopia#2` is a new requirement: the change process must be
+  `djbclark/tendcf#2` is a new requirement: the change process must be
   much faster and more atomic than stayturgid's current coordinated
   three-repo release train (not yet folded into the architecture doc).
 - **Docs:** `docs/architecture/` holds the full renamed research corpus (18
@@ -59,12 +59,12 @@ concrete follow-ups were explicitly deferred (see "Where We're Going").
   `befffef`. Last 5 commits: `befffef` (D13–D19 architecture rewrite),
   `4f69198` (D12 clarification), `962e52e` (D12 addition), `22e402b`
   (imported renamed research corpus), `aee9357` (repo init).
-- **Herdr:** current pane/tab renamed to `fleetopia-p`/`fleetopia-t`
+- **Herdr:** current pane/tab renamed to `tendcf-p`/`tendcf-t`
   (previously `stayturgid-2.0-p`/`-t`).
-- **Memory (site-private, pushed):** `memory/project_fleetopia_rename.md`
+- **Memory (site-private, pushed):** `memory/project_tendcf_rename.md`
   and `memory/project_cfengine_blockers_corrected.md`, both indexed in
   `MEMORY.md`. Hermes (the CLI agent, not this session) also independently
-  confirmed it persisted the fleetopia-rename context to its own
+  confirmed it persisted the tendcf-rename context to its own
   `~/.hermes/memories/MEMORY.md` — verified by direct read, not just its
   claim.
 - **stayturgid correction (pushed):** `docs/research/evaluations/
@@ -78,17 +78,17 @@ concrete follow-ups were explicitly deferred (see "Where We're Going").
 Nothing failed outright, but several avenues were explored and explicitly
 rejected or narrowed — recording these saves re-deriving them:
 
-- **Naming candidates other than fleetopia/Declaropia/Provenopia/Meshtopia**
+- **Naming candidates other than tendcf/Declaropia/Provenopia/Meshtopia**
   were screened (web search for existing trademark/product/domain
-  conflicts) before "fleetopia" — actually **wait**: fleetopia itself was
+  conflicts) before "tendcf" — actually **wait**: tendcf itself was
   the rejected name (UK conflict); Declaropia/Provenopia/Meshtopia were the
   *alternatives* proposed and never chosen because the operator, mid-
-  discussion, pivoted straight to keeping "fleetopia" as the working name
+  discussion, pivoted straight to keeping "tendcf" as the working name
   anyway (the rename request in this session was from "stayturgid 2.0" to
-  "fleetopia" — the earlier trademark-risk conversation about renaming
-  fleetopia itself to something else appears to have been from a **prior**
-  session; this session took "fleetopia" as already the settled name and
-  did not re-open that question). If the operator still wants a fleetopia→
+  "tendcf" — the earlier trademark-risk conversation about renaming
+  tendcf itself to something else appears to have been from a **prior**
+  session; this session took "tendcf" as already the settled name and
+  did not re-open that question). If the operator still wants a tendcf→
   something-else rename, that's a separate, unresolved thread — worth
   asking about explicitly, not assumed closed.
 - **Nix-store-based macOS management without nix-darwin's actual `/nix/
@@ -181,7 +181,7 @@ rejected alternative noted:
   Blockers)** — never point a Nix store's metadata DB at shared/network
   storage across hosts; single-writer-per-host always.
 - **D19 — Nix Flakes + flake-parts adopted.** One flake per repo
-  (`fleetopia`, `stayturgid`, `site-djbclark`, `site-private`), fleetopia's
+  (`tendcf`, `stayturgid`, `site-djbclark`, `site-private`), tendcf's
   flake as the shared module-system library the other three import,
   flake-parts for internal composition. Left genuinely open: whether
   `flake.lock` should replace or just parallel `ops-release.json`'s
@@ -191,7 +191,7 @@ rejected alternative noted:
 
 **Tests: none run.** This session was entirely architecture research and
 documentation — no code was written, no test suite exists yet for
-fleetopia (Step 0 of §12's build order, which would create the first
+tendcf (Step 0 of §12's build order, which would create the first
 schemas/lint, has not started).
 
 Concrete numbers from the practical audit that grounds D16 (checked
@@ -324,8 +324,8 @@ session can re-find them fast):
    hang/fail) or confirm it's already resolved — every commit this session
    needed the `env -u SSH_AUTH_SOCK ... user.signingkey=...git_signing_key`
    workaround. A 1Password app restart was suggested, never confirmed.
-5. **Resolve the possibly-still-open fleetopia-naming question.** This
-   session took "fleetopia" as the settled name throughout and did not
+5. **Resolve the possibly-still-open tendcf-naming question.** This
+   session took "tendcf" as the settled name throughout and did not
    revisit the earlier (evidently prior-session) trademark-conflict
    discussion. If that's still an open thread from before this session,
    it needs an explicit check-in — don't assume it's closed just because
@@ -342,7 +342,7 @@ session can re-find them fast):
 ## Quick Start
 
 ```bash
-cd ~/src/fleetopia
+cd ~/src/tendcf
 git log --oneline -5
 git status
 

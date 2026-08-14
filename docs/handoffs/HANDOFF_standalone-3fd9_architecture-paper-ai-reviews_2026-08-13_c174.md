@@ -4,7 +4,7 @@ handoff_id: c174
 parent_handoff_ids: [405e]
 lineage: deterministic
 chain: [standalone-3fd9]
-repo: fleetopia
+repo: tendcf
 workspace: N/A (plain repo checkout, not an ops-worktrees task workspace)
 branch: master
 head_sha: f9f8f876631c11dc37e40cf123f81f44d0b53ff9
@@ -17,7 +17,7 @@ writer: claude-code
 ## The Goal
 
 Resume chain `standalone-3fd9` from `405e` and execute **its item 1**, which
-was not Step 0's remainder: **write an academic paper about the fleetopia
+was not Step 0's remainder: **write an academic paper about the tendcf
 architecture**, in the style of the four Bcfg2 papers in
 `~/src/bcfg2/doc/papers/`, **not too long**, for review by **Narayan Desai** —
 Bcfg2's author, co-author of three of those four papers, and a friend of the
@@ -45,7 +45,7 @@ clean, `master` in sync with `origin/master`.
 
 Also pushed `43b344e` — the previous session's handoff commit, which `405e`
 had deliberately left local. Operator approved pushing explicitly this
-session, so the "fleetopia declares no memory-is-data exception" posture is
+session, so the "tendcf declares no memory-is-data exception" posture is
 now **operator-overridden for content but not automated**: this handoff is
 again committed locally and NOT pushed, per the skill's default.
 
@@ -54,7 +54,7 @@ again committed locally and NOT pushed, per the skill's default.
 **Files created:**
 
 ```
-docs/paper/fleetopia-architecture-paper.md     the paper (~5850 words)
+docs/paper/tendcf-architecture-paper.md     the paper (~5850 words)
 docs/paper/reviews/README.md                   triage: what survived, what didn't
 docs/paper/reviews/2026-08-13_gemini-3.1-pro_iclr-review.md
 docs/paper/reviews/2026-08-13_gemini-3.1-pro_flaw-audit.md
@@ -305,9 +305,9 @@ weak evidence the honesty is being read rather than skimmed.
 
 ```bash
 # The paper, and the reviews of it (read the README first — it is the triage):
-$EDITOR ~/src/fleetopia/docs/paper/reviews/README.md
-$EDITOR ~/src/fleetopia/docs/paper/fleetopia-architecture-paper.md
-wc -w ~/src/fleetopia/docs/paper/fleetopia-architecture-paper.md   # 5815
+$EDITOR ~/src/tendcf/docs/paper/reviews/README.md
+$EDITOR ~/src/tendcf/docs/paper/tendcf-architecture-paper.md
+wc -w ~/src/tendcf/docs/paper/tendcf-architecture-paper.md   # 5815
 
 # Bibliography verification source material:
 ls ~/src/bcfg2/doc/papers/
@@ -315,22 +315,22 @@ ls ~/src/bcfg2/doc/papers/
 
 # The architecture the paper describes (PROTECTED — do not edit without
 # specific operator approval for a named change):
-$EDITOR ~/src/fleetopia/docs/architecture/architecture-DEFINITIVE-v2.md
+$EDITOR ~/src/tendcf/docs/architecture/architecture-DEFINITIVE-v2.md
 #   §4.1 / §4.5.1  Site Model contract + the four D16 sub-decisions
 #   §12  build order, Steps 0-10
 #   §15  decision register (D22 newest)
 # Already-mined Bcfg2 notes — do NOT redo this reading:
-$EDITOR ~/src/fleetopia/docs/architecture/bcfg2-papers-2026-08-13.md
+$EDITOR ~/src/tendcf/docs/architecture/bcfg2-papers-2026-08-13.md
 
 # Re-running an AI review (Codex is quota-dead until 2026-08-20):
 cd /tmp && awk '/^## References/{exit} {print}' \
-  ~/src/fleetopia/docs/paper/fleetopia-architecture-paper.md > paper.md
-cat ~/src/fleetopia/docs/paper/reviews/prompt_audit.txt paper.md > full.txt
+  ~/src/tendcf/docs/paper/tendcf-architecture-paper.md > paper.md
+cat ~/src/tendcf/docs/paper/reviews/prompt_audit.txt paper.md > full.txt
 gemini --model gpt-oss-120b-medium --print-timeout 10m -p "$(cat full.txt)"
 # omit --model for Gemini 3.1 Pro (the default)
 
 # State:
-cd ~/src/fleetopia && git log --oneline -4   # f9f8f87 at HEAD, clean, pushed
+cd ~/src/tendcf && git log --oneline -4   # f9f8f87 at HEAD, clean, pushed
 cd ~/src/nix2cf && ./bin/schema_lint.py      # expect: OK (5 schemas), exit 0
 ```
 

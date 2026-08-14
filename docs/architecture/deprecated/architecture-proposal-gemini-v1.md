@@ -1,4 +1,4 @@
-# fleetopia Architecture Proposal (Gemini)
+# tendcf Architecture Proposal (Gemini)
 
 ## 1. Executive Summary & Verdict on Options
 

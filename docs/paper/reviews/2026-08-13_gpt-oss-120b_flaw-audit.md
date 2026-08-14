@@ -1,12 +1,12 @@
 > **Archival (2026-08-13).** Review of an earlier paper draft. Not current design. On conflict, [`../tendcf-architecture-guide.md`](../tendcf-architecture-guide.md) wins.
 
-**Scientific‑error review of “fleetopia: A Configuration Management Architecture for AI‑Authored Configuration”**  
+**Scientific‑error review of “tendcf: A Configuration Management Architecture for AI‑Authored Configuration”**  
 
 Below is a **complete catalogue of flaws** detected in the draft. Each entry follows the required template:
 
 | # | Error Category | Location (section / paragraph) | Explanation | Actionable Fix |
 |---|----------------|--------------------------------|-------------|----------------|
-| 1 | **Claim overstatement** | **Abstract (first paragraph)** – “prefer designs whose correctness follows from information *local* …” and the implied claim that this rule “inverts two decisions … and both inversions are the substance of this paper.” | The paper proposes a design rule but provides **no empirical evidence** (benchmarks, user studies, or formal proof) that the rule actually improves correctness, maintainability, or cost. Stating the rule as a “substantive contribution” overstates what has been demonstrated. | Add a **rigorous evaluation** (e.g., controlled experiment comparing manual vs. AI‑authored configs with and without the rule, or a formal**Scientific‑error review of “fleetopia: A Configuration Management Architecture for AI‑Authored Configuration”**  
+| 1 | **Claim overstatement** | **Abstract (first paragraph)** – “prefer designs whose correctness follows from information *local* …” and the implied claim that this rule “inverts two decisions … and both inversions are the substance of this paper.” | The paper proposes a design rule but provides **no empirical evidence** (benchmarks, user studies, or formal proof) that the rule actually improves correctness, maintainability, or cost. Stating the rule as a “substantive contribution” overstates what has been demonstrated. | Add a **rigorous evaluation** (e.g., controlled experiment comparing manual vs. AI‑authored configs with and without the rule, or a formal**Scientific‑error review of “tendcf: A Configuration Management Architecture for AI‑Authored Configuration”**  
 
 Below is a **complete catalogue of flaws** detected in the draft. Each entry follows the required template:
 

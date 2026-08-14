@@ -1,4 +1,4 @@
-# fleetopia — pre-mortem and scope realism
+# tendcf — pre-mortem and scope realism
 
 - **Date:** 2026-08-08
 - **Lens:** sceptical engineering manager
@@ -60,7 +60,7 @@ waiting for hardware, soaks, provider procurement, and unrelated incidents.
 
 | Work                                  |                  Honest range | Why this is not a bullet point                                                                                                                                 | Scarce human attention                                        |
 | ------------------------------------- | ----------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Reliability debt before fleetopia           |                    10–25 days | #43/#188 Fire OS boot recovery, remaining peer-start E2E, #224, and OpenObserve acceptance are production work.                                                | Decide acceptable degradation; run and judge reboots/soaks.   |
+| Reliability debt before tendcf           |                    10–25 days | #43/#188 Fire OS boot recovery, remaining peer-start E2E, #224, and OpenObserve acceptance are production work.                                                | Decide acceptable degradation; run and judge reboots/soaks.   |
 | Phase 0 — map and fence               |                     5–10 days | Schema syntax is cheap; a truthful public/site/private ownership census is not.                                                                                | Decide actual writer boundaries.                              |
 | Phase 1 — toolchains/build-only flake |                      4–9 days | Evaluation is easy; pinning, CI, clean recovery, and preserving toolchains are not.                                                                            | Decide what deserves pinning; review inputs.                  |
 | Phase 2 — Mac substrate switch        |                    12–25 days | Services untouched does not remove package ownership, shell, upgrade, and rollback risk on the only critical laptop.                                           | Schedule recovery window; test and judge rollback.            |
@@ -129,7 +129,7 @@ pull, and consent. That is backwards.
 
 | Step | Deliverable and hard boundary                                                                                                                                            | Coherent stop                                                                              |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| A    | Finish or explicitly park Fire OS, observability, and restart work. Freeze fleetopia runtime changes during soaks.                                                             | **S0:** known-good current fleet; current just/Ansible/CFEngine is the only control plane. |
+| A    | Finish or explicitly park Fire OS, observability, and restart work. Freeze tendcf runtime changes during soaks.                                                             | **S0:** known-good current fleet; current just/Ansible/CFEngine is the only control plane. |
 | B    | Add worktree ownership/provenance automation, descriptive writer census, and lint; no render/switch.                                                                     | **S1:** safer current operations; no second runtime ownership path.                        |
 | C    | Build-only flake and emergency removal instructions; no Mac switch.                                                                                                      | **S2:** evaluated Nix, no Nix dependency; delete the flake to recover the old model.       |
 | D    | Acquire VPS only for standalone value. Use existing adapters for a non-primary shadow telemetry/backup role; do not move obs-main.                                       | **S3:** real second host, no mesh; destroying it leaves Mac/fleet unchanged.               |
@@ -160,7 +160,7 @@ At every stop, require demonstrated rollback; tests that fail against the old
 or bad behaviour; live evidence for device/service changes; and a short STATUS
 or handoff statement of gaps. A green build is never a promotion criterion.
 
-Use a capacity rule too: no fleetopia implementation while more than two live
+Use a capacity rule too: no tendcf implementation while more than two live
 reliability/release incidents or cross-repo commitments are active. The current
 issue queue and in-flight secretspec, LiteLLM, Beads/Ralph, and site work
 already consume that capacity. Architecture is the first work to pause; the

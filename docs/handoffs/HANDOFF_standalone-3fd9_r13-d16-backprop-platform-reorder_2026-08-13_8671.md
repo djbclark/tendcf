@@ -4,7 +4,7 @@ handoff_id: 8671
 parent_handoff_ids: [601f]
 lineage: deterministic
 chain: [standalone-3fd9]
-repo: fleetopia
+repo: tendcf
 workspace: N/A (plain repo checkout, not an ops-worktrees task workspace)
 branch: master
 head_sha: 94cbff0e760c0a492ba4d24c377d3121407f2924
@@ -149,7 +149,7 @@ altering either.
 
 ## Evidence & Data
 
-**Tests: none run.** `fleetopia` is documentation-only at this stage —
+**Tests: none run.** `tendcf` is documentation-only at this stage —
 there is no build, no test suite, and no code to exercise. Verification
 was mechanical grep sweeps, listed below.
 
@@ -257,7 +257,7 @@ Files changed, all three commits: a single file,
 ## Quick Start
 
 ```bash
-cd ~/src/fleetopia
+cd ~/src/tendcf
 git log --oneline -5          # expect 94cbff0 at or near HEAD
 git status -sb                # this handoff commit is LOCAL-ONLY, unpushed
 
@@ -273,10 +273,10 @@ $EDITOR docs/architecture/architecture-DEFINITIVE-v2.md
 
 **Push status:** the three architecture commits (`2923935`, `51d2ae3`,
 `94cbff0`) are pushed. **This handoff commit is committed locally and NOT
-pushed** — `fleetopia` has no `AGENTS.md`/`CLAUDE.md` declaring the
+pushed** — `tendcf` has no `AGENTS.md`/`CLAUDE.md` declaring the
 memory-is-data exception that lets `site-private` push handoffs
 automatically, so per the handoff skill it waits for the operator. Push
-with `git -C ~/src/fleetopia push` whenever wanted.
+with `git -C ~/src/tendcf push` whenever wanted.
 
 Prior context in this chain, newest first:
 

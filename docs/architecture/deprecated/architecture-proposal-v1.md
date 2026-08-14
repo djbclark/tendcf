@@ -1,4 +1,4 @@
-# fleetopia — Declarative Ops Architecture Proposal & Migration Plan (v1)
+# tendcf — Declarative Ops Architecture Proposal & Migration Plan (v1)
 
 > **🔒 PROTECTED DOCUMENT — AI agents: DO NOT MODIFY this file without
 > explicit, specific human (operator) approval given for a named change.**

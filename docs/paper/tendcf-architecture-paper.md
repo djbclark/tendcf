@@ -1255,10 +1255,11 @@ prefix nested inside another.
 
 **Validated only in the following narrow sense.** A lint that passes on
 correct input demonstrates nothing about whether it catches incorrect input,
-so the schemas were tested against twelve deliberately broken fixtures — an
-opt-out with no reason, a rogue launchd label, a nested writer prefix, a
-literal secret where a key name belongs, a typo'd capability token kind, an
-enforce-mode row carrying an audit-mode outcome — and each is caught. Two of
+so the schemas are tested against twelve deliberately broken fixtures in
+`examples/broken/` — an opt-out with no reason, a rogue launchd label, a
+nested writer prefix, a literal secret where a key name belongs, a typo'd
+capability token kind, an enforce-mode row carrying an audit-mode outcome —
+and each is caught. The lint fails if any of those twelve is accepted. Two of
 the twelve exposed error messages that were useless (`is not valid under any
 of the given schemas`, with no field pointer): the failure §3 rules out for
 the compiler, which we had not applied to the compiler's own tooling.

@@ -4,7 +4,7 @@ handoff_id: c4be
 parent_handoff_ids: [c174]
 lineage: deterministic
 chain: [standalone-3fd9]
-repo: fleetopia
+repo: tendcf
 workspace: main
 branch: master
 head_sha: 94018b4fd874b712650d3ab7fd7aadc9b4099c3a
@@ -15,7 +15,7 @@ writer: claude-code
 
 ## The Goal
 
-Continue improving `docs/paper/fleetopia-architecture-paper.md` — the
+Continue improving `docs/paper/tendcf-architecture-paper.md` — the
 architecture paper prepared for Narayan Desai — per operator direction this
 session: add concrete input/output configuration examples, rewrite the
 personal-scale framing into a formal register without misrepresenting the
@@ -30,7 +30,7 @@ findings..." commit from the *previous* session/handoff, c174). This was
 committed proactively per the standing `auto-commit-at-checkpoints`
 instruction (site-private memory, granted 2026-08-13) — commit automatically
 at natural checkpoints, don't wait to be asked. **It has not been pushed**:
-fleetopia declares no memory-is-data exception, so per that same instruction
+tendcf declares no memory-is-data exception, so per that same instruction
 ("pushing is a separate question from committing") it's a local commit
 waiting for the operator to push whenever they want. Diff stat: 339
 insertions / 37 deletions. Word count grew from 6083 (session start) → 6934
@@ -174,10 +174,10 @@ being updated to say so. That drift is now closed by this handoff.
   edits to a Markdown paper — no test suite applies. Verification took the
   form of `diff`-checking quoted fixture excerpts against their real source
   (see below) and `grep`-confirming removed phrases were actually gone.
-- Word count: `wc -w docs/paper/fleetopia-architecture-paper.md` — 6083 at
+- Word count: `wc -w docs/paper/tendcf-architecture-paper.md` — 6083 at
   session start (already reflected the c174 handoff's commit), 6934 after
   §2.6, 7666 after §1.1 + Nix example + acknowledgements fix + §9 sentence.
-- `git diff --stat`: `docs/paper/fleetopia-architecture-paper.md | 339
+- `git diff --stat`: `docs/paper/tendcf-architecture-paper.md | 339
   insertions(+), 37 deletions(-)` against HEAD (`7b2a540`).
 - Fixture source verified: `diff` between the paper's Example A YAML block
   and `~/src/nix2cf/examples/services.yml` (with the paper's intentionally
@@ -231,7 +231,7 @@ being updated to say so. That drift is now closed by this handoff.
    the growth since then is entirely the new worked examples and §1.1. Trim
    elsewhere to compensate, leave it, or a new target now that concrete
    examples exist — operator's call, flagged twice this session without an
-   answer yet. Whether to `git push` the local commit (`94018b4`, fleetopia
+   answer yet. Whether to `git push` the local commit (`94018b4`, tendcf
    has no memory-is-data exception so it wasn't pushed automatically) is a
    smaller open item that can be folded into the same check-in.
 2. ~~Write a `feedback`-type memory entry~~ **DONE** this session:
@@ -251,11 +251,11 @@ being updated to say so. That drift is now closed by this handoff.
 ## Quick Start
 
 ```bash
-cd ~/src/fleetopia
+cd ~/src/tendcf
 git log --oneline -3                       # confirm 94018b4 is HEAD, tree clean
 git show --stat 94018b4                    # review this session's committed edits
-wc -w docs/paper/fleetopia-architecture-paper.md              # current length
-grep -n '^## \|^### ' docs/paper/fleetopia-architecture-paper.md  # re-map section lines
+wc -w docs/paper/tendcf-architecture-paper.md              # current length
+grep -n '^## \|^### ' docs/paper/tendcf-architecture-paper.md  # re-map section lines
 ```
 
 Then: ask the operator about word-count and whether to push (Where We're

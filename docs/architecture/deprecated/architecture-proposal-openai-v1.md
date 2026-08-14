@@ -1,4 +1,4 @@
-# fleetopia architecture proposal — OpenAI
+# tendcf architecture proposal — OpenAI
 
 **Status:** proposed architecture and migration plan
 **Scope:** macOS/Apple Silicon; Linux `x86_64` and `aarch64`; Android
@@ -50,7 +50,7 @@ separated.
   remote last-ditch channel. No Nix store, daemon, or Nix-on-Droid is put on a
   handset.
 - Vector, OpenObserve, VictoriaMetrics, `otelcol-contrib`, CFEngine roles,
-  Beads, and Ralph remain products in the system. fleetopia should make their
+  Beads, and Ralph remain products in the system. tendcf should make their
   interfaces more portable, not force a rewrite.
 
 The current Mac has a Determinate Nix installation but no configured remote
@@ -140,7 +140,7 @@ contracts are publishable without a site's private facts.
 
 The current site path registry already names `com.stayturgid.*` and
 `com.<site>.*` LaunchAgent namespaces and observes some Homebrew services.
-fleetopia formalizes the following ownership table and enforces it in CI and
+tendcf formalizes the following ownership table and enforces it in CI and
 preflight.
 
 | State                                                                                           | Sole writer                                  | Rule                                                                                                                                                                       |

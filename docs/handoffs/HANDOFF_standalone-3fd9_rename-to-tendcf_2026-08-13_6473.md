@@ -12,7 +12,7 @@ created_at: 2026-08-13T19:17:22-0400
 writer: claude-code
 ---
 
-# Handoff — Renaming fleetopia to tendcf, and fixing a citation bug found along the way
+# Handoff — Renaming the project to tendcf, and fixing a citation bug found along the way
 
 ## The Goal
 
@@ -20,13 +20,13 @@ Continue from handoff `70af`, whose top next-step was "re-read the full
 paper end to end before the next substantive edit." That re-read surfaced
 a real citation bug, which led into the session's main event: the operator
 decided the project's name needed to change now that `nix2cf` (the
-compiler) has already split into its own repo, leaving `fleetopia` an
-awkward umbrella name for what's left — and wanted something short enough
+compiler) has already split into its own repo, leaving the then-current
+name an awkward umbrella for what's left — and wanted something short enough
 to work as a CLI front end (`<name> apply`, `<name> plan`, `<name>
 status`). What started as "propose some names" escalated across the
 session into: pick a name, verify it's actually available, then execute a
 full rename — GitHub repo, local directory, all forward-facing content,
-and a sweep for every other place "fleetopia" might be mentioned across
+and a sweep for every other place the previous name might be mentioned across
 `~/src` and `~/ops`, followed by an explicit follow-up to also edit the
 three other-task worktrees that sweep had flagged but initially skipped.
 
@@ -34,7 +34,7 @@ three other-task worktrees that sweep had flagged but initially skipped.
 
 **Session start:** resumed via `/baton` → `resume` → chain-discovery
 fallback (cwd was the bare `~/src` home directory). Five chains existed;
-operator picked `standalone-3fd9` (this one, then still `fleetopia`) over
+operator picked `standalone-3fd9` (this one, then still under the previous name) over
 `standalone-ecc2`, `standalone-bfbf`, `standalone-0c41`, and the
 already-closed `standalone-cbd5`. Staleness check found both workspaces
 clean and matching logged `head_sha` — log was fresh.
@@ -43,7 +43,7 @@ clean and matching logged `head_sha` — log was fresh.
 
 | Repo/location | HEAD after this session | Pushed? |
 | --- | --- | --- |
-| `~/src/tendcf` (was `~/src/fleetopia`) | `1de50c3` | yes |
+| `~/src/tendcf` (local directory after the rename) | `1de50c3` | yes |
 | `~/src/nix2cf` | `1f3be42` | yes |
 | `~/ops/site-private` (memory) | `4be91f5` | yes |
 | `~/src/config-mgmt-prior-art` | n/a — not a git repo, plain edit | n/a |
@@ -54,10 +54,10 @@ clean and matching logged `head_sha` — log was fresh.
 **The three worktree rows are the one thing a future session must not
 miss** — see "Where We're Going" #1.
 
-GitHub: `djbclark/fleetopia` → `djbclark/tendcf` via `gh repo rename`
+GitHub: repo renamed to `djbclark/tendcf` via `gh repo rename`
 (confirmed the old URL 301s to the new one). Local `origin` remote
 auto-updated by `gh`. `djbclark/nix2cf` unaffected (separate repo, only
-its README/schema text mentioning `fleetopia` changed).
+its README/schema text mentioning `tendcf` changed).
 
 ## What We Tried
 
@@ -112,17 +112,17 @@ duplicate reference-list entries.
 
 **3. The rename's scope decision — the load-bearing judgment call of the
 session.** Before touching anything, found an existing memory file,
-`project_fleetopia_rename.md`, documenting the *first* rename
-(`stayturgid 2.0` → `fleetopia`, 2026-08-10). It explicitly recorded that
+`project_tendcf_rename.md`, documenting the *first* rename
+(`stayturgid 2.0` → `tendcf`, 2026-08-10). It explicitly recorded that
 old copies were deliberately left in stayturgid at the time, "per operator
 choice." That precedent shaped the whole plan: **rename forward-facing
 content only, leave historical/archival documents alone.**
 
-Categorized every file mentioning "fleetopia" (case-insensitive grep
+Categorized every file mentioning "tendcf" (case-insensitive grep
 across `~/src` and `~/ops`) into two buckets:
 
 - **Renamed:** the paper (title, body, and filename —
-  `fleetopia-architecture-paper.md` → `tendcf-architecture-paper.md`),
+  `tendcf-architecture-paper.md` → `tendcf-architecture-paper.md`),
   the protected `architecture-DEFINITIVE-v2.md` (required and received
   explicit named-change approval per that file's own header — the
   operator's rename instruction *was* that approval), the two same-day
@@ -145,33 +145,33 @@ across `~/src` and `~/ops`) into two buckets:
   under the prior name).
 
 Also decided **not** to rewrite this repo's own site-private memory
-narrative entries that mention "fleetopia" in past tense
-(`project_fleetopia_rename.md` itself, `project_cfengine_blockers_corrected.md`)
+narrative entries that mention "tendcf" in past tense
+(`project_tendcf_rename.md` itself, `project_cfengine_blockers_corrected.md`)
 — same reasoning: they're accurately describing what was true when
 written.
 
 **4. Executing the rename.** Order mattered: content rename and commits
 *before* the GitHub rename and directory move, so the working tree stayed
-addressable by its old path (`~/src/fleetopia`) for every prior step.
+addressable by its old path (`~/src/tendcf`) for every prior step.
 
-- `sed` replace `fleetopia`→`tendcf` in the four forward-facing docs (31
+- `sed` replace `tendcf`→`tendcf` in the four forward-facing docs (31
   occurrences: paper 3, `architecture-DEFINITIVE-v2.md` 16,
   `ai-optimization-review` 2, `prior-art-review` 10). Checked case
-  variants first — a capitalized "Fleetopia" exists somewhere in the
+  variants first — a capitalized "tendcf" exists somewhere in the
   repo, but not in any of these four files, so a plain lowercase
   substitution was safe.
 - `git mv` the paper file, fixed the one live relative link to it
   (`docs/paper/reviews/README.md`).
 - Two commits: `026f6c5` (citation fix + paper rename, since both touched
   the same uncommitted file) and `1de50c3` (the other three docs).
-- `gh repo rename tendcf --yes` run from inside `~/src/fleetopia` —
+- `gh repo rename tendcf --yes` run from inside `~/src/tendcf` —
   confirmed it auto-updates the local `origin` remote, no manual
   `git remote set-url` needed.
-- `mv ~/src/fleetopia ~/src/tendcf` (plain filesystem move; git doesn't
+- Local directory renamed to `~/src/tendcf` (plain filesystem move; git doesn't
   care about directory names).
 - `git push origin master` from the new path — this also carried the 11
   commits from the *prior* session (`70af`'s handoff had explicitly left
-  them unpushed, "fleetopia has no memory-is-data exception, never
+  them unpushed, "tendcf has no memory-is-data exception, never
   pushed") since origin had never seen any of them. Not a surprise, just
   worth knowing the push range (`7b2a540..1de50c3`) included more than
   just this session's two commits.
@@ -222,11 +222,11 @@ and edit them." Checked each one's git state first:
   `web/maynarddaycare/README.md`, untracked `tests/`) — clearly a task
   mid-flight. Its own git log already has a local memory commit
   (`cfc8c3e memory: CFEngine eval blockers corrected, reopens D1 for
-  fleetopia`) that predates and is independent of this session.
+  tendcf`) that predates and is independent of this session.
 - `stayturgid-2.0` (branch `feature/stayturgid-2.0`) — clean tree.
 
 Diffed each worktree's memory-file copies against the now-updated
-canonical versions in `~/ops/site-private`. `project_fleetopia_rename.md`
+canonical versions in `~/ops/site-private`. `project_tendcf_rename.md`
 and `project_cfengine_blockers_corrected.md` were byte-identical to
 canonical in both worktrees — safe to leave untouched (matches the
 historical-preservation decision made for canonical). Their `MEMORY.md`
@@ -240,10 +240,10 @@ single-line append (the new "Tendcf rename" index entry) plus copying
 For `stayturgid-2.0`, read wider context around the flagged mention first
 — confirmed it's a live forward-pointer (an "operator correction,
 2026-08-13" blockquote annotation inserted into an older 2026-07-12 eval
-doc, pointing readers at "fleetopia docs/architecture, D12/§4.3" and
-`djbclark/fleetopia` as a GitHub thread), not a historical-event
+doc, pointing readers at "tendcf docs/architecture, D12/§4.3" and
+`djbclark/tendcf` as a GitHub thread), not a historical-event
 narrative — so a straight text fix was correct, unlike the
-`project_fleetopia_rename.md`-style files. First `Edit` attempt failed
+`project_tendcf_rename.md`-style files. First `Edit` attempt failed
 (old-string mismatch — had dropped the leading `> ` blockquote markers
 when copying the target text); re-read the exact lines and retried
 successfully.
@@ -261,7 +261,7 @@ See "Where We're Going" #1.
 - **Rename forward-facing content only; leave historical/archival docs
   and past-tense memory narrative as-is.** Directly inherited from the
   first rename's own documented precedent
-  (`project_fleetopia_rename.md`), not invented fresh this session. Full
+  (`project_tendcf_rename.md`), not invented fresh this session. Full
   file-by-file scope list lives in `~/ops/site-private/memory/project_tendcf_rename.md`
   if it ever needs revisiting.
 - **Content rename and commits before the GitHub rename and directory

@@ -463,9 +463,9 @@ minisign, a Git tag, a CA-signed builder, or a future roadmap label.
 
 ## Sources checked
 
-- [fleetopia final architecture v1](architecture-final-v1.md) —
+- [tendcf final architecture v1](architecture-final-v1.md) —
   authoritative requirements and phase gates.
-- [fleetopia detailed proposal v1](architecture-proposal-v1.md) §§6–8,
+- [tendcf detailed proposal v1](architecture-proposal-v1.md) §§6–8,
   12, 14 — manifest, cache, pull, consent, secrets, and roadmap detail.
 - [OpenAI alternative proposal](architecture-proposal-openai-v1.md) §5–6 —
   stronger but non-authoritative suggestions such as per-device pinning,

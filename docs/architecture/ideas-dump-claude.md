@@ -1,4 +1,4 @@
-# fleetopia — Loose Ideas Dump (low-effort, unpolished)
+# tendcf — Loose Ideas Dump (low-effort, unpolished)
 
 > **Archival.** Dump, not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins.
 

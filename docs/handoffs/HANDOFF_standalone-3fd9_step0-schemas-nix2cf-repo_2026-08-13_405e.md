@@ -4,7 +4,7 @@ handoff_id: 405e
 parent_handoff_ids: [8671]
 lineage: deterministic
 chain: [standalone-3fd9]
-repo: fleetopia
+repo: tendcf
 workspace: N/A (plain repo checkout, not an ops-worktrees task workspace)
 branch: master
 head_sha: ecb42a1fdb59d6aca552f99b7d14ff04b53b3ecd
@@ -39,11 +39,11 @@ remainder — see Where We're Going item 1.**
 | Repo | Commit | What |
 | --- | --- | --- |
 | `djbclark/nix2cf` | `f5f01e0` | New public repo. Schemas + lint + fixtures |
-| `djbclark/fleetopia` | `ecb42a1` | §4.2 + §12 Step 0 record that the repo exists |
-| `djbclark/fleetopia` | `8cd472b` | Handoff 8671, pushed this session (was local-only) |
+| `djbclark/tendcf` | `ecb42a1` | §4.2 + §12 Step 0 record that the repo exists |
+| `djbclark/tendcf` | `8cd472b` | Handoff 8671, pushed this session (was local-only) |
 
 `nix2cf` working tree clean at `f5f01e0`, `master` tracking
-`origin/master`, in sync. `fleetopia` clean at `ecb42a1`, in sync.
+`origin/master`, in sync. `tendcf` clean at `ecb42a1`, in sync.
 Repository is public, Issues enabled by default (matches the standing
 preference).
 
@@ -56,11 +56,11 @@ No blockers.
 ## What We Tried
 
 1. **Nearly wrote the schemas without resolving where they live.** The
-   obvious move on resuming was to start writing files in `fleetopia`,
+   obvious move on resuming was to start writing files in `tendcf`,
    which was already checked out and clean. Reading §4.2 first showed D21
    makes that the wrong home by decision, not by taste: a schema change is
    a `nix2cf` interface change and an instance change is site data, and
-   they do not move together. Staging in `fleetopia` would have guaranteed
+   they do not move together. Staging in `tendcf` would have guaranteed
    a `git mv` later plus a period where the boundary the document asserts
    was false on disk. **This is the same failure mode 8671 recorded — the
    log's framing of an item is not evidence about the item** — and it was
@@ -104,8 +104,8 @@ smuggling in a premise).
 D21-correct from day one, no later move, and Step 3's compiler lands into a
 repo that already holds the contract it implements.
 
-**Rejected:** (a) *stage in `fleetopia`, move at Step 3* — cheapest today,
-but guarantees a move and makes `fleetopia` stop being docs-only;
+**Rejected:** (a) *stage in `tendcf`, move at Step 3* — cheapest today,
+but guarantees a move and makes `tendcf` stop being docs-only;
 (b) *put them in `site-djbclark` next to `registry_lint.py`* — enforcement
 would be free since CI and pre-commit already run there, but it directly
 contradicts D21 and would require an `ops-worktrees` task workspace.
@@ -191,7 +191,7 @@ README.md                            the contract's rationale, not a tutorial
 .gitignore
 ```
 
-**Files changed in `fleetopia`** (commit `ecb42a1`): one file,
+**Files changed in `tendcf`** (commit `ecb42a1`): one file,
 `docs/architecture/architecture-DEFINITIVE-v2.md`, §4.2 and §12 Step 0 only.
 
 **Contract details worth not re-reading the schemas for:**
@@ -267,7 +267,7 @@ README.md                            the contract's rationale, not a tutorial
      accumulate; whether per-domain `comprehensive` is the right
      granularity; and whether R13's cost inversion is an argument or a
      hypothesis.
-   - Suggested home: `docs/paper/` in `fleetopia`. Format is an open
+   - Suggested home: `docs/paper/` in `tendcf`. Format is an open
      question — the sources are PDFs, so there is no LaTeX skeleton to copy
      from in that directory. Ask before committing to one.
 2. **Rest of §12 Step 0 — transcribe current reality into instances.**
@@ -299,10 +299,10 @@ README.md                            the contract's rationale, not a tutorial
 ls ~/src/bcfg2/doc/papers/
 #   bcfg-cluster2003.pdf  desai_lisa05.pdf  desai_lisa06.pdf  19_bcfg2.pdf
 # Already-mined notes, do NOT redo:
-$EDITOR ~/src/fleetopia/docs/architecture/bcfg2-papers-2026-08-13.md
+$EDITOR ~/src/tendcf/docs/architecture/bcfg2-papers-2026-08-13.md
 
 # The architecture the paper describes:
-$EDITOR ~/src/fleetopia/docs/architecture/architecture-DEFINITIVE-v2.md
+$EDITOR ~/src/tendcf/docs/architecture/architecture-DEFINITIVE-v2.md
 #   §0   six things to internalize
 #   §4.1 / §4.5.1  the Site Model contract + the four D16 sub-decisions
 #   §12  build order, Steps 0-10
@@ -312,7 +312,7 @@ $EDITOR ~/src/fleetopia/docs/architecture/architecture-DEFINITIVE-v2.md
 cd ~/src/nix2cf && ./bin/schema_lint.py     # expect: OK (5 schemas), exit 0
 git log --oneline -1                        # f5f01e0
 
-cd ~/src/fleetopia && git log --oneline -3  # ecb42a1 at HEAD, clean, pushed
+cd ~/src/tendcf && git log --oneline -3  # ecb42a1 at HEAD, clean, pushed
 ```
 
 Gotcha for whoever writes the next Tier 1 entry: `session_log.py write`

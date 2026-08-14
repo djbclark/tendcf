@@ -4,7 +4,7 @@ handoff_id: 601f
 parent_handoff_ids: [05f4]
 lineage: deterministic
 chain: [standalone-3fd9]
-repo: fleetopia
+repo: tendcf
 workspace: N/A (plain repo checkout, not an ops-worktrees task workspace)
 branch: master
 head_sha: 08b7098cf0c1c50b8219c49d74e3309f1927205b
@@ -28,7 +28,7 @@ Three phases, in order:
 1. **Close out `05f4`'s deferred items** — push the unpushed commit, fix the
    D-number cross-reference drift, run the `fleet/fleet.yml` Android-chain audit
    that gated D16.
-2. **Resolve naming and project structure** — `fleetopia` → `nix2cf` for the
+2. **Resolve naming and project structure** — `tendcf` → `nix2cf` for the
    compiler layer, with the Android/device modules split out separately.
 3. **Research whether communal multi-author management changes the
    CFEngine-vs-Puppet decision** — including the Puppet and CFEngine
@@ -36,7 +36,7 @@ Three phases, in order:
 
 ## Where We Are
 
-- **Repo:** `djbclark/fleetopia`, local checkout `~/src/fleetopia`, `master`,
+- **Repo:** `djbclark/tendcf`, local checkout `~/src/tendcf`, `master`,
   HEAD `08b7098`, **clean, pushed to origin**. (Parent handoff left `a4f8582`
   unpushed; that is now pushed along with this session's `08b7098`.)
 - **Architecture doc** (`docs/architecture/architecture-DEFINITIVE-v2.md`):
@@ -157,7 +157,7 @@ mistaken for an operator constraint. Check before weighting.**
 
 - **`nix2cf`** is the name for the Nix→CFEngine compiler layer. Chosen over
   `nixcf` (collision), `nix2json` (names the serialization), and keeping
-  `fleetopia`. Rationale: the `X2Y` form names the *direction* — this is a
+  `tendcf`. Rationale: the `X2Y` form names the *direction* — this is a
   transform, and encoding the arrow is free precision. It also lands inside the
   Nix ecosystem's own idiom (`node2nix`, `cabal2nix`, `poetry2nix`,
   `crate2nix`, `gomod2nix`, `dream2nix`) while deliberately running the
@@ -166,7 +166,7 @@ mistaken for an operator constraint. Check before weighting.**
 - **The project splits in two**: `nix2cf` = the generic compiler layer;
   Android/device modules stay separate under a fleet-domain name (they are the
   real successor to stayturgid 2.0 and need no new name). Rationale: D19
-  already made fleetopia's flake "the shared module-system library the other
+  already made tendcf's flake "the shared module-system library the other
   three repos import" — the split makes that dependency direction enforceable
   rather than conventional, and the audiences differ (a Nix→CFEngine compiler
   is useful to strangers; Termux/Shizuku modules are useful to one person).
@@ -175,7 +175,7 @@ mistaken for an operator constraint. Check before weighting.**
   imports anything fleet-specific; split when the interface stops churning.
   Rationale: the abstraction is currently n=1, and splitting before the
   interface stabilizes puts the boundary in the wrong place. Also, a repo split
-  adds a cross-repo version boundary and `fleetopia#2` explicitly demands a
+  adds a cross-repo version boundary and `tendcf#2` explicitly demands a
   *faster, more atomic* change process — the split is only cheap if D19
   resolves in favor of `flake.lock` being authoritative.
 - **Open boundary question, not yet recorded in the doc:** Site Model
@@ -228,7 +228,7 @@ its own row.
 **Tests run: one.** A real signed commit in a scratch repo with the agent
 socket still set and no `env` override → `Good "git" signature for
 djbclark@gmail.com with ED25519 key SHA256:NOf/qpfDPyYOKOSto9KMSe6KhH7EfiKssVf6ltppa+A`.
-No other suites exist — fleetopia is documentation-only, Step 0 has not started.
+No other suites exist — tendcf is documentation-only, Step 0 has not started.
 
 ### The `fleet.yml` audit (the D16 gate)
 
@@ -426,7 +426,7 @@ the same reason and is flagged for the operator, not edited from here.
 
 **7. Triage stayturgid `#288`/`#289`/`#290`.** `#288` is a one-line fix.
 
-**8. Fold `fleetopia#2`** (faster, more atomic change process) into the
+**8. Fold `tendcf#2`** (faster, more atomic change process) into the
 architecture doc — still unaddressed, and the repo split makes it more urgent.
 
 **9. Operator action: restart 1Password.** Wedged 10+ days. Signing no longer
@@ -439,7 +439,7 @@ function for the transport-bootstrap and interlock designs regardless.
 ## Quick Start
 
 ```bash
-cd ~/src/fleetopia
+cd ~/src/tendcf
 git log --oneline -5          # expect 08b7098 at HEAD, clean, == origin/master
 
 # Item 1 — the research ask. Current state of the three candidates:

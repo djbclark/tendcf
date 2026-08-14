@@ -1,4 +1,4 @@
-# PRE-MORTEM / SCOPE-REALISM BRIEF — fleetopia
+# PRE-MORTEM / SCOPE-REALISM BRIEF — tendcf
 
 > **Archival.** Prompt that produced a now-deprecated draft. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins.
 

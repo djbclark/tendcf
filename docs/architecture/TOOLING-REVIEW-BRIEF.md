@@ -1,4 +1,4 @@
-# TOOLING ASSUMPTIONS REVIEW BRIEF — fleetopia
+# TOOLING ASSUMPTIONS REVIEW BRIEF — tendcf
 
 > **Archival.** Prompt that produced a now-deprecated draft. Not current design. On conflict, [`../paper/tendcf-architecture-guide.md`](../paper/tendcf-architecture-guide.md) wins.
 
@@ -8,7 +8,7 @@ The 2026-08-08 architecture panel (4 AI proposals + 1 red-team, all in
 `docs/architecture/`) evaluated the _config management_ layer thoroughly but treated a
 large set of other tools as **unexamined keeps** — preserved under requirement
 R11 ("preserve existing invariants") without anyone asking whether they are
-still the right choice for the fleetopia architecture. The operator has explicitly
+still the right choice for the tendcf architecture. The operator has explicitly
 asked for that gap to be closed.
 
 Your job: **systematically challenge every load-bearing tool in this stack.**
@@ -126,7 +126,7 @@ flock/claim files
 **Proposed-but-not-yet-adopted (also review):** minisign/signify · deploy-rs ·
 harmonia/attic · nixos-anywhere · comin (rejected — was that right?)
 
-For each, ask: does the fleetopia architecture (role mesh, Site Model, signed
+For each, ask: does the tendcf architecture (role mesh, Site Model, signed
 manifests, consent layer, Free Sysadmin publishing, cheap-exit constraint)
 change the calculus that originally justified this tool? Flag any tool whose
 _failure or compromise_ is under-considered (the red-team noted CFEngine's

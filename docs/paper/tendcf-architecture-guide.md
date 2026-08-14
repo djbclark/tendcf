@@ -847,8 +847,8 @@ variant of this one — is the better choice.
 - A lint that carries the cross-file rules JSON Schema cannot state
   alone: reference resolution, launchd labels checked against declared
   writer prefixes, no prefix nested inside another.
-- Twelve deliberately broken fixtures used as a check that the lint
-  catches bad input, not only that it accepts good input.
+- Twelve deliberately broken fixtures in `examples/broken/`, which the lint
+  must catch. A passing lint on correct input is not a check.
 
 **Not built — this is most of it**
 

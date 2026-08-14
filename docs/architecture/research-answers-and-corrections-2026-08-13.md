@@ -125,7 +125,7 @@ They cannot substitute for each other:
   architectural change than D19 contemplates, and it breaks the release
   model in `OPS-RELEASES.md`, where all three carry the same tag.
 - Worse, the current relationship is **mutually referential** (D19 already
-  has `fleetopia`'s flake as a shared library the others import, while the
+  has `tendcf`'s flake as a shared library the others import, while the
   suite as a whole releases together). Flake inputs form a DAG; **circular
   inputs are not expressible**, so a lock file structurally cannot encode
   a peer relationship.

@@ -1,8 +1,8 @@
-# fleetopia — Architecture Proposal (Grok v1)
+# tendcf — Architecture Proposal (Grok v1)
 
 **Author:** Grok (xAI) as independent second opinion  
 **Date:** 2026-08-08  
-**Worktree:** `~/src/fleetopia` (branch `master`)  
+**Worktree:** `~/src/tendcf` (branch `master`)  
 **Normative inputs:** operator requirements R1–R11 in
 `docs/architecture/SECOND-OPINIONS-BRIEF.md`; live ground truth under `~/ops/` and
 `~/src/ops-worktrees/`.
@@ -14,7 +14,7 @@ makes decisive calls, and delivers a migration plan with rollback points.
 
 ## 0. Executive verdict (read this first)
 
-| Candidate                              | Verdict                          | Role in fleetopia                                                                                                                              |
+| Candidate                              | Verdict                          | Role in tendcf                                                                                                                              |
 | -------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | **bgub/nix-macos-starter**             | **Pattern source, not adoption** | Steal flake + nix-darwin + home-manager + mise cohabitation; do not replace ops with a personal starter                                  |
 | **mrkuz/macos-config**                 | **Pattern source, not adoption** | Steal modular hosts/profiles, brew-vs-nix package rule of thumb, optional linux-builder discipline; reject VM-first lifestyle (R3)       |
@@ -449,7 +449,7 @@ Keep exactly:
 - Post-deploy apply split: `just deploy` (Android), `just deploy-mac` /
   future `just deploy-host` (peers), `just site-serverapps` (serverapps)
 
-### 7.2 Push path (today → fleetopia)
+### 7.2 Push path (today → tendcf)
 
 ```text
 operator/agent on any role.release peer
@@ -512,7 +512,7 @@ Interfaces in stayturgid (Python + on-device stub):
 **Keep secretspec as single declaration authority** (already true in
 site-private; stayturgid + site-djbclark symlink).
 
-Actions for fleetopia:
+Actions for tendcf:
 
 1. Finish value migration off scattered `~/.config/stayturgid/*.env` into
    providers (macOS Keychain / 1Password) per existing project notes.
@@ -531,7 +531,7 @@ Actions for fleetopia:
 
 Preserve O-V-G-O + Vector + Caddy (+ blackbox_exporter, OliveTin).
 
-fleetopia deltas:
+tendcf deltas:
 
 1. **Role-based placement:** `role.obs-main` prefers always-on Linux; Mac
    laptop becomes `role.obs-backup` or edge collector when VPS is ready.
@@ -557,7 +557,7 @@ was the right calibration:
   PR-reviewable without detangle steps.
 - Token cost for agents stays on code + small ADRs, not on woven novels.
 
-### 10.2 Policy for fleetopia
+### 10.2 Policy for tendcf
 
 | Material                                          | Literate?                                | Why                                                    |
 | ------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------ |

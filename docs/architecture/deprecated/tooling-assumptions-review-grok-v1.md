@@ -12,8 +12,8 @@
   deploy-rs/comin context. Training memory is not used as feature evidence.
 
 This review systematically challenges every load-bearing tool treated as an
-unexamined R11 keep by the fleetopia architecture panel. Verdicts aim for reasoned
-keeps, not churn. Where the fleetopia design (role mesh, Site Model, signed
+unexamined R11 keep by the tendcf architecture panel. Verdicts aim for reasoned
+keeps, not churn. Where the tendcf design (role mesh, Site Model, signed
 manifests, consent, Free Sysadmin, cheap-exit) changes the original calculus,
 that is called out explicitly.
 
@@ -38,7 +38,7 @@ that is called out explicitly.
 | **secretspec**                                 | Sole secret _declaration_ schema                                                               | **KEEP**                                                                                              | D1/R11: no second schema (agenix/sops). Values in providers only.                                                                                                                                                                     |
 | **Vector**                                     | Log shipper (serverapp)                                                                        | **KEEP**                                                                                              | Working adapter path; migrate placement with obs-main role, not tool churn.                                                                                                                                                           |
 | **OpenObserve**                                | Log/UI sink                                                                                    | **KEEP**                                                                                              | Live stack; auth fix 2026-07-25 pending soak. Replacement only if product fails soak, not for architecture fashion.                                                                                                                   |
-| **VictoriaMetrics**                            | Metrics store                                                                                  | **KEEP**                                                                                              | Fits role-mesh obs placement; no fleetopia pressure to replace.                                                                                                                                                                             |
+| **VictoriaMetrics**                            | Metrics store                                                                                  | **KEEP**                                                                                              | Fits role-mesh obs placement; no tendcf pressure to replace.                                                                                                                                                                             |
 | **otelcol-contrib**                            | OTel collection on devices/hosts                                                               | **KEEP**                                                                                              | Standard collector; Termux role already ships it.                                                                                                                                                                                     |
 | **Grafana**                                    | Dashboards                                                                                     | **KEEP**                                                                                              | Operator UI; low coupling to trust layer.                                                                                                                                                                                             |
 | **Caddy**                                      | Local reverse proxy / TLS front                                                                | **KEEP**                                                                                              | Simple, Ansible-owned; exit-compatible.                                                                                                                                                                                               |
@@ -224,7 +224,7 @@ Red-team RT-04 / RT-09: capability-enforcing executor; AI advisor must never be 
 ### Orchestration / config
 
 **Ansible — KEEP.**  
-fleetopia strengthens the case: role mesh still needs multi-OS config push; R5 exit re-renders services via Ansible adapters; R10 consumers must not need nix-darwin. Failure mode under-considered: playbooks are general-purpose code once signed (RT-03). Mitigation is typed operation IR + check-mode honesty, not replacing Ansible.
+tendcf strengthens the case: role mesh still needs multi-OS config push; R5 exit re-renders services via Ansible adapters; R10 consumers must not need nix-darwin. Failure mode under-considered: playbooks are general-purpose code once signed (RT-03). Mitigation is typed operation IR + check-mode honesty, not replacing Ansible.
 
 **CFEngine — KEEP-WITH-CHANGES.**  
 Last-ditch heal is both _recovery_ and _remote exec_. Ground truth: `cf-serverd` ACLs exist (Tailscale CGNAT range, wrapper path); `just cf-run` is preferred over classic cf-runagent. Under consent/trust: CFEngine should remain **break-glass**, logged, network-restricted, and not a silent bypass of signed converge for routine changes. Adding "converge agent alive" promise (proposal-v1) is fine; expanding remote-exec surface is not.
@@ -260,7 +260,7 @@ Encryption and peer identity are real. **ACLs/grants are not specified as fleet 
 
 **Vector, OpenObserve, VictoriaMetrics, otelcol-contrib, Grafana, Caddy, blackbox_exporter, OliveTin — KEEP** as a set.
 
-fleetopia changes _placement_ (obs-main off the sleeping M1 Air → VPS role), not _tool choice_. OliveTin must remain a thin button face over existing just/Ansible verbs so it does not become a second unsigned remote-exec path. OpenObserve clean-log soak remains an ops gate, not a redesign trigger.
+tendcf changes _placement_ (obs-main off the sleeping M1 Air → VPS role), not _tool choice_. OliveTin must remain a thin button face over existing just/Ansible verbs so it does not become a second unsigned remote-exec path. OpenObserve clean-log soak remains an ops gate, not a redesign trigger.
 
 ### Agent orchestration
 
@@ -315,9 +315,9 @@ Mechanics in site-djbclark (`ops-release-check/deploy`, annotated tags, `ops-rel
 
 ---
 
-## Does fleetopia change the original calculus?
+## Does tendcf change the original calculus?
 
-| Tool                                              | Original reason               | fleetopia effect                                                                                    |
+| Tool                                              | Original reason               | tendcf effect                                                                                    |
 | ------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------- |
 | just                                              | Nice CLI after Make migration | Still best verb surface; DAG requirement → use deps, don't churn tool                         |
 | mise                                              | Runtime pins                  | Elevated to toolchain SSOT + exit baseline (D3) — **stronger keep** for toolchains, not tasks |

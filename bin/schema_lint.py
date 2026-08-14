@@ -8,15 +8,17 @@
 Three layers, cheapest first:
 
   1. every schema/*.schema.json is itself a valid JSON Schema 2020-12;
-  2. every examples/* instance validates against its schema;
+  2. every happy-path examples/*.yml instance validates against its schema;
   3. cross-file rules JSON Schema cannot express on its own — domain and
      bundle references resolve, service names are unique, launchd labels
      fall under a declared writer prefix, no writer prefix nests inside
-     another.
+     another;
+  4. each of the twelve deliberately broken fixtures in examples/broken/
+     is caught. A lint that only accepts good input is not a check.
 
 Layer 3 is the point. Layer 1 and 2 catch a broken schema; layer 3 is what
 keeps a valid-but-wrong Site Model out of a render (§0 rule 6: prefer
-machine-checkable to conventional).
+machine-checkable to conventional). Layer 4 is why we believe layer 3.
 
 Exit 0 clean, 1 findings, 2 cannot read/parse.
 Run from repo root:  bin/schema_lint.py
@@ -25,8 +27,10 @@ Run from repo root:  bin/schema_lint.py
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +41,8 @@ from referencing import Registry, Resource
 REPO = Path(__file__).resolve().parent.parent
 SCHEMA_DIR = REPO / "schema"
 EXAMPLE_DIR = REPO / "examples"
+BROKEN_DIR = EXAMPLE_DIR / "broken"
+EXPECTED_BROKEN = 12
 
 # example file -> schema file. report-rows.yml is a sequence of rows, each
 # validated individually against the row schema.
@@ -48,11 +54,26 @@ EXAMPLES: dict[str, tuple[str, bool]] = {
 }
 
 findings: list[str] = []
+PRINT_FINDINGS = True
 
 
 def fail(msg: str) -> None:
     findings.append(msg)
-    print(f"schema-lint: FAIL: {msg}")
+    if PRINT_FINDINGS:
+        print(f"schema-lint: FAIL: {msg}")
+
+
+@contextmanager
+def capture_findings(*, silent: bool = True):
+    global findings, PRINT_FINDINGS
+    prev_findings, prev_print = findings, PRINT_FINDINGS
+    findings = []
+    PRINT_FINDINGS = not silent
+    try:
+        yield findings
+    finally:
+        findings = prev_findings
+        PRINT_FINDINGS = prev_print
 
 
 def die(msg: str) -> None:
@@ -133,28 +154,89 @@ def validate_row(row: Any, schema: dict, registry: Registry, label: str) -> None
     )
 
 
-def check_examples(schemas: dict[str, dict], registry: Registry) -> dict[str, Any]:
+def load_happy_examples() -> dict[str, Any]:
     loaded: dict[str, Any] = {}
-    for example_name, (schema_name, is_sequence) in EXAMPLES.items():
+    for example_name in EXAMPLES:
         path = EXAMPLE_DIR / example_name
         if not path.exists():
             fail(f"examples/{example_name} is missing — the schema has no fixture")
             continue
-        data = load_yaml(path)
-        loaded[example_name] = data
+        loaded[example_name] = load_yaml(path)
+    return loaded
+
+
+def validate_loaded(
+    loaded: dict[str, Any],
+    schemas: dict[str, dict],
+    registry: Registry,
+    *,
+    label_prefix: str = "examples",
+) -> None:
+    for example_name, (schema_name, is_sequence) in EXAMPLES.items():
+        if example_name not in loaded:
+            continue
+        data = loaded[example_name]
         schema = schemas.get(schema_name)
+        label = f"{label_prefix}/{example_name}"
         if schema is None:
-            fail(f"schema/{schema_name} is missing (needed by examples/{example_name})")
+            fail(f"schema/{schema_name} is missing (needed by {label})")
             continue
         if is_sequence:
             if not isinstance(data, list):
-                fail(f"examples/{example_name}: expected a sequence of rows")
+                fail(f"{label}: expected a sequence of rows")
                 continue
             for i, row in enumerate(data):
-                validate_row(row, schema, registry, f"examples/{example_name}[{i}]")
+                validate_row(row, schema, registry, f"{label}[{i}]")
         else:
-            validate(data, schema, registry, f"examples/{example_name}")
-    return loaded
+            validate(data, schema, registry, label)
+    check_cross_file(loaded)
+
+
+def check_negative_fixtures(
+    happy: dict[str, Any],
+    schemas: dict[str, dict],
+    registry: Registry,
+) -> int:
+    """Each examples/broken/<case>/ overlay must be rejected.
+
+    Overlay files replace the happy-path document of the same name; the rest
+    of the Site Model stays as in examples/. Silence on the expected failures
+    — a negative fixture that the lint accepts is the finding.
+    """
+    if not BROKEN_DIR.is_dir():
+        fail("examples/broken/ is missing — the twelve negative fixtures are gone")
+        return 0
+    cases = sorted(p for p in BROKEN_DIR.iterdir() if p.is_dir())
+    if len(cases) != EXPECTED_BROKEN:
+        fail(
+            f"examples/broken/: expected {EXPECTED_BROKEN} cases, found {len(cases)}"
+        )
+    caught = 0
+    for case in cases:
+        overlays = sorted(case.glob("*.yml"))
+        if not overlays:
+            fail(f"examples/broken/{case.name}: no overlay .yml")
+            continue
+        loaded = {name: copy.deepcopy(doc) for name, doc in happy.items()}
+        for overlay in overlays:
+            if overlay.name not in EXAMPLES:
+                fail(
+                    f"examples/broken/{case.name}: {overlay.name} is not a Site Model file"
+                )
+                continue
+            loaded[overlay.name] = load_yaml(overlay)
+        with capture_findings(silent=True) as case_findings:
+            validate_loaded(
+                loaded, schemas, registry, label_prefix=f"examples/broken/{case.name}"
+            )
+        if case_findings:
+            caught += 1
+        else:
+            fail(
+                f"examples/broken/{case.name}: was not caught "
+                "(lint accepted a deliberately broken fixture)"
+            )
+    return caught
 
 
 def check_cross_file(loaded: dict[str, Any]) -> None:
@@ -263,14 +345,18 @@ def main() -> int:
         die("no schemas found in schema/")
 
     check_schemas_valid(schemas)
+    caught = 0
     if not args.schemas_only:
-        loaded = check_examples(schemas, registry)
-        check_cross_file(loaded)
+        loaded = load_happy_examples()
+        validate_loaded(loaded, schemas, registry)
+        if not findings:
+            caught = check_negative_fixtures(loaded, schemas, registry)
 
     if findings:
         print(f"schema-lint: {len(findings)} finding(s)")
         return 1
-    print(f"schema-lint: OK ({len(schemas)} schemas)")
+    extra = f", {caught} negative fixtures" if caught else ""
+    print(f"schema-lint: OK ({len(schemas)} schemas{extra})")
     return 0
 
 

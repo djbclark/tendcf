@@ -1,0 +1,24 @@
+contract_version: 1
+domain:
+  description: The launchd label namespace on macOS
+writers:
+- prefix: com.djbclark.*
+  writer: cfengine
+  repo: site-shared
+  note: Site services. Rendered from services.yml via nix2cf.
+- prefix: org.tendcf.*
+  writer: cfengine
+  repo: tendcf
+  note: Engine-owned example services. Fixture only.
+- prefix: dev.mise.*
+  writer: mise
+  note: Toolchain shims only; mise does not own services (D13).
+- prefix: org.nixos.*
+  writer: nix-darwin
+  note: Substrate only, and only if §14.1 resolves toward nix-darwin (§12 Step 7).
+- prefix: com.apple.*
+  writer: apple
+  note: Not ours. Declared so it is not reported as an extra entry.
+- prefix: com.djbclark.caddy.*
+  writer: cfengine
+  note: Nested inside com.djbclark.* — two writers over one namespace.

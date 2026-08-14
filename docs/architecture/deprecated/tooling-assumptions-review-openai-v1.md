@@ -1,7 +1,7 @@
-# fleetopia tooling-assumptions review — OpenAI v1
+# tendcf tooling-assumptions review — OpenAI v1
 
 **Date:** 2026-08-08
-**Scope:** authoritative fleetopia architecture, red-team report, live ~/ops suite,
+**Scope:** authoritative tendcf architecture, red-team report, live ~/ops suite,
 and worktree protocol. This is a review, not an adoption plan. A tool is not a
 security boundary merely because it emits a plan, signature, or green check.
 
