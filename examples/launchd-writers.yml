@@ -29,7 +29,7 @@ writers:
 
   - prefix: org.nixos.*
     writer: nix-darwin
-    note: "Substrate only, and only if §14.1 resolves toward nix-darwin (§12 Step 7)."
+    note: "Substrate only, and only if §14.1 resolves toward nix-darwin (Step 7)."
 
   - prefix: com.apple.*
     writer: apple

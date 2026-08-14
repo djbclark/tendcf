@@ -28,6 +28,17 @@ are still to be built.
 
 ```bash
 bin/schema_lint.py
+bin/check_protected_docs.py
 ```
+
+CI runs both on every push and pull request. Locally, D27 also runs as a
+commit-msg hook once git uses this repo's hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Edits to `docs/architecture/architecture-DEFINITIVE-v3.md` need an
+`Approved-change: <reason>` trailer on the commit.
 
 License: [GPL-3.0-or-later](LICENSE).

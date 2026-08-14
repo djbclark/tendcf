@@ -1,0 +1,35 @@
+name: Check
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Schema lint
+        run: bin/schema_lint.py
+
+      - name: Protected architecture map (D27)
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -e
+          if [ "$EVENT" = "pull_request" ]; then
+            bin/check_protected_docs.py --range "$BASE" "$SHA"
+          elif [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "protected-docs: initial push, skip range"
+          else
+            bin/check_protected_docs.py --range "$BEFORE" "$SHA"
+          fi

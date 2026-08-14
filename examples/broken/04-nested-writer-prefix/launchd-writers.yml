@@ -15,7 +15,7 @@ writers:
   note: Toolchain shims only; mise does not own services (D13).
 - prefix: org.nixos.*
   writer: nix-darwin
-  note: Substrate only, and only if §14.1 resolves toward nix-darwin (§12 Step 7).
+  note: Substrate only, and only if §14.1 resolves toward nix-darwin (Step 7).
 - prefix: com.apple.*
   writer: apple
   note: Not ours. Declared so it is not reported as an extra entry.

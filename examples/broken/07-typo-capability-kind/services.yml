@@ -61,7 +61,7 @@ services:
   requires:
   - path:/etc/caddy/Caddyfile
   - netwrok:tailnet
-  platform_notes: Port allocations are authoritative in registry/ports.yml, asserted
+  platform_notes: Port allocations are site-private authorities, existence-checked at compile time.
     at eval time.
 - name: litellm-proxy
   description: LLM gateway behind Caddy
