@@ -2,13 +2,15 @@
 
 **Draft for review — not published, not submitted.**
 Daniel Joseph Barnhart Clark (djbclark@mit.edu).
-Prepared 2026-08-13 for Narayan Desai; facts aligned to architecture v3 on
-2026-08-14. Sections are numbered so comments can cite them.
+Prepared 2026-08-13 for Narayan Desai; facts checked against the vetted
+current-state guide on 2026-08-14. Sections are numbered so comments can
+cite them.
 
 The living architecture is
 [`docs/architecture/architecture-DEFINITIVE-v3.md`](../architecture/architecture-DEFINITIVE-v3.md).
-A companion in plainer language is
-[`tendcf-architecture-guide.md`](tendcf-architecture-guide.md).
+The vetted current-state description — last fully read and approved — is
+[`tendcf-architecture-guide.md`](tendcf-architecture-guide.md). Where this
+paper and that guide disagree on the current design, the guide wins.
 
 ---
 
@@ -22,8 +24,8 @@ by AI agents rather than by hand.** We treat that premise as a first-order
 design constraint and derive a decision rule from it: prefer designs whose
 correctness follows from information *local* to the file being edited over
 designs that require *global* knowledge of what everyone else declared.
-Applying that rule inverted two decisions we had already argued the other
-way, and both inversions are the substance of this paper.
+That rule shapes the Site Model: types state what they provide and require,
+and domains are comprehensive unless they opt out with a reason.
 
 The architecture is a data spine (the Site Model), a pure compiler from that
 spine to CFEngine's native JSON augments layer, append-only JSONL as the
@@ -52,7 +54,8 @@ stated goals are to extend software freedom to configuration glue — the
 generic layer is publishable, and an adopter should be able to supply their
 own facts and run it unmodified — and to give the eventual users of managed
 devices the ability to *understand and refuse* a proposed change to their own
-computer.
+computer — using **their** AI, not ours. We never run their model, see their
+prompt, or see the conversation.
 
 That framing produces the usual requirements (portability, no permanent
 control node, a signed update path) and one unusual one.
@@ -106,28 +109,51 @@ a claim about where a *different* design starts winning on its own terms,
 which is the comparison §5 and §8 return to throughout.
 
 The rest of the paper: §2 describes the architecture in enough detail to
-argue about; §3 the design rule we derive; §4 the two decisions it inverted;
-§5 where we depart from Bcfg2 and why; §6 what we took from it; §7 an honest
-account of validation status, which is thin; §8 the open questions we would
-most like attacked.
+argue about (including composition layers, per-device trust, peer actions,
+and token discovery); §3 the design rule we derive; §4 two places that
+rule shows up in the Site Model; §5 where we depart from Bcfg2 and why;
+§6 what we took from it; §7 an honest account of validation status, which
+is thin; §8 the open questions we would most like attacked.
 
 ---
 
 ## 2. Architecture
 
-### 2.1 The Site Model: facts as data, one home
+### 2.1 The Site Model: facts in layers, behavior in tendcf
 
-Every fact about the site — host inventory and taxonomy, port and path
-allocation, service definitions, role assignments, trust tiers, signing key
-identifiers — lives in a set of schema-validated JSON/YAML files called the
-Site Model. Behavior lives in generic code that holds no facts and is
-therefore publishable. Adapters translate between them.
+Git-repo count is not the composition mechanism. Layers are roles:
 
-The Site Model is deliberately not a tool's configuration format. Every
-config tool in the system — CFEngine, the toolchain bootstrapper, Nix for
-builds — is a *consumer* of that data and is individually replaceable. This
-is the mechanism by which the same generic code runs on somebody else's
-machines: they supply their own Site Model through the same schema.
+- **tendcf** (public) — engine, schemas/types, generic adapters, default
+  advisor prompt, compiler interface.
+- **site-shared** (optional, public) — reusable recipes, not live inventory.
+- **foreign site-shared** — other people's recipes, listed as read-only inputs.
+- **site-private** (never an input) — this site's facts: inventory,
+  allocations, secret *names*, trust policy, extra advisor prompt. Holds the
+  lockfile that pins everything else.
+- **tool forks** (optional) — nix2cf, sudo-secretspec, Shizuku, only if
+  patching them.
+
+Site-private holds a lockfile (flake-style inputs) that pins tendcf, nix2cf,
+site-shared, foreign shared sites, and optional tool forks. The signed
+release is the deploy artifact. There is no lockstep of sibling checkouts
+that must share one tag. Collision of the same identity from two peer inputs
+is a **compile error**. Only site-private may bind a winner
+(`caddy: from: alice`) or a short name. Never silent last-wins. Foreign
+inputs are namespaced (`alice.caddy`) so auto-provided service tokens do not
+collide.
+
+Every fact about *this* site lives in schema-validated JSON/YAML files called
+the Site Model. Behavior lives in generic code in tendcf that holds no facts
+and is therefore publishable. Adapters translate. Every config tool —
+CFEngine, the toolchain bootstrapper, Nix for builds — is a *consumer* of
+that data and is individually replaceable. An adopter supplies their own Site
+Model through the same schema.
+
+**Inventory is private by default.** Site-shared may ship device *kinds*,
+example inventories, and explicit exports (public endpoints, role
+advertisements) only for fields the private site marked exportable. A host
+identity in trust and ChangePlans is the **device public key**, not the
+hostname.
 
 Three record types matter for what follows. `services.yml` holds one record
 per service (name, run-as user, argv command, environment as secret *names*
@@ -141,11 +167,8 @@ source. launchd is one adapter, not the model.
 
 Schemas and types belong in tendcf (`schema/`, `examples/`,
 `bin/schema_lint.py`). The compiler (`nix2cf`) is a tool; it is not the
-home of the contract. Inventory is private by default;
-site-shared may ship device kinds, templates, and explicit exports only.
-Composition is a private-site lockfile pinning inputs; the signed release is
-the deploy artifact. Same identity from two peer inputs is a compile error;
-only the private site may bind a winner.
+home of the contract. A schema change is a tendcf interface change; a
+hostname change is site data.
 
 The Site Model *may* be authored in the Nix module system — `mkOption`,
 `types.*`, `mkIf`/`mkDefault`/`mkMerge` — and rendered to the same JSON
@@ -160,7 +183,11 @@ become a derivation.
 
 A compiler (working name `nix2cf`) reads the Site Model and renders CFEngine
 augments — `def.json` / `host_specific.json` — which CFEngine has accepted
-as a native JSON data-injection layer since 3.7. The standard Masterfiles
+as a native JSON data-injection layer since 3.7. The name is historical;
+YAML and JSON are valid inputs. An optional Nix module frontend may author
+the same JSON later. The compiler is a tool, not the home of schemas.
+
+The standard Masterfiles
 Policy Framework is already substantially data-driven on top of that layer,
 so for the common case the compiler emits *data*, not promise text: a
 generic bundle written once handles "this package is present and pinned,
@@ -185,33 +212,37 @@ would receive, without touching device X" is nearly free. We
 plan to build that affordance *first*, before the pipeline is finished, and
 §6.2 explains why it earns its place three separate times over.
 
-**This compile-to-native-format shape is not new; the pairing is what we
-could not find elsewhere.** A typed or module-based authoring language
-compiling to an existing execution engine's native format is an established
-pattern, and the closest examples use the same authoring language we do:
-NixOS's own module system compiles down to `systemd` unit files the same
-way we compile the Site Model to CFEngine Augments [18], and `nix-darwin`
-compiles Nix modules to `launchd` agents and macOS `defaults` [19] — a
-dependency this design already adopts elsewhere, for the Mac substrate,
-in the architecture document this paper summarizes. The Cloud
-Development Kit family generalizes the same move past Nix entirely: `cdk8s`
-synthesizes typed code into Kubernetes YAML [20], and `cdktf` did the same
-into Terraform JSON before HashiCorp deprecated it in December 2025 [21].
-What we searched for and did not find is a prior combination of Nix
-specifically with CFEngine specifically — one inactive personal
-experiment, nothing resembling an active project. The mechanism is common;
-the target is, as far as we can tell, not one anyone has paired it with
-before, and the reason for that target is CFEngine's fit to disconnected,
-multi-owner operation (§2.3), not the compiler mechanism itself.
+**Where it runs:** operator machine or CI. Consented devices receive a
+signed artifact. They do not run Nix or nix2cf.
 
-### 2.3 Deployment shape: no policy server, no push requirement
+**This compile-to-native-format shape is not new.** A typed or module-based
+authoring language compiling to an existing execution engine's native format
+is an established pattern: NixOS's own module system compiles down to
+`systemd` unit files [18], `nix-darwin` compiles Nix modules to `launchd`
+agents and macOS `defaults` [19], and `cdk8s` synthesizes typed code into
+Kubernetes YAML [20] (`cdktf` did the same into Terraform JSON before
+HashiCorp deprecated it in December 2025 [21]). The pairing here is Site
+Model (YAML/JSON, or an optional Nix frontend) into CFEngine Augments,
+because of Promise Theory and disconnected multi-owner operation (§2.3) —
+not because the compiler mechanism is new. NixOS / nix-darwin remain
+optional Mac *substrate*, Step 7, not a runtime dependency of the compiler.
+
+### 2.3 Deployment shape: no policy server, push and pull as one mechanism
 
 Every host runs its own `cf-serverd` and reads policy synced via git as part
 of the ordinary signed-release mechanism. There is no dedicated central
-policy host, no SSH dependency, and no push requirement. Push exists — an
-operator host holding a deploy role can trigger an immediate convergence run
-on a target rather than waiting for its next cycle — but it is one mode of
-the same mechanism rather than a separate system.
+policy host, no SSH dependency, and no push requirement. Push exists — a
+host holding a deploy role can trigger an immediate convergence run on
+**operator** (and operator-chosen `managed`) hosts rather than waiting for
+the next cycle. Push to a `consented` device still requires that device's
+consent grant. Push and pull are two modes of the same mechanism.
+
+**Supervisors are adapters.** A service record is one fact. The host's
+`supervisor` field (or a platform default) selects the renderer: systemd,
+launchd (macOS example), runit via termux-services, Jobber, OpenRC / s6 /
+dinit when a real host needs one. Packages on Linux come from CFEngine's
+package modules. File and service idioms are taken from ncf / Rudder generic
+methods as a vendored, stripped reference — not as a runtime.
 
 This shape was scoped out of an earlier revision on the belief that CFEngine
 required dedicated policy-server infrastructure and an SSH push model. Both
@@ -289,21 +320,38 @@ second constrains the effect. Signing itself is an unremarkable TUF [26]
 subset sized for one operator, plus a durable per-client high-water mark so
 replay, freeze, and downgrade are closed. The first trusted root is enrolled
 out of band: install shows the fingerprint, and the person compares it to a
-channel they already trust. TOFU is not used for consented devices.
-Revocation and freeze detection tighten what may run and do not need a local
-yes; installing new targets on a consented device still does.
+channel they already trust. TOFU is not used for consented devices. Later
+root rotation is in-band (threshold of old **and** new keys). Threshold
+compromise of root is again out of band. Revocation, freeze detection, and
+high-water rejection tighten what may run and do not need a local yes;
+installing new targets on a consented device still does. An optional enrolled
+policy "I pre-grant emergency security patches from role E" may exist;
+**default off**.
 
 Layered on the verifiable plan is a *semantic* layer — generated, cached,
 and written for a language model to read: "this bumps a TLS library across a
 CVE and restarts the public proxy." The semantic layer briefs a user and
 their advisor; it never authorizes. Only the verifiable layer, checked by
-the executor, authorizes. We never run their model or see their prompt. They
-enroll an advisor key in site-private; tendcf ships a replaceable default
-prompt and accepts a signed `accept | reject` bound to the plan's nonce,
-the same shape as a Kubernetes admission webhook. That separation is what
-lets a person's own AI explain a proposed change in plain language, and
-maintain their divergence from upstream if they refuse it, without becoming
-part of the trust layer.
+the executor, authorizes. Where the prose can be filled in from the plan's
+typed fields, it is. Where it has to be written freely, it must point at the
+exact fields it is summarizing.
+
+We never run their model, see their prompt, or see the conversation. We
+offer a change and accept a signed yes/no, the same shape as a Kubernetes
+admission webhook. At install they enroll an **advisor key** (or a local
+app/socket) in site-private. tendcf ships a suggested default prompt as a
+replaceable public file; they may append or replace it. Modes: auto-review,
+or a conversation with them first. Return path: `accept | reject`, signed by
+the enrolled key, bound to that plan's nonce. Timeout is deny. Advisor down
+→ fail closed for *installs* (revocation still applies). Custom tools
+(OpenPGP web of trust, a transparency log, a chain, gossip of signed
+apply-attestations) are theirs. Consensus among "everyone waiting for
+everyone else" is a separate project that consumes attestations. tendcf
+owes: the ChangePlan, optional exportable apply-attestations, the
+`accept | reject` slot. The proposing side and the consenting side are
+different programs. The advisor never authorizes; the executor does, against
+the signed grant. A personal branch is theirs, applied under their consent;
+it never auto-merges into anyone else's trust domain.
 
 ### 2.6 Two worked examples: input to output
 
@@ -317,13 +365,15 @@ mandatory attribution, and an interlock.
 [`examples/services.yml`](../../examples/services.yml)
 — a real fixture, schema-validated by `bin/schema_lint.py` against
 `schema/services.schema.json`, though still a fixture and not live site data
-(§7). The *outputs* — the CFEngine augments and the rendered promise text —
-are hand-authored by us to show the target shape, as is the Nix rendering of
-the same input shown partway through Example A. `nix2cf`'s render stage and
-its Nix authoring frontend do not exist yet (§6.5, §7), so nothing below
-except the YAML was produced mechanically, and the exact augments keys and
-MPF wiring are illustrative, not a claim about a validated binding to a
-running CFEngine instance.
+(§7). launchd here is one adapter; the same service record would render a
+systemd unit or a runit service on another host. The *outputs* — the
+CFEngine augments and the rendered promise text — are hand-authored by us
+to show the target shape, as is the Nix rendering of the same input shown
+partway through Example A. `nix2cf`'s render stage and its Nix authoring
+frontend do not exist yet (§6.5, §7), so nothing below except the YAML was
+produced mechanically, and the exact augments keys and MPF wiring are
+illustrative, not a claim about a validated binding to a running CFEngine
+instance.
 
 **Example A — an edge nobody wrote.** `caddy` and `litellm-proxy` are two
 records in the same `edge-http` bundle. `litellm-proxy` states only what it
@@ -426,9 +476,10 @@ algebra is a policy choice at that stage, not a second type system to keep
 in sync with the schema.
 
 `litellm-proxy`'s `requires: [service:caddy, ...]` matches `caddy`'s
-`provides: [service:caddy, ...]`. The compiler derives an ordering edge from
-that match alone — no author declared it — and §4.1 requires the edge to
-carry its own provenance rather than appear as a bare ordering fact:
+`provides: [service:caddy, ...]` (and would also match auto-provide of
+`service:caddy` from the name alone, §2.9). The compiler derives an ordering
+edge from that match alone — no author declared it — and §4.1 requires the
+edge to carry its own provenance rather than appear as a bare ordering fact:
 
 ```jsonc
 // host_specific.json (host: mac) — ILLUSTRATIVE, hand-authored, not compiler output
@@ -501,10 +552,10 @@ constraint come from" — a search.
 
 **Example B — an interlock, from schema to guard.** The `fleet-vpn` bundle
 carries the precondition §6.1 takes from Bcfg2 Actions: lockdown may not be
-enforced before Tailscale authenticates.
+enforced before the VPN authenticates.
 
 ```yaml
-# examples/services.yml — verbatim excerpt
+# examples/services.yml — excerpt; launchd is one adapter
 bundles:
   fleet-vpn:
     description: "VPN transport and the lockdown policy that depends on it"
@@ -512,8 +563,8 @@ bundles:
     interlocks:
       - id: tailscale-authenticated-before-lockdown
         description: >-
-          Tailscale must be authenticated before always-on VPN lockdown may be
-          enforced. Setting lockdown on a device whose Tailscale is
+          The mesh VPN must be authenticated before always-on VPN lockdown
+          may be enforced. Setting lockdown on a device whose VPN is
           unauthenticated severs every management path to it.
         pre_action:
           command: ["tailscale", "status", "--json"]
@@ -540,7 +591,7 @@ bundle agent fleet_vpn
   methods:
       "guard"
         usebundle => report_if_missing_class("tailscale_authenticated",
-                       "fleet-vpn: blocked, Tailscale not authenticated");
+                       "fleet-vpn: blocked, VPN not authenticated");
 
   services:
       # every promise in this bundle carries the same guard —
@@ -557,6 +608,67 @@ it — mechanically, because the schema gave the render stage no field to read
 a narrower scope from. That is the sense in which §6.1's claim ("an author
 who could narrow either one could reintroduce the bug the mechanism exists
 to close") is enforced by omission rather than by convention.
+
+### 2.7 Peer actions: help without a global lock
+
+Some operations a host cannot perform locally. Example from our last system:
+a device that cannot start its privileged helper itself; any healthy peer in
+its allowlist may do it over ADB; if every helper is down, **only that
+device waits**.
+
+That is a **peer action**: the target declares an operation it cannot do
+locally; any helper with the capability **and** on the **target's** peer
+allowlist may do it. Helpers are fungible. Prefer **groups** ("household
+helpers") plus allowed verbs, not only individual keys. Stall is local.
+Idempotent. Not a distributed lock, and not Bcfg2's LISA '06 state machine
+over *releases* — those stall the *fleet* when one box is unreachable.
+
+Cross-machine "wait until the server is serving the new export" is a **local
+probe** (or a wait for a signed apply-attestation from the host that holds
+that role). Bcfg2's FSM is a **view** reconstructed from JSONL plus optional
+attestations, never a coordinator. §6.5 records the Bcfg2 comparison.
+
+### 2.8 Per-device trust
+
+`trust_tier` (`operator` | `managed` | `consented`) is a **class**: which
+consent gate applies. It is not who trusts whom. Full-mesh "every device has
+operator root to every sibling" is **not** the product default. It is a
+site-private policy some operator-tier labs may still choose.
+
+Each device carries a **local trust policy** in its signed release (authored
+in site-private). It does not phone home to ask.
+
+| Axis | Question | Default |
+| --- | --- | --- |
+| **Release** | Whose signatures may change me? | Site TUF root enrolled at the first-run ceremony |
+| **Consent** | Do I also need a local yes? | `operator`: no. `consented`: yes (advisor key). `managed`: operator-chosen |
+| **Peer** | Who may act *on* me (ADB, SSH, peer-help)? | Nobody, unless listed. Prefer groups plus allowed verbs |
+| **Attestation** | Whose "I applied this" counts for my advisor tools? | Only sets that person configured |
+| **Secrets / cache** | Who may receive this secret or substitute this store path? | secretspec resolver; cache keys `operator` only |
+
+Peer actions check the **target's** peer allowlist, not only "the helper has
+a capability." Identity is the device public key. A label in inventory does
+not enforce this. The executor does. Web-of-trust thresholds ("50% of people
+I trust have installed this") live in the **advisor plug-in**, not in the
+executor.
+
+### 2.9 Token discovery
+
+Inference removes "you must already know the *edge*." Naming the *thing* is
+a catalog, not a graph.
+
+1. Auto-provide `service:<name>` unless the service opts out.
+2. Lookup CLI against registries and compiled provides (`who-provides`,
+   `does-role exist`, `tokens kind=service`).
+3. Unknown token, unmatched `requires`, or two providers of the same token
+   → compile error listing near-misses and the catalog.
+
+Token *kinds* are a closed enum in the schema (`service`, `port`, `path`,
+`secret`, `class`, `network`, …). Token *values* are instance data, checked
+at compile time — not a schema enum that changes with every new service. The
+writing rule is "don't require the graph," not "don't require names." Token
+discovery is a mechanism, not an open question; whether authors actually use
+the lookup is untested.
 
 ---
 
@@ -814,26 +926,26 @@ carefully as what it recommends.
 
 ---
 
-## 4. Two decisions the rule inverted
+## 4. Two places the rule shows up
 
-### 4.1 Dependency inference, which we had argued against
+### 4.1 Dependency inference
 
 The ordering question decomposes into three levels: convergence fixpoint
 alone; fixpoint plus explicit `depends_on` where a real constraint exists;
 or an inference stage that derives ordering edges from what each declaration
-*provides* and *consumes*. Under human authorship we had concluded the
-middle option: explicit edges, written by the person who knows the
-constraint, with the fixpoint underneath.
+*provides* and *consumes*. This design uses all three. Retry-until-stable is
+the substrate. Explicit `depends_on` remains available and wins where it
+exists. The primary authoring mechanism is `provides`/`requires`.
 
-The rule inverts that. Explicit `depends_on` is a global-knowledge
+Explicit `depends_on` is a global-knowledge
 mechanism — to write the edge, the author must already know that someone
 else's resource exists and must run first. `provides`/`requires` is a
 local-knowledge mechanism: each type states only what it supplies and what
 it needs, answerable from inside one file by an agent that has never seen
-the rest of the system. So the compiler additionally *derives* edges;
-fixpoint remains the substrate and explicit `depends_on` remains available
-and authoritative. §2.6, Example A works this through on a real fixture
-pair, attribution and all.
+the rest of the system. A service named `caddy` **auto-provides**
+`service:caddy` unless it opts out (§2.9). So the compiler additionally
+*derives* edges. §2.6, Example A works this through on a
+real fixture pair, attribution and all.
 
 We have one piece of evidence, and it is not hypothetical, though it is worth
 being precise about what it evidences. The site's existing Android deploy
@@ -863,7 +975,7 @@ output is what turns that from an investigation into a query.
 
 §5.1 is the argument that we should not be doing this at all.
 
-### 4.2 Comprehensiveness, flipped from opt-in to default-on
+### 4.2 Comprehensiveness, default-on with a reasoned opt-out
 
 Bcfg2's configuration goals are comprehensive by convention: the
 specification describes every configuration entity on the client, so
@@ -873,16 +985,16 @@ no less than specified, and no more. Unspecified state surfaces as an
 **extra entry**, a first-class reported category [1, §2.2].
 
 We adopt this per *domain* rather than per client — the app list on a
-device, `/etc/ssh`, the launchd services under a given prefix — because
+device, `/etc/ssh`, the services under a given unit-name prefix — because
 adopting it fleet-wide on day one is not survivable in an environment that
 was never built under it.
 
-Our first decision was opt-in per domain. The rule flipped it to
-**default-on with an explicit, reasoned opt-out**: AI-authored drift is
-exactly what extra-entry detection catches, so the safe default belongs on
-the detecting side. A bare opt-out boolean would let an agent widen the
-unmanaged surface silently; requiring a reason string makes every gap in
-coverage a visible, greppable decision rather than an absence.
+A domain is comprehensive unless it opts out, and opting out requires a
+reason. AI-authored drift is exactly what extra-entry detection catches,
+so the safe default belongs on the detecting side. A bare opt-out boolean
+would let an agent widen the unmanaged surface silently; requiring a reason
+string makes every gap in coverage a visible, greppable decision rather than
+an absence.
 
 The reason is drawn from a closed set of two, and keeping them distinct is
 what makes default-on survivable:
@@ -941,12 +1053,12 @@ Three ways we can see it being wrong, offered rather than rebutted:
 2. **`provides`/`requires` may only relocate the global knowledge.** Naming
    a capability token that another type must name identically is a shared
    vocabulary; agreeing on a vocabulary across files is a coordination
-   problem wearing local clothing. The mitigation now in the architecture
-   (v3 D40) is auto-provide of `service:<name>`, a lookup CLI against the
-   compiled catalog, and compile errors that list near-misses. Token *kinds*
-   stay a closed enum; token *values* stay instance data. That answers "how
-   does an agent find the right name" as a mechanism. Whether authors
-   actually use the lookup instead of guessing is untested.
+   problem wearing local clothing. The mitigation is auto-provide of
+   `service:<name>`, a lookup CLI against the compiled catalog, and compile
+   errors that list near-misses (§2.9). Token *kinds* stay a closed enum;
+   token *values* stay instance data. That answers "how does an agent find
+   the right name" as a mechanism. Whether authors actually use the lookup
+   instead of guessing is untested.
 3. **Spurious edges may be worse than we have priced in.** We claim
    provenance makes them a query. That claim is untested, and the failure
    mode is silent by construction: a spurious edge does not fail anything,
@@ -976,7 +1088,7 @@ recovers enough of that. We are not certain it does.
 
 Bcfg2 uploads client statistics to the server, which is what makes nightly
 network-wide reports possible and, per LISA '05, what actually bought
-administrator trust. We invert the direction: the device's JSONL capture
+administrator trust. Here the device's JSONL capture
 (and the agent's rebuildable SQLite index) is authoritative and any central
 view is an optional, best-effort push.
 
@@ -1074,7 +1186,7 @@ converge on it:
 LISA '06's change is small and mechanical: stamp every generated client
 configuration with the repository revision, keep a log of what was served
 when, and carry that revision into every statistics upload. We already have
-the identifier — the coordinated release tag and its manifest — so this is
+the identifier — the signed release and its manifest — so this is
 one column in the row schema, not an integration. Every row records the
 release that produced it and each device records which release it is
 converged to.
@@ -1152,7 +1264,10 @@ the compiler, which we had not applied to the compiler's own tooling.
 
 **Not implemented, and this is most of it:** the compiler, all three platform
 adapters, the signed release path, the ChangePlan executor, the consent
-surface. **Nothing is deployed.** No device has been provisioned from factory
+surface, peer-action runtime, generic supervisor switch. Remaining Step 0
+work after the existing schemas: `peer_actions`, trust-policy shape, generic
+unit-writers, lookup stub, YAML canonicalize, transcribing reality as
+`not-yet-migrated`. **Nothing is deployed.** No device has been provisioned from factory
 reset by this automation. We have no deployment time, no effort figure, no
 managed/unmanaged ratio, and no failure data. The worked examples in §2.6
 are therefore hand-authored to show the target rendering, not compiler
@@ -1180,7 +1295,7 @@ this question we most want answered: is the convergence fixpoint *already*
 the local-knowledge mechanism, making `provides`/`requires` a strictly worse
 answer to a problem that was already solved?
 
-**8.2 Is the machine-authorship cost inversion an argument or a hypothesis?**
+**8.2 Is the writing rule an argument or a hypothesis?**
 We have one confirming instance (§4.1's hand-ordered chain contradicting its
 own rule) and no counter-instances, which is a suspiciously good record for a
 rule this load-bearing. What would a counter-instance even look like — a
@@ -1203,21 +1318,13 @@ one hides drift inside itself just as effectively as opting out would.
 central copy today, but "no consumer yet" is precisely the reasoning LISA '05
 warns against, and we are taking one of its findings while declining another.
 
-**8.6 Is the fleet-wide view good enough when a genuinely global question
-arrives, given §2.4/§5.3's local-first record?** §3's rule pushes
-correctness toward information local to one file; §2.4 and §5.3 push the
-record of what happened toward JSONL-plus-index per device as the
-authoritative copy. There is a place to ask "did the security rollout land
-everywhere?" — the best-effort Vector/OpenObserve/Grafana sync described in
-§5.3 — but that view is explicitly not authoritative and is incomplete for
-exactly the devices most likely to matter during the window they are
-unreachable. The open question is not whether a fleet-wide view exists but
-whether an eventually-consistent, best-effort one is *sufficient* for a
-question with a real yes/no answer, or whether answering it correctly
-requires querying reachable devices directly and treating the rest as
-unknown rather than trusting a stale aggregate. §8.5 discusses local-first
-from the angle of having no consumer driving that view's completeness; this
-is the sharper version of the same gap once a consumer exists.
+**8.6 When a genuinely global question arrives, is querying reachable
+devices and treating the rest as unknown enough?** The design already
+chooses that path over trusting a stale aggregate (§2.4). The best-effort
+Vector/OpenObserve/Grafana sync exists and is explicitly not authoritative.
+The open question is whether the chosen answer is *sufficient* for a
+question with a real yes/no, not whether a dashboard should be the record
+of truth.
 
 **8.7 Does spurious-edge provenance actually work?** We claim attribution
 turns "why is this waiting?" into a query. Nobody has run it. If it does not
@@ -1236,26 +1343,29 @@ something else — plausible-looking output that type systems do not catch,
 say — then we have hardened the wrong surface, and the schemas are a
 Maginot line.
 
+Token discovery (how an author finds the right name) is a mechanism
+(§2.9), not an open question. Whether authors actually use the lookup and
+the error catalog is still untested.
+
 ---
 
 ## 9. Conclusion
 
 We have described a configuration management architecture built on treating
 machine authorship as a first-order design constraint, and deriving from it
-a rule — prefer local knowledge to global — that inverted two decisions we
-had already settled. That rule itself is not novel: it is a
+a rule: prefer local knowledge to global. That rule itself is not novel: it is a
 machine-authorship instance of a local-reasoning-for-global-properties
 pattern with decades of standing in programming-language theory [9], and
 Tratt [10] argues the same design move for AI-generated code in general,
 independently of and roughly concurrently with this draft (§3.1). What we
-claim as new is narrower — applying that rule to build a concrete
-configuration-management architecture for a heterogeneous fleet, with §4's
-two inversions as evidence that it does something rather than merely
-sounding right. The rest is composition:
-a data spine, a pure compiler into CFEngine's own data layer, per-device
-JSONL capture with an agent-owned SQLite index, and a signed plan the
-executor may not exceed, with four of its load-bearing ideas taken from
-Bcfg2 and credited above. We do not claim
+claim as new is narrower — applying that rule to a concrete
+configuration-management architecture for a heterogeneous fleet. The rest is
+composition:
+a data spine in layered repos, a pure compiler into CFEngine's own data
+layer, per-device JSONL capture with an agent-owned SQLite index, a signed
+plan the executor may not exceed, per-device trust, peer actions, and a
+BYO advisor slot, with four of its load-bearing ideas taken from Bcfg2 and
+credited above. We do not claim
 that composition itself as novel, only as uncommon: compiling into an
 existing tool's native data layer, rather than shipping a new client, is not
 the path most configuration-management projects take.
