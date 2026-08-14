@@ -2,8 +2,13 @@
 
 **Draft for review — not published, not submitted.**
 Daniel Joseph Barnhart Clark (djbclark@mit.edu).
-Prepared 2026-08-13 for Narayan Desai. Sections are numbered so comments can
-cite them.
+Prepared 2026-08-13 for Narayan Desai; facts aligned to architecture v3 on
+2026-08-14. Sections are numbered so comments can cite them.
+
+The living architecture is
+[`docs/architecture/architecture-DEFINITIVE-v3.md`](../architecture/architecture-DEFINITIVE-v3.md).
+A companion in plainer language is
+[`tendcf-architecture-guide.md`](tendcf-architecture-guide.md).
 
 ---
 
@@ -21,10 +26,11 @@ Applying that rule inverted two decisions we had already argued the other
 way, and both inversions are the substance of this paper.
 
 The architecture is a data spine (the Site Model), a pure compiler from that
-spine to CFEngine's native JSON augments layer, per-device SQLite as the
-authoritative record of what happened, and a signed release carrying a typed
-operation plan that the on-device executor mechanically refuses to exceed.
-Bcfg2 supplies four of its load-bearing ideas, credited in §6.
+spine to CFEngine's native JSON augments layer, append-only JSONL as the
+durable local capture with a rebuildable SQLite index in tendcf-agent, and a
+signed release carrying a typed operation plan that the on-device executor
+mechanically refuses to exceed. Bcfg2 supplies four of its load-bearing
+ideas, credited in §6.
 
 **Nothing described here is deployed.** No device has been provisioned from
 factory reset by this automation; we have no operational numbers of any
@@ -70,7 +76,7 @@ which a different architecture — not a variant of this one — is the better
 choice.
 
 - **Local-first reporting (§2.4, §5.3) stops paying for itself once a
-  fleet-wide query becomes routine rather than exceptional.** A SQLite record
+  fleet-wide query becomes routine rather than exceptional.** A JSONL record
   per device is free — CFEngine's local promise-outcome log must be captured
   regardless — for as long as "did host X converge" is the dominant question.
   Once "did the rollout land everywhere" (§8.6) needs an answer with bounded
@@ -125,12 +131,21 @@ machines: they supply their own Site Model through the same schema.
 
 Three record types matter for what follows. `services.yml` holds one record
 per service (name, run-as user, argv command, environment as secret *names*
-only, role binding, owning writer); every launchd plist and systemd unit in
-the fleet is a rendering of one such record. `roles.yml` maps a feature role
-to `{main, backups[], peers[]}` — this is how "the control node" is dissolved
-into data, since any host may hold any role. `launchd-writers.yml` declares
-exactly one writer per launchd label prefix, killing a two-writers-on-one-plist
-hazard at the source.
+only, role binding, owning writer, supervisor); every systemd unit, launchd
+plist, runit service, or Jobber job in the fleet is a rendering of one such
+record. `roles.yml` maps a feature role to `{main, backups[], peers[]}` —
+this is how "the control node" is dissolved into data, since any host may
+hold any role. Unit-writer registries declare exactly one writer per
+unit-name prefix for every supervisor, killing a two-writers hazard at the
+source. launchd is one adapter, not the model.
+
+Schemas and types belong in tendcf. The compiler (`nix2cf`) is a tool; it
+is not the home of the contract. JSON Schema files currently live in the
+nix2cf repository until that move finishes. Inventory is private by default;
+site-shared may ship device kinds, templates, and explicit exports only.
+Composition is a private-site lockfile pinning inputs; the signed release is
+the deploy artifact. Same identity from two peer inputs is a compile error;
+only the private site may bind a winner.
 
 The Site Model *may* be authored in the Nix module system — `mkOption`,
 `types.*`, `mkIf`/`mkDefault`/`mkMerge` — and rendered to the same JSON
@@ -230,9 +245,11 @@ phone home to it; this design has no equivalent to phone home to at all.
 
 ### 2.4 The record of truth is local
 
-Each device owns a SQLite database, populated from CFEngine's local
-promise-outcome log, and *that* is the authoritative record of what
-converged. Any central or shared view is optional and eventually consistent.
+Capture and index are different files. The durable capture is append-only
+JSONL, one `write()` per event, filled from CFEngine's local promise-outcome
+log. The queryable index is SQLite inside tendcf-agent, rebuildable from
+JSONL. CFEngine never opens SQLite. If the index is corrupt, history still
+exists. Any central or shared view is optional and eventually consistent.
 
 The grounds are narrower than the local-first literature's [25], and one of them
 is an operational fact about this fleet rather than a principle. On CFEngine
@@ -242,6 +259,12 @@ in sync. And devices in this fleet demonstrably go unreachable — flaky ADB
 over wireless, Android boot-recovery failures, offline peers — so any central
 copy fed by best-effort sync is incomplete during exactly the windows one
 would want it.
+
+On Android, Termux and tendcf-agent are different UIDs; the APK cannot read
+Termux private directories as files. The agent owns both JSONL and SQLite in
+app-private storage. Either cf-agent runs as a native helper of the agent, or
+a Termux-side reporter pushes lines to the agent. Never "the agent opens
+Termux's files."
 
 We keep the outcome vocabulary of `ncf` — Rudder's library of parameterized
 CFEngine generic methods, which we vendor as a reference corpus rather than
@@ -264,16 +287,23 @@ hash is signed" and "apply only these operations, on these resources,
 because the plan says so." The first authenticates the author; only the
 second constrains the effect. Signing itself is an unremarkable TUF [26]
 subset sized for one operator, plus a durable per-client high-water mark so
-replay, freeze, and downgrade are closed.
+replay, freeze, and downgrade are closed. The first trusted root is enrolled
+out of band: install shows the fingerprint, and the person compares it to a
+channel they already trust. TOFU is not used for consented devices.
+Revocation and freeze detection tighten what may run and do not need a local
+yes; installing new targets on a consented device still does.
 
 Layered on the verifiable plan is a *semantic* layer — generated, cached,
 and written for a language model to read: "this bumps a TLS library across a
 CVE and restarts the public proxy." The semantic layer briefs a user and
-their advisor agent; it never authorizes. Only the verifiable layer,
-checked by the executor, authorizes. That separation is what lets the
-eventual user-sovereignty feature — a person's own AI explaining a proposed
-change in plain language, and maintaining their divergence from upstream if
-they refuse it — sit on top of the trust layer without becoming part of it.
+their advisor; it never authorizes. Only the verifiable layer, checked by
+the executor, authorizes. We never run their model or see their prompt. They
+enroll an advisor key in site-private; tendcf ships a replaceable default
+prompt and accepts a signed `accept | reject` bound to the plan's nonce,
+the same shape as a Kubernetes admission webhook. That separation is what
+lets a person's own AI explain a proposed change in plain language, and
+maintain their divergence from upstream if they refuse it, without becoming
+part of the trust layer.
 
 ### 2.6 Two worked examples: input to output
 
@@ -484,7 +514,7 @@ bundles:
         description: >-
           Tailscale must be authenticated before always-on VPN lockdown may be
           enforced. Setting lockdown on a device whose Tailscale is
-          unauthenticated severs every management path to it (stayturgid#289).
+          unauthenticated severs every management path to it.
         pre_action:
           command: ["tailscale", "status", "--json"]
           expect_exit: 0
@@ -607,7 +637,9 @@ cannot see, not syntax it cannot produce.
 Grounding the rule in prior work (§3.1) answers whether the idea is
 defensible. It does not show whether it pays for itself in a real design.
 Extending the same search past this paper's own claims, into the
-architecture document `tendcf` is built from, surfaced nine concrete
+architecture document `tendcf` is built from
+([`architecture-DEFINITIVE-v3.md`](../architecture/architecture-DEFINITIVE-v3.md)),
+surfaced nine concrete
 applications of §3's rule, each checked directly against its cited source
 rather than a summary of it.
 
@@ -627,11 +659,12 @@ result directly, not merely the cost of producing it [15].
 **2. Worked examples belong beside their schema, enforced, not customary.**
 The same study finds worked examples consistently outperform prose
 description as a way of telling a generator what correct output looks like
-[15]. The project's own compiler-schema repository already pairs one
+[15]. The project's schema set already pairs one
 concrete, validated example file with every schema it defines — a
 convention adopted before this literature search, for ordinary
 documentation reasons, that turns out to be exactly the intervention the
-literature says matters most. The gap this closes is not that the pairing
+literature says matters most. Those files currently live in the compiler
+repository; they belong in tendcf. The gap this closes is not that the pairing
 is missing; it is that nothing currently stops the pairing from silently
 lapsing as new schemas are added. Making the build fail when a schema
 arrives without its paired example is the same move §3 makes generally:
@@ -639,7 +672,8 @@ convert a habit that depends on someone remembering into a check that
 does not.
 
 **3. A document's warning about itself should be a check, not prose.** The
-architecture document this paper describes carries, at its own top, an
+architecture document this paper describes (`architecture-DEFINITIVE-v3.md`)
+carries, at its own top, an
 instruction telling any AI agent reading it not to modify the document
 without a human's explicit approval. That instruction is exactly the
 shape of thing §3's second clause warns about: a convention a reader must
@@ -907,14 +941,12 @@ Three ways we can see it being wrong, offered rather than rebutted:
 2. **`provides`/`requires` may only relocate the global knowledge.** Naming
    a capability token that another type must name identically is a shared
    vocabulary; agreeing on a vocabulary across files is a coordination
-   problem wearing local clothing. Our mitigation is a closed enumeration of
-   token kinds, so a typo is a schema error rather than a silently
-   unmatched edge — but the *token values* remain a namespace two authors
-   must agree on. That leaves a discovery question we do not answer: absent
-   the global context we are trying not to require, how does an agent find
-   the *right* token to name, as opposed to merely naming one validly? A
-   closed enumeration of token kinds catches a typo; it does not tell an
-   author which token names the resource they actually need.
+   problem wearing local clothing. The mitigation now in the architecture
+   (v3 D40) is auto-provide of `service:<name>`, a lookup CLI against the
+   compiled catalog, and compile errors that list near-misses. Token *kinds*
+   stay a closed enum; token *values* stay instance data. That answers "how
+   does an agent find the right name" as a mechanism. Whether authors
+   actually use the lookup instead of guessing is untested.
 3. **Spurious edges may be worse than we have priced in.** We claim
    provenance makes them a query. That claim is untested, and the failure
    mode is silent by construction: a spurious edge does not fail anything,
@@ -944,8 +976,9 @@ recovers enough of that. We are not certain it does.
 
 Bcfg2 uploads client statistics to the server, which is what makes nightly
 network-wide reports possible and, per LISA '05, what actually bought
-administrator trust. We invert the direction: the device's SQLite is
-authoritative and any central view is an optional, best-effort push.
+administrator trust. We invert the direction: the device's JSONL capture
+(and the agent's rebuildable SQLite index) is authoritative and any central
+view is an optional, best-effort push.
 
 We are aware this is the decision most likely to be wrong. The grounds are in
 §2.4, and the honest summary is that we currently have *no consumer* for a
@@ -953,7 +986,7 @@ central copy: no compliance requirement obliges a queryable fleet-wide view,
 so building one out would be infrastructure without a customer at this
 design's scale (§1.1) — not that one is unbuildable. A path to a fleet-wide
 view already exists and costs nothing new to stand up: a subset of each
-device's local SQLite pushes, best-effort and eventually consistent, into
+device's local index pushes, best-effort and eventually consistent, into
 the observability stack (Vector/OpenObserve/Grafana) this fleet already
 runs for other purposes. What makes the device the record of truth is that
 this path is optional and never authoritative, not that it is absent. "No
@@ -996,10 +1029,9 @@ incomplete.
 
 One class of constraint in this fleet is not a dependency: setting an
 always-on VPN lockdown on a device whose VPN is *unauthenticated* severs
-every management path to that device permanently. Nothing in the existing
-codebase authenticates the VPN first; only a safe default and a comment
-prevent it today. We had characterized this as inexpressible in a catalog,
-which is true, and had left it there.
+every management path to that device permanently. Without an interlock,
+only a safe default and a comment would prevent it. We had characterized
+this as inexpressible in a catalog, which is true, and had left it there.
 
 Bcfg2 Actions are the shipped precedent for exactly this shape — the
 load-bearing sentence [4, §A.2.1]: *unless exit status is ignored, a failing
@@ -1067,24 +1099,29 @@ dry-run nightly and mailed the resulting state to the responsible
 administrator, auto-apply reserved for workstations; we make dry-run the
 standing posture for the first platform class brought under management: the
 primary workstation, which is also the machine that cannot easily be
-reimaged. And "deploy reporting early, not last" reframes our local SQLite
-plus a trivial "what changed, what is dirty, what am I converged to" view as
-an **adoption requirement rather than an observability nicety** — which is
-the argument against sequencing it last because nothing consumes it yet.
+reimaged. And "deploy reporting early, not last" reframes our local JSONL
+capture plus a trivial "what changed, what is dirty, what am I converged to"
+view as an **adoption requirement rather than an observability nicety** —
+which is the argument against sequencing it last because nothing consumes it
+yet.
 
 ### 6.5 What did not transfer
 
 XML as the configuration language and the plugin taxonomy built around it;
 the client/server render-on-demand topology (§5.2); and LISA '06's FSM change
-orchestration over repository revisions. The last one is the interesting
-rejection: expressing cross-machine sequencing as a state machine over
-*releases* rather than as edges in a per-host catalog fits our release train
-unusually well, but the paper is honest that administrators must enumerate
-all contingencies as discrete states, that time in any state is unbounded,
-and that one down client can stall a workflow. For a fleet whose devices are
-routinely unreachable, that last property is disqualifying as a default. We
-have it filed as the shape to reach for *if* a real cross-device sequencing
-need appears, and we are not building it on spec.
+orchestration over repository revisions *as a coordinator*. The last one is
+the interesting rejection: expressing cross-machine sequencing as a state
+machine over *releases* rather than as edges in a per-host catalog fits our
+release train unusually well, but the paper is honest that administrators
+must enumerate all contingencies as discrete states, that time in any state
+is unbounded, and that one down client can stall a workflow. For a fleet
+whose devices are routinely unreachable, that last property is disqualifying
+as a coordinator. Cross-machine help is instead a **peer action**: the
+target declares an operation it cannot do locally; any helper with the
+capability and on the target's peer allowlist may do it; stall is local.
+The FSM is a *view* reconstructed from JSONL plus optional attestations,
+never a lock. "Wait until the server is serving the new export" is a local
+probe or a wait for a signed apply-attestation, not a distributed lock.
 
 One piece we expect to want verbatim is `altsrc` — binding an entry as if it
 had a different name, so that two paths share one source. Termux's
@@ -1168,7 +1205,7 @@ warns against, and we are taking one of its findings while declining another.
 **8.6 Is the fleet-wide view good enough when a genuinely global question
 arrives, given §2.4/§5.3's local-first record?** §3's rule pushes
 correctness toward information local to one file; §2.4 and §5.3 push the
-record of what happened toward one SQLite database per device as the
+record of what happened toward JSONL-plus-index per device as the
 authoritative copy. There is a place to ask "did the security rollout land
 everywhere?" — the best-effort Vector/OpenObserve/Grafana sync described in
 §5.3 — but that view is explicitly not authoritative and is incomplete for
@@ -1215,8 +1252,9 @@ configuration-management architecture for a heterogeneous fleet, with §4's
 two inversions as evidence that it does something rather than merely
 sounding right. The rest is composition:
 a data spine, a pure compiler into CFEngine's own data layer, per-device
-local records, and a signed plan the executor may not exceed, with four of
-its load-bearing ideas taken from Bcfg2 and credited above. We do not claim
+JSONL capture with an agent-owned SQLite index, and a signed plan the
+executor may not exceed, with four of its load-bearing ideas taken from
+Bcfg2 and credited above. We do not claim
 that composition itself as novel, only as uncommon: compiling into an
 existing tool's native data layer, rather than shipping a new client, is not
 the path most configuration-management projects take.
