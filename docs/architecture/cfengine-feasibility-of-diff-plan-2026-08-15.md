@@ -1,7 +1,15 @@
 # Can the diff-derived ChangePlan be built on CFEngine, or does it need a new mutation engine?
 
 **Date:** 2026-08-15. **Author:** Claude Opus 5 (effort medium), from CFEngine
-primary documentation. **Status:** research note, not a decision.
+primary documentation; **addendum** the same day (effort xhigh) from the
+CFEngine Community source and the locally installed 3.27.1 binary.
+**Status:** research note, not a decision.
+
+> The addendum at the end closes both items this note originally left
+> unverified. `--simulate` is Community, and the machine-readable artifact a
+> briefing generator needs is not the `diff` stdout but the structured record
+> files the simulated run leaves in the changes chroot. Read it before acting
+> on the body.
 
 ## Why this exists
 
@@ -189,7 +197,93 @@ All accessed 2026-08-15.
 - [services — CFEngine 3.21](https://docs.cfengine.com/docs/3.21/reference-promise-types-services.html) — `service_policy`, `service_bundle` delegation
 - [classes — CFEngine docs (LTS)](https://docs.cfengine.com/docs/lts/reference/promise-types/classes/) — class guards on promise actuation
 
-**Not verified:** whether `--simulate=diff` output is machine-readable in a form
-a briefing generator could consume directly, and whether it is available in
-CFEngine Community or Enterprise only. Both need checking before item 1 commits
-to this path.
+## Addendum, 2026-08-15 — the two open items, now closed
+
+The first version of this note ended with two unverified questions. Both are
+answered, from the CFEngine Community source and from a CFEngine binary that
+turns out to be installed on this machine. The answer to the second is better
+than the question assumed.
+
+### 1. `--simulate` is Community, not Enterprise
+
+Three independent confirmations:
+
+- `cf-agent/simulate_mode.c` lives in [`cfengine/core`](https://github.com/cfengine/core),
+  which is the Community repository. Its header is plain GPL v3. (The header
+  also notes that COSL *may* apply "to the extent this program is licensed as
+  part of the Enterprise versions" — that is ordinary dual-licensing of the
+  same file, not a feature gate.)
+- **CFEngine Core 3.27.1 is installed locally** at `/opt/homebrew/bin/cf-agent`.
+  `cf-agent --help` lists it:
+  `--simulate value - Run in simulate mode, either 'manifest', 'manifest-full' or 'diff'`
+- The Homebrew formula's license field is `BSD-3-Clause AND GPL-2.0-or-later AND
+  GPL-3.0-only AND LGPL-2.0-or-later` — no commercial component.
+
+**Consequence:** the strongest argument for E1 in this note — that a
+device-computed diff moves the briefing from the proposer's side of the line to
+the device's — does not depend on an Enterprise licence. It is available on
+every platform tendcf targets, today. There is also now a real binary on this
+machine to test against, which the build order should use rather than reasoning
+further from documentation.
+
+### 2. `--simulate=diff` stdout is *not* machine-readable — and that does not matter
+
+The stdout is a human report. From `simulate_mode.c`:
+
+- `RunDiff()` shells out to `<bindir>/diff -u --label 'original <path>' --label
+  'changed  <path>'` and copies that process's stdout to cf-agent's stdout
+  verbatim.
+- It is interleaved with prose for the non-diffable cases: `'<path>' no longer
+  exists`, `'<path>' changed type from <a> to <b>`, `'<path>' is a <type>`.
+- Records are separated by `PrintDelimiter()`, which prints a run of dashes
+  sized from `$COLUMNS` (minimum 80, less 5). That is the only record
+  separator, and its width depends on the caller's environment.
+
+A briefing generator parsing that would be parsing prose against a
+terminal-width delimiter. Do not.
+
+**But the structured data is already on disk.** The simulated run leaves the
+changes chroot populated, and `libpromises/changes_chroot.h` defines four
+record files inside it:
+
+| File | Format | Written by |
+| --- | --- | --- |
+| `/changed_files` | length-prefixed strings, one path each | `RecordFileChangedInChroot()` |
+| `/renamed_files` | length-prefixed string *pairs* (old, new) | `RecordFileRenamedInChroot()` |
+| `/kept_files` | length-prefixed strings | `RecordFileEvaluatedInChroot()` |
+| `/pkgs_ops` | **CSV** — op, name, arch, version | `RecordPkgOperationInChroot()` |
+
+Alongside them, the chroot tree holds the actual post-change file *contents*,
+reachable by mapping any real path through `ToChangesChroot()`.
+
+**So the briefing generator never reads `--simulate=diff` stdout at all.** It
+reads `/changed_files` and `/pkgs_ops`, then diffs `<path>` against
+`ToChangesChroot(<path>)` itself, with whatever differ it wants and into
+whatever structure the ChangePlan schema needs. `diff` output rendered for a
+terminal was never the interface; it is one of two consumers of the same
+underlying artifact, and tendcf should be the other.
+
+This strengthens the §7-executor-gate argument above rather than weakening it.
+The pre-flight validator under E1 compares two goal files against an approved
+diff; the *device-side* evidence that the diff is real is now a set of
+structured files a program can read, not a report a program must scrape.
+
+**Still unverified, and now the cheapest thing to check:** an actual
+`--simulate=diff` run against a scratch policy on the local 3.27.1 binary, to
+confirm the chroot path, the record files' presence, and whether any of this
+needs root. Everything above is read from source and from `--help`; none of it
+has been executed. That test is Step 0 work, not Step 3 work.
+
+Unchanged by any of this: **only files and packages promises are simulated.**
+The "loaded and running" half of a service change still does not appear.
+
+### Sources for the addendum
+
+All accessed 2026-08-15. GitHub reads via `gh api`; local binary is Homebrew
+`cfengine` 3.27.1.
+
+- [`cfengine/core` — `cf-agent/simulate_mode.c`](https://github.com/cfengine/core/blob/master/cf-agent/simulate_mode.c) — `RunDiff()`, `DiffFile()`, `PrintDelimiter()`, licence header
+- [`cfengine/core` — `libpromises/changes_chroot.h`](https://github.com/cfengine/core/blob/master/libpromises/changes_chroot.h) — the four record-file names
+- [`cfengine/core` — `libpromises/changes_chroot.c`](https://github.com/cfengine/core/blob/master/libpromises/changes_chroot.c) — `WriteLenPrefixedString()` records; `CsvWriterField()` for package operations
+- [`cfengine/core` — `libpromises/eval_context.c`](https://github.com/cfengine/core/blob/master/libpromises/eval_context.c) — `ToChangesChroot()`
+- `/opt/homebrew/bin/cf-agent --version` → `CFEngine Core 3.27.1`; `--help` → the `--simulate` line quoted above
