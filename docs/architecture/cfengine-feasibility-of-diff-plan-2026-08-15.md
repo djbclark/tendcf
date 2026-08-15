@@ -6,10 +6,12 @@ CFEngine Community source and the locally installed 3.27.1 binary.
 **Status:** research note, not a decision.
 
 > The addendum at the end closes both items this note originally left
-> unverified. `--simulate` is Community, and the machine-readable artifact a
-> briefing generator needs is not the `diff` stdout but the structured record
-> files the simulated run leaves in the changes chroot. Read it before acting
-> on the body.
+> unverified, and was itself run against the local binary rather than reasoned
+> from docs. `--simulate` is Community and works without root. But **CFEngine
+> has no machine-readable simulate output in any mode** — the structured
+> records exist only inside a chroot that is deleted on exit. The addendum
+> recommends upstreaming a JSON output mode rather than parsing the report.
+> Read it before acting on the body.
 
 ## Why this exists
 
@@ -242,9 +244,14 @@ The stdout is a human report. From `simulate_mode.c`:
 A briefing generator parsing that would be parsing prose against a
 terminal-width delimiter. Do not.
 
-**But the structured data is already on disk.** The simulated run leaves the
-changes chroot populated, and `libpromises/changes_chroot.h` defines four
-record files inside it:
+`--simulate=manifest` is no better. Empirically (see the run log below) it
+emits `stat(1)`-style prose — `'<path>' is a regular file`, `Size: 23`,
+`Access: (0644/rw-r--r--)`, then `Contents of the file:` and the bytes. Also a
+report, also not a format.
+
+**Structured records do exist — but they are internal to the run, not an
+interface.** `libpromises/changes_chroot.h` defines four record files inside
+the changes chroot:
 
 | File | Format | Written by |
 | --- | --- | --- |
@@ -256,23 +263,80 @@ record files inside it:
 Alongside them, the chroot tree holds the actual post-change file *contents*,
 reachable by mapping any real path through `ToChangesChroot()`.
 
-**So the briefing generator never reads `--simulate=diff` stdout at all.** It
-reads `/changed_files` and `/pkgs_ops`, then diffs `<path>` against
-`ToChangesChroot(<path>)` itself, with whatever differ it wants and into
-whatever structure the ChangePlan schema needs. `diff` output rendered for a
-terminal was never the interface; it is one of two consumers of the same
-underlying artifact, and tendcf should be the other.
+**The catch: the chroot does not survive the run.** `cf-agent.c` prints the
+report and then calls `CallCleanupFunctions()`, which removes the chroot. Ran
+it and checked: after exit, `<workdir>/state/` contains no `*.changes`
+directory at all. There is no flag to retain it. So those four files are
+implementation detail — real, well-structured, and unreachable by any consumer
+that is not inside the process.
 
-This strengthens the §7-executor-gate argument above rather than weakening it.
-The pre-flight validator under E1 compares two goal files against an approved
-diff; the *device-side* evidence that the diff is real is now a set of
-structured files a program can read, not a report a program must scrape.
+The chroot path *is* deterministic and announced on stderr at the start of the
+run (`<workdir>/state/<pid>.changes`), so a wrapper could in principle read it
+mid-flight. That races cleanup on every run. Do not build on it.
 
-**Still unverified, and now the cheapest thing to check:** an actual
-`--simulate=diff` run against a scratch policy on the local 3.27.1 binary, to
-confirm the chroot path, the record files' presence, and whether any of this
-needs root. Everything above is read from source and from `--help`; none of it
-has been executed. That test is Step 0 work, not Step 3 work.
+### What this means for the design
+
+The honest conclusion is narrower than the previous draft claimed, and points
+somewhere better:
+
+**CFEngine's simulate mode has no machine-readable output, in any mode, as
+shipped.** A device-computed change set is exactly the artifact E1 wants and
+CFEngine computes it — it just renders it for a terminal and then throws the
+structure away.
+
+Three ways to close that, in the order they fit the project's own constraints
+("re-use existing systems… minimize the code we maintain… let others plug in"):
+
+1. **Upstream a machine-readable output mode** — a `--simulate-output=json`
+   flag, or a flag that retains the chroot. The data structures already exist
+   and are already populated; this is a rendering change to a GPL project, not
+   a feature. It is the smallest patch, it is plausibly welcome upstream, and
+   it leaves tendcf maintaining **zero** lines of parsing. If it lands, every
+   other CFEngine user gets a programmable simulate too — which is the
+   pluggability argument the project makes about itself, applied to its own
+   dependency.
+2. **Parse the report.** Cheap to start, permanently fragile: the record
+   separator is a dash rule sized from `$COLUMNS`, and the prose lines are
+   printf format strings with no stability guarantee. This is the option that
+   quietly becomes maintained code.
+3. **Compute the diff outside CFEngine**, from the two signed goal files, and
+   use `--simulate` only as a human-facing confirmation. This needs no upstream
+   change and is where E1 already points — but it gives up the specific
+   property that made `--simulate` interesting, namely a delta computed by the
+   engine against the device's *actual* state rather than predicted by a
+   compiler that has never seen the device (red-team TC-29).
+
+**Recommendation: 1, with 3 as the fallback and 2 never.** Option 1 is a small
+contribution to a tool the project already depends on, which is the same trade
+the design makes everywhere else. Worth an upstream issue before any tendcf
+code is written — the answer changes what Step 3 builds.
+
+### The run log, for whoever repeats this
+
+CFEngine needs a writable workdir. `CFENGINE_TEST_OVERRIDE_WORKDIR` sets one,
+no root required:
+
+```bash
+export CFENGINE_TEST_OVERRIDE_WORKDIR="$PWD/cfwork"
+mkdir -p cfwork/{inputs,bin,modules,masterfiles}
+ln -sf "$(command -v cf-promises)" cfwork/bin/cf-promises   # else it fails to failsafe
+ln -sf "$(command -v diff)" cfwork/bin/diff                 # RunDiff() uses <bindir>/diff
+cf-agent --simulate diff -f "$PWD/cfwork/inputs/promises.cf"
+```
+
+Against a one-line file the policy rewrites, that printed a dash rule and:
+
+```
+--- original /…/sim-target/motd
++++ changed  /…/sim-target/motd
+@@ -1 +1 @@
+-original line
++new line from cfengine
+```
+
+**The real file was unmodified afterwards** — the chroot isolation works as
+documented. `--simulate manifest` on the same policy printed the `stat`-style
+block quoted earlier. Neither invocation needed root.
 
 Unchanged by any of this: **only files and packages promises are simulated.**
 The "loaded and running" half of a service change still does not appear.
