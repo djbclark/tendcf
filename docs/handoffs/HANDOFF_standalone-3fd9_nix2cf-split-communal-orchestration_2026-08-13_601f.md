@@ -36,7 +36,7 @@ Three phases, in order:
 
 ## Where We Are
 
-- **Repo:** `djbclark/tendcf`, local checkout `~/src/tendcf`, `master`,
+- **Repo:** `frdminc/tendcf`, local checkout `~/src/tendcf`, `master`,
   HEAD `08b7098`, **clean, pushed to origin**. (Parent handoff left `a4f8582`
   unpushed; that is now pushed along with this session's `08b7098`.)
 - **Architecture doc** (`docs/architecture/architecture-DEFINITIVE-v2.md`):

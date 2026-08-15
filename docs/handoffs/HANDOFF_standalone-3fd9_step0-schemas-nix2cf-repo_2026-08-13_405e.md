@@ -38,9 +38,9 @@ remainder — see Where We're Going item 1.**
 
 | Repo | Commit | What |
 | --- | --- | --- |
-| `djbclark/nix2cf` | `f5f01e0` | New public repo. Schemas + lint + fixtures |
-| `djbclark/tendcf` | `ecb42a1` | §4.2 + §12 Step 0 record that the repo exists |
-| `djbclark/tendcf` | `8cd472b` | Handoff 8671, pushed this session (was local-only) |
+| `frdminc/nix2cf` | `f5f01e0` | New public repo. Schemas + lint + fixtures |
+| `frdminc/tendcf` | `ecb42a1` | §4.2 + §12 Step 0 record that the repo exists |
+| `frdminc/tendcf` | `8cd472b` | Handoff 8671, pushed this session (was local-only) |
 
 `nix2cf` working tree clean at `f5f01e0`, `master` tracking
 `origin/master`, in sync. `tendcf` clean at `ecb42a1`, in sync.
@@ -100,7 +100,7 @@ standing protocol, and with the document's own assertion in play as an
 option (the lesson `8671` recorded after its question was rejected for
 smuggling in a premise).
 
-**Chosen:** create `djbclark/nix2cf` immediately, holding only its contract.
+**Chosen:** create `frdminc/nix2cf` immediately, holding only its contract.
 D21-correct from day one, no later move, and Step 3's compiler lands into a
 repo that already holds the contract it implements.
 

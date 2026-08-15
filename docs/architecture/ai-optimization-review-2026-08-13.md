@@ -5,7 +5,7 @@
 > **Proposal doc, not a decision.** Per `architecture-DEFINITIVE-v2.md`'s own
 > header: this is *not* an edit to that file. It is the "new review doc"
 > route that header specifies. Nothing here is adopted until the operator
-> says so — see `djbclark/tendcf#1`.
+> says so — see `frdminc/tendcf#1`.
 >
 > **Correction, 2026-08-13 (same day, before adoption):** items 1, 3, and 4
 > originally cited specific numbers that did not survive checking against

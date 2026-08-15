@@ -12,7 +12,7 @@
   v1/v2 files, panel drafts, and the v2 trust spec are archival — see
   `deprecated/README.md`.
 - **Date:** 2026-08-14
-- **Tracker:** djbclark/tendcf#1.
+- **Tracker:** frdminc/tendcf#1.
 
 This document describes the **current design and what is planned next**.
 It does not recount how the design was reached. A previous configuration
@@ -644,6 +644,6 @@ with full mesh) is **D38**.
 - `docs/paper/tendcf-architecture-paper.md` — technical paper; the guide
   wins on conflict.
 - `schema/`, `examples/`, `bin/schema_lint.py` — Site Model contract.
-- `djbclark/nix2cf` — compiler tool (Step 3). Consumes this contract.
+- `frdminc/nix2cf` — compiler tool (Step 3). Consumes this contract.
 
 Local prior-art clones (not dependencies): `~/src/config-mgmt-prior-art/`.

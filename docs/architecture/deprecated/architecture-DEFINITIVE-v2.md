@@ -4,7 +4,7 @@
 > specific human (operator) approval for a named change.** Blanket
 > instructions ("fix docs", "update stale refs", "reconcile with the
 > latest") do NOT authorize edits here. Propose changes as a _new_ review
-> doc or a comment on djbclark/tendcf#1. This binds every agent —
+> doc or a comment on frdminc/tendcf#1. This binds every agent —
 > Claude Code, Codex, Hermes, Ralph controllers, `agy`, and whatever comes
 > next. If you are an AI reading this to do implementation work: this file
 > is your map, not your worksheet. Read §0 first.
@@ -17,7 +17,7 @@
 - **Author:** Claude (Anthropic, Claude Fable 5), holding the full operator
   dialogue plus every review pass. This is the apex-context document; later
   AIs will have less. See §0.
-- **Tracker:** djbclark/tendcf#1.
+- **Tracker:** frdminc/tendcf#1.
 
 ---
 
@@ -362,7 +362,7 @@ compiler layer's working name) as its public contract; the *instances*
 (concrete site data, including site-pika's) live in the fleet/site repos
 and are supplied through that contract. A schema change is a `nix2cf`
 interface change; an instance change is site data.
-**The repo exists as of 2026-08-13** — `djbclark/nix2cf`, created at Step 0
+**The repo exists as of 2026-08-13** — `frdminc/nix2cf`, created at Step 0
 rather than Step 3 because this boundary leaves the schemas no other legal
 home, and staging them somewhere else would have guaranteed a later move.
 It currently holds the contract and its lint, and nothing else. Ubuntu/mise reads the model via a small generator
@@ -1212,7 +1212,7 @@ All are Site Model inventory entries + artifacts, not new architecture.
 by matching `ops-vX.Y.Z` tags (unchanged, R11). Each declares its own
 `flake.nix`; `stayturgid`/`site-djbclark`/`site-private` declare
 `tendcf` as a flake input (`inputs.tendcf.url =
-"github:djbclark/tendcf?ref=<tag>"`), pinned exactly by `flake.lock` —
+"github:frdminc/tendcf?ref=<tag>"`), pinned exactly by `flake.lock` —
 which doubles as machine-readable cross-repo provenance for a release,
 close to free reproducibility documentation on top of what
 `ops-release.json` already tracks. **Answered 2026-08-13
@@ -1688,7 +1688,7 @@ Two consequences of the sequence, both deliberate:
   for `services.yml`/`roles.yml`/`launchd-writers.yml`, **including the
   three D16 fields from §4.1** — `provides`/`requires` per type,
   `interlocks` per bundle, `comprehensive`/`opt_out_reason` per domain.
-  _Schemas written 2026-08-13 and living in `djbclark/nix2cf` per D21
+  _Schemas written 2026-08-13 and living in `frdminc/nix2cf` per D21
   (§4.2), alongside a `bin/schema_lint.py` carrying the cross-file rules
   JSON Schema cannot state on its own — reference resolution, launchd
   labels against the writer prefixes, no prefix nested in another. The
@@ -2097,5 +2097,5 @@ research trail live in the session transcript; key names, for follow-up:
   in place, 2026-08-13, commit `3cfd3fa` on `feature/stayturgid-2.0`) and
   `docs/research/evaluations/bcfg2-evaluation-2026-07-12.md`.
 
-_Filed under djbclark/tendcf#1. Amend via this register; treat the
+_Filed under frdminc/tendcf#1. Amend via this register; treat the
 archived reviews as immutable record._

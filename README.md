@@ -20,7 +20,7 @@ living document disagrees on the current design, **the guide wins**.
 | [`docs/paper/tendcf-architecture-paper.md`](docs/paper/tendcf-architecture-paper.md) | Technical paper |
 | [`schema/`](schema/), [`examples/`](examples/), [`bin/schema_lint.py`](bin/schema_lint.py) | Site Model contract, fixtures, lint |
 | [`examples/broken/`](examples/broken/) | Twelve deliberately broken fixtures the lint must catch |
-| [djbclark/nix2cf](https://github.com/djbclark/nix2cf) | Compiler (Site Model → CFEngine Augments). Not this repo. |
+| [frdminc/nix2cf](https://github.com/frdminc/nix2cf) | Compiler (Site Model → CFEngine Augments). Not this repo. |
 
 Nothing described here is deployed. Some data formats exist and are
 checked. The compiler, the on-device executor, and the consent surface

@@ -4,7 +4,7 @@
 > explicit, specific human (operator) approval given for a named change.**
 > Blanket instructions like "fix docs" or "update stale references" do NOT
 > authorize edits here. Propose changes as a review document or GitHub issue
-> (tracker: djbclark/tendcf#1). This rule binds all agents.
+> (tracker: frdminc/tendcf#1). This rule binds all agents.
 
 - **Status:** Final synthesis v1 — awaiting operator sign-off on the
   Decision Register (§6)
@@ -286,6 +286,6 @@ register, not the archived proposals.
   mechanics; Free Sysadmin publishing architecture — all surviving,
   with the D1 end-state conceded to the panel.
 
-_Filed under djbclark/tendcf#1. The four source proposals are
+_Filed under frdminc/tendcf#1. The four source proposals are
 archival records of independent positions — do not edit them; amend via
 this document's Decision Register._

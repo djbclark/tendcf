@@ -91,7 +91,7 @@ being updated to say so. That drift is now closed by this handoff.
   - **Example A** (an inferred dependency edge): `caddy`/`litellm-proxy`
     Site Model records, an excerpt of the real, schema-validated
     `nix2cf` fixture (`examples/services.yml` in the sibling `nix2cf` repo,
-    linked via `github.com/djbclark/nix2cf/blob/master/examples/services.yml`)
+    linked via `github.com/frdminc/nix2cf/blob/master/examples/services.yml`)
     — verified byte-for-byte against the source with `diff` after an initial
     trim accidentally dropped `OPENAI_API_KEY` from the env map (fixed).
     Followed by an illustrative Nix-module authoring-frontend rendering of
@@ -185,7 +185,7 @@ being updated to say so. That drift is now closed by this handoff.
   the `OPENAI_API_KEY` fix.
 - `nix2cf` is pushed and clean: `git -C ~/src/nix2cf status -s` empty,
   `git -C ~/src/nix2cf log --oneline origin/master..HEAD` empty — the
-  paper's link to `github.com/djbclark/nix2cf/blob/master/examples/services.yml`
+  paper's link to `github.com/frdminc/nix2cf/blob/master/examples/services.yml`
   resolves against what's actually on GitHub.
 - Section line numbers as of this write (`grep -n '^## \|^### '`): §1.1 at
   line 62, §2.6 at line 235 (through line 489), §9 at line 937,

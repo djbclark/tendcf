@@ -37,15 +37,15 @@ concrete follow-ups were explicitly deferred (see "Where We're Going").
 
 ## Where We Are
 
-- **Repo:** `djbclark/tendcf` — public, local checkout `~/src/tendcf`
+- **Repo:** `frdminc/tendcf` — public, local checkout `~/src/tendcf`
   (a plain repo, deliberately **not** under `~/src/ops-worktrees/` — it's not
   part of the ops-djbclark suite). Working directly on `master` per operator
   instruction ("for now we can just work directly on master").
 - **Repo settings:** GitHub Actions disabled, no branch protection, Issues
   enabled, default branch `master`.
-- **Issues:** `djbclark/tendcf#1` is the tracker (transferred from
+- **Issues:** `frdminc/tendcf#1` is the tracker (transferred from
   `djbclark/stayturgid#272`, retitled/annotated for the rename).
-  `djbclark/tendcf#2` is a new requirement: the change process must be
+  `frdminc/tendcf#2` is a new requirement: the change process must be
   much faster and more atomic than stayturgid's current coordinated
   three-repo release train (not yet folded into the architecture doc).
 - **Docs:** `docs/architecture/` holds the full renamed research corpus (18

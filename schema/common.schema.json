@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/djbclark/tendcf/schema/common.schema.json",
+  "$id": "https://github.com/frdminc/tendcf/schema/common.schema.json",
   "title": "tendcf — shared Site Model definitions",
   "description": "Definitions shared by every Site Model file. The three D16 fields (provides/requires, interlocks, comprehensive/opt_out_reason) live here because they are cross-cutting. Schemas live in tendcf (D21); nix2cf is the compiler. Current-design facts follow docs/paper/tendcf-architecture-guide.md.",
 

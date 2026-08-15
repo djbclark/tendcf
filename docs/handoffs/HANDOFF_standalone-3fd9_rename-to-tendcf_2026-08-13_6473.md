@@ -370,7 +370,7 @@ See "Where We're Going" #1.
 ```bash
 cd ~/src/tendcf
 git log --oneline -8                                 # confirm 1de50c3 is HEAD, tree clean
-git remote -v                                         # confirm origin is djbclark/tendcf
+git remote -v                                         # confirm origin is frdminc/tendcf
 wc -w docs/paper/tendcf-architecture-paper.md          # word count check before the next read
 cat ~/ops/site-private/memory/project_tendcf_rename.md # full rename scope/rationale
 
