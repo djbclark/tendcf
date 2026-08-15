@@ -1,6 +1,2 @@
 __pycache__/
 .venv/
-
-# secretspec dotenv provider — secret VALUES live here, declarations live in
-# secretspec.toml. Never commit this.
-.env
