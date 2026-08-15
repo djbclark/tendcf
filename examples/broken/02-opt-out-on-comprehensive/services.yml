@@ -23,8 +23,8 @@ bundles:
     domain: macos-launchd-services
     interlocks:
     - id: tailscale-authenticated-before-lockdown
-      description: Tailscale must be authenticated before always-on VPN lockdown may
-        be enforced. Setting lockdown on a device whose Tailscale is unauthenticated
+      description: The mesh VPN must be authenticated before always-on VPN lockdown may
+        be enforced. Setting lockdown on a device whose VPN is unauthenticated
         severs every management path to it.
       pre_action:
         command:

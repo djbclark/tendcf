@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/djbclark/tendcf/schema/launchd-writers.schema.json",
   "title": "Site Model — launchd unit-writers (macOS adapter)",
-  "description": "The launchd instance of generic unit-writers (guide §4.1, D36): exactly one writer per unit-name prefix. Two writers on one prefix is a lint failure. Other supervisors (systemd, runit, Jobber, …) get the same rule; this file is the first adapter, not the model.",
+  "description": "The launchd instance of generic unit-writers (guide §3 / map §4.1, D36): exactly one writer per unit-name prefix. Two writers on one prefix is a lint failure. Other supervisors (systemd, runit, Jobber, …) get the same rule; this file is the first adapter, not the model.",
 
   "type": "object",
   "properties": {

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/djbclark/tendcf/schema/roles.schema.json",
   "title": "Site Model — roles",
-  "description": "Feature roles and their assignment: role -> {main, backups[], peers[]} (§4.1). This file is what dissolves 'control node' into data (R2) — deploy authority is a role a host holds, not a machine.\n\nDeliberately has NO domain_coverage block: comprehensiveness (D16(d)) is a property of a domain of DEVICE STATE, and roles are intent/assignment, not device state. There is nothing on a device that could show up as an extra entry against this file. Its absence is a decision, not an oversight.",
+  "description": "Feature roles and their assignment: role -> {main, backups[], peers[]} (map §4.1). This file is what dissolves 'control node' into data (R2) — deploy authority is a role a host holds, not a machine.\n\nDeliberately has NO domain_coverage block: comprehensiveness (D16(d)) is a property of a domain of DEVICE STATE, and roles are intent/assignment, not device state. There is nothing on a device that could show up as an extra entry against this file. Its absence is a decision, not an oversight.",
 
   "type": "object",
   "properties": {
@@ -24,7 +24,7 @@
       "properties": {
         "description": { "type": "string", "minLength": 1 },
         "main": {
-          "description": "The host currently holding the role. Flipping this to a backup and back is the R2 proof (§12 Step 5).",
+          "description": "The host currently holding the role. Flipping this to a backup and back is the R2 proof (guide §18 / map §13, Step 5).",
           "$ref": "common.schema.json#/$defs/host_name"
         },
         "backups": {
@@ -40,7 +40,7 @@
           "uniqueItems": true
         },
         "trust_tier_required": {
-          "description": "Minimum inventory trust_tier a host must hold to be assigned this role (§4.1). A consented device must never silently acquire a deploy role.",
+          "description": "Minimum inventory trust_tier a host must hold to be assigned this role (map §4.1). A consented device must never silently acquire a deploy role.",
           "enum": ["operator", "managed", "consented"]
         },
         "provides": { "$ref": "common.schema.json#/$defs/provides" },

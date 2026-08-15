@@ -26,14 +26,14 @@
     },
 
     "release_stamp": {
-      "description": "Identifier of the signed release that produced this row. Every reporting row carries it (guide §8; D19). Not a sibling-repo lockstep tag.",
+      "description": "Identifier of the signed release that produced this row. Every reporting row carries it (guide §6; D19). Not a sibling-repo lockstep tag.",
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9._-]*$",
       "maxLength": 64
     },
 
     "capability_token": {
-      "description": "A capability a type supplies or needs, stated locally (D16(b)). `kind:name`. The kind set is closed so a typo is a schema error rather than a silently-unmatched edge — §0 rule 6, prefer machine-checkable to conventional. Extending the set is additive.",
+      "description": "A capability a type supplies or needs, stated locally (D16(b)). `kind:name`. The kind set is closed so a typo is a schema error rather than a silently-unmatched edge — map §0 rule 6, prefer machine-checkable to conventional. Extending the set is additive.",
       "type": "string",
       "pattern": "^(service|port|path|class|package|device|network|secret):[^\\s]+$",
       "maxLength": 200
@@ -123,7 +123,7 @@
           "oneOf": [
             {
               "const": "not-yet-migrated",
-              "description": "Real device state nobody has described yet. Backlog, and COUNTABLE — this count is the build order's progress metric (§12 Step 0). Normal day-one state for everything."
+              "description": "Real device state nobody has described yet. Backlog, and COUNTABLE — this count is the build order's progress metric (guide §18 / map §13, Step 0). Normal day-one state for everything."
             },
             {
               "const": "deliberately-unmanaged",

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/djbclark/tendcf/schema/services.schema.json",
   "title": "Site Model — services",
-  "description": "One record per service. The host's supervisor adapter renders it to a launchd plist, systemd unit, runit service, Jobber job, or equivalent (guide §6; D13). `managed_by` is `cfengine` for anything under management.",
+  "description": "One record per service. The host's supervisor adapter renders it to a launchd plist, systemd unit, runit service, Jobber job, or equivalent (guide §5 / map §6; D13). `managed_by` is `cfengine` for anything under management.",
 
   "type": "object",
   "properties": {

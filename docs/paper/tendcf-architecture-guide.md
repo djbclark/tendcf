@@ -6,9 +6,13 @@ designed today, and what is planned next. It does not recount how the
 design was reached.
 
 Where any other living document disagrees on the **current design**,
-**this guide wins**. Archival files (dated notes, briefs, handoffs,
-deprecated drafts, paper reviews) are snapshots; do not rewrite them to
-match — they lose on conflict.
+**this guide wins** — with one exception. Where the implementer map fixes
+a *security parameter* that this guide states only in general terms — the
+offline root's 2-of-3 threshold, NAR digests in the manifest — the map's
+value is a **floor**. This guide's silence is not permission to relax it.
+Archival files (dated notes, briefs, handoffs, deprecated drafts, paper
+reviews) are snapshots; do not rewrite them to match — they lose on
+conflict.
 
 Draft for review — not published, not submitted.
 Daniel Joseph Barnhart Clark (djbclark@mit.edu).
@@ -106,10 +110,12 @@ Collision of the same identity from two peer inputs is a **compile error**.
 Only site-private may bind a winner (`caddy: from: alice`) or a short name.
 Never silent last-wins.
 
-Four ideas in this picture come from [Bcfg2](https://www.usenix.org/legacy/publications/library/proceedings/lisa05/tech/full_papers/desai/desai.pdf),
+Six ideas in this picture come from [Bcfg2](https://www.usenix.org/legacy/events/lisa05/tech/full_papers/desai/desai.pdf),
 a configuration system built at Argonne and described in a series of papers
-by Narayan Desai and colleagues. They are credited in the sections that use
-them. [CFEngine](https://docs.cfengine.com) is the on-device engine; `tendcf`
+by Narayan Desai and colleagues — extra entries (§11), Actions as
+bundle-scoped guards and the bundle as the re-verification scope (§12),
+`buildfile` (§4), revision stamping (§6), and `altsrc` (§13). They are
+credited in the sections that use them. [CFEngine](https://docs.cfengine.com) is the on-device engine; `tendcf`
 does not replace it.
 
 ---
@@ -162,8 +168,12 @@ else consumes. That is an authoring frontend only. Nobody adopting the
 project has to know Nix. Until that frontend exists, the files are written
 as YAML.
 
-Every schema is paired with a concrete example file. The lint fails if a
-schema arrives without its example, or the other way around. A lookup
+Every schema is paired with a concrete example file, except schemas that
+hold only shared definitions and describe no document of their own; those
+are named in an explicit allowlist. The lint derives the pairing from the
+filesystem, so it fails if a schema arrives without its example, if an
+example arrives without its schema, or if a new schema is added to
+neither list. A lookup
 command is planned so an agent can ask “who provides port 443?” without
 reading the whole registry.
 
@@ -173,9 +183,13 @@ reading the whole registry.
 
 The compiler (working name `nix2cf`) reads the Site Model and writes
 [CFEngine Augments](https://docs.cfengine.com/docs/3.21/reference-language-concepts-augments.html)
-— JSON files (`def.json`, `host_specific.json`) that CFEngine has accepted
-as a native data-injection layer since version 3.7. The name is historical;
-YAML is a valid input. The compiler is a tool, not the home of schemas.
+— JSON files (`def.json`, `host_specific.json`) CFEngine reads natively as
+a data-injection layer. The version history is on that page: 3.7.0 put
+augments into the Masterfiles Policy Framework and 3.7.3 back-ported
+`def.json` parsing into the core agent, but `$(sys.workdir)/data/host_specific.json`
+has only been parsed **since 3.18.0**. Using both files therefore sets the
+floor at CFEngine 3.18, not 3.7. The name is historical; YAML is a valid
+input. The compiler is a tool, not the home of schemas.
 
 CFEngine’s [Masterfiles Policy Framework](https://github.com/cfengine/masterfiles)
 is already largely data-driven on top of that layer. For the common case
@@ -535,7 +549,7 @@ Setting always-on VPN lockdown on a device whose VPN is unauthenticated
 severs every management path to that device. That is not “start B after
 A.” It is “do not do B unless this probe still succeeds.”
 
-[Bcfg2 Actions](https://www.usenix.org/legacy/publications/library/proceedings/lisa06/tech/full_papers/desai/desai.pdf)
+[Bcfg2 Actions](https://www.usenix.org/legacy/events/lisa06/tech/full_papers/desai/desai.pdf)
 are the shipped precedent: unless exit status is ignored, a failing
 pre-action prevents modification of entries in the enclosing bundle. That
 is a guard with a defined blast radius — not an edge in a graph, and not
@@ -616,10 +630,13 @@ is a catalog, not a graph.
 3. Unknown token, unmatched `requires`, or two providers of the same
    token → compile error listing near-misses and the catalog.
 
-Token *kinds* are a closed enum in the schema (`service`, `port`, `path`,
-`secret`, `class`, `network`, …). Token *values* are instance data,
-checked at compile time — not a schema enum that changes with every new
-service.
+Token *kinds* are a closed enum — `service`, `port`, `path`, `class`,
+`package`, `device`, `network`, `secret` — defined once in
+[`schema/common.schema.json`](../../schema/common.schema.json)
+(`$defs.capability_token`). That schema is the authority; if this list and
+that pattern ever disagree, the schema is right. Token *values* are
+instance data, checked at compile time — not a schema enum that changes
+with every new service.
 
 If an author has never heard of the thing they need, lookup and the error
 are the discovery path. The writing rule is “don’t require the graph,”
@@ -703,7 +720,10 @@ edge from that match:
         "launchd_label": "com.djbclark.litellm",
         "command": ["/opt/homebrew/bin/litellm", "--config", "/etc/litellm/config.yaml"],
         "run_as": "djbclark",
-        "env": { "LITELLM_MASTER_KEY": "@{secrets.LITELLM_MASTER_KEY}" }
+        "env": {
+          "LITELLM_MASTER_KEY": "@{secrets.LITELLM_MASTER_KEY}",
+          "OPENAI_API_KEY": "@{secrets.OPENAI_API_KEY}"
+        }
       }
     }
   },
@@ -715,10 +735,23 @@ edge from that match:
       "origin": "inferred",
       "rule": "requires-matches-provides",
       "source": { "file": "services.yml", "service": "litellm-proxy", "field": "requires[0]" }
+    },
+    {
+      "from": "caddy",
+      "to": "tailscaled",
+      "on": "service:tailscaled",
+      "origin": "inferred",
+      "rule": "requires-matches-provides",
+      "source": { "file": "services.yml", "service": "caddy", "field": "requires[1]" }
     }
   ]
 }
 ```
+
+Two edges, not one. `caddy` states `requires: service:tailscaled`, and the
+`tailscaled` record in the same fixture (§16.B's `fleet-vpn` bundle)
+provides it — so the same rule fires across a bundle boundary without
+anyone writing that down either.
 
 `origin` says this edge was never authored. `rule` names the mechanism.
 `source` points at the exact `requires` entry. If the edge is wrong, the
@@ -937,7 +970,7 @@ links where they help:
 1. N. Desai, A. Lusk, R. Bradshaw, and R. Evard. *BCFG: A Configuration
    Management Tool for Heterogeneous Environments.* CLUSTER ’03.
 2. N. Desai, R. Bradshaw, et al. *A Case Study in Configuration Management
-   Tool Deployment.* [LISA ’05](https://www.usenix.org/legacy/publications/library/proceedings/lisa05/tech/full_papers/desai/desai.pdf).
+   Tool Deployment.* [LISA ’05](https://www.usenix.org/legacy/events/lisa05/tech/full_papers/desai/desai.pdf).
 3. N. Desai, R. Bradshaw, J. Hagedorn, and C. Lueninghoener. *Directing
    Change Using Bcfg2.* LISA ’06. (Revision stamping; FSM over releases —
    used here as a view, not a coordinator.)

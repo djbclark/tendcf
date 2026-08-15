@@ -5,20 +5,24 @@
 # ///
 """Lint the tendcf Site Model contract.
 
-Three layers, cheapest first:
+Five layers, cheapest first:
 
   1. every schema/*.schema.json is itself a valid JSON Schema 2020-12;
-  2. every happy-path examples/*.yml instance validates against its schema;
-  3. cross-file rules JSON Schema cannot express on its own — domain and
+  2. every schema is paired with an example and every example with a
+     schema, derived from the filesystem — a new schema with no fixture
+     is a finding, not a convention someone has to remember;
+  3. every happy-path examples/*.yml instance validates against its schema;
+  4. cross-file rules JSON Schema cannot express on its own — domain and
      bundle references resolve, service names are unique, launchd labels
      fall under a declared writer prefix, no writer prefix nests inside
      another;
-  4. each of the twelve deliberately broken fixtures in examples/broken/
+  5. each of the twelve deliberately broken fixtures in examples/broken/
      is caught. A lint that only accepts good input is not a check.
 
-Layer 3 is the point. Layer 1 and 2 catch a broken schema; layer 3 is what
-keeps a valid-but-wrong Site Model out of a render (§0 rule 6: prefer
-machine-checkable to conventional). Layer 4 is why we believe layer 3.
+Layer 4 is the point. Layers 1-3 catch a broken or unpaired schema; layer
+4 is what keeps a valid-but-wrong Site Model out of a render (map §0 rule
+6: prefer machine-checkable to conventional). Layer 5 is why we believe
+layer 4.
 
 Exit 0 clean, 1 findings, 2 cannot read/parse.
 Run from repo root:  bin/schema_lint.py
@@ -52,6 +56,12 @@ EXAMPLES: dict[str, tuple[str, bool]] = {
     "launchd-writers.yml": ("launchd-writers.schema.json", False),
     "report-rows.yml": ("report-row.schema.json", True),
 }
+
+# Schemas that hold only shared $defs and describe no document of their own,
+# so they have no fixture. Everything NOT listed here must be paired — see
+# check_pairing(). The allowlist is what makes the guide's "every schema is
+# paired with an example" claim machine-checkable rather than a convention.
+DEFINITION_ONLY_SCHEMAS = {"common.schema.json"}
 
 findings: list[str] = []
 PRINT_FINDINGS = True
@@ -112,6 +122,33 @@ def check_schemas_valid(schemas: dict[str, dict]) -> None:
             Draft202012Validator.check_schema(schema)
         except Exception as exc:  # noqa: BLE001 - surface whatever it says
             fail(f"schema/{name} is not a valid JSON Schema 2020-12: {exc}")
+
+
+def check_pairing(schemas: dict[str, dict]) -> None:
+    """Every schema has a fixture and every fixture a schema, from the disk.
+
+    EXAMPLES alone cannot enforce this: a schema nobody adds to it is simply
+    never looked at, so the pairing rule would hold only as long as whoever
+    added the schema remembered. Reading both directories closes that.
+    """
+    on_disk_schemas = {p.name for p in SCHEMA_DIR.glob("*.schema.json")}
+    on_disk_examples = {p.name for p in EXAMPLE_DIR.glob("*.yml")}
+    paired_schemas = {schema_name for schema_name, _ in EXAMPLES.values()}
+
+    for name in sorted(on_disk_schemas - paired_schemas - DEFINITION_ONLY_SCHEMAS):
+        fail(
+            f"schema/{name} has no example: add one to examples/ and register the "
+            "pair in EXAMPLES, or list it in DEFINITION_ONLY_SCHEMAS if it holds "
+            "only shared $defs"
+        )
+    for name in sorted(paired_schemas - on_disk_schemas):
+        fail(f"EXAMPLES pairs against schema/{name}, which does not exist")
+    for name in sorted(on_disk_examples - set(EXAMPLES)):
+        fail(f"examples/{name} is paired with no schema — register it in EXAMPLES")
+    for name in sorted(DEFINITION_ONLY_SCHEMAS - on_disk_schemas):
+        fail(f"DEFINITION_ONLY_SCHEMAS names schema/{name}, which does not exist")
+    for name in sorted(DEFINITION_ONLY_SCHEMAS & paired_schemas):
+        fail(f"schema/{name} is both definition-only and paired with an example")
 
 
 def validate(instance: Any, schema: dict, registry: Registry, label: str) -> None:
@@ -347,6 +384,7 @@ def main() -> int:
     check_schemas_valid(schemas)
     caught = 0
     if not args.schemas_only:
+        check_pairing(schemas)
         loaded = load_happy_examples()
         validate_loaded(loaded, schemas, registry)
         if not findings:
