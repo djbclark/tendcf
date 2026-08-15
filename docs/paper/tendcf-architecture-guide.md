@@ -86,9 +86,9 @@ Two other goals sit alongside that:
                          Not the home of schemas or facts.
 
           ▼
-  Signed release         manifest + per-host typed ChangePlan
-                         (TUF-subset; executor refuses anything
-                         outside the plan)
+  Signed release         manifest + per-host canonical goal file
+                         (TUF-subset; the device validates the diff
+                         from its own approved baseline)
 
           ▼
   CFEngine +             each device is its own policy hub.
@@ -316,23 +316,120 @@ which release it is converged to.
 
 ## 7. Changes arrive as signed plans
 
-Configuration reaches devices only as a versioned, signed release. Each
-release also publishes a per-host **ChangePlan**: a list of operations,
-each declaring
+Configuration reaches devices only as a versioned, signed release. What a
+release carries for each host is that host’s **goal file**: one JSON
+document describing the device’s complete intended state — every service,
+package, file, and domain the site claims to manage — fully resolved, with
+nothing left to a default.
 
-- a `capability` drawn from a closed list
-- the exact `resources` it may touch (checked against the port and path
-  registries)
-- a `target` bound to the host’s public key
-- rollback, expiry, and a one-time nonce
+A **ChangePlan** is the difference between two goal files: the one the
+device is currently converged to and the one the release proposes. The
+device computes that difference itself, from its own stored, approved copy,
+so a device seven releases behind is briefed on the one true delta from
+where it actually is rather than on a delta from a baseline it never
+reached. The compiler computes the same diff at release time, as a preview
+for whoever is proposing the change and as a regression test for the
+compiler. Where the baselines agree the two must agree, and a disagreement
+is reported, not swallowed.
 
-The on-device executor maps declared capabilities to an allowlist and
-**refuses any effect outside that set.** Signing the bundle authenticates
-the author. Only the plan constrains the effect.
+The diff is structural, not textual: entries added, removed, or replaced,
+addressed by `(domain, kind, id)`, each carrying the whole old and new
+entry. A text rendering of it is a display convenience and is never what
+gets signed.
+
+The on-device **validator** therefore compares; it does not interpret. It
+checks that the received goal file is byte-identical to its own canonical
+form of that file, that the difference from its stored baseline is exactly
+the difference that was approved, and — where the device’s tier requires a
+local yes (§14) — that the approval is signed by the enrolled advisor key,
+bound to this device’s public key, to both document hashes, and to a nonce
+this device issued. Then it lets CFEngine converge on the new state.
+Nothing in that path has to decide what an operation *means*, because there
+are no operations: there are two states and an approved difference between
+them.
+
+**One meaning, one file.** Serialization noise would be camouflage. If the
+same state can be written two ways, a change can hide in the difference
+between the two. So the goal file has a canonical form — JSON on the wire,
+collections sorted by a declared key, every field present with an explicit
+value, no empty collections, no timestamps or nonces inside the document —
+and a file that is not already in that form is refused rather than
+normalized. YAML stays an authoring format for the Site Model and never
+reaches a device.
+
+**Removals are actuated, not omitted.** Under a convergent engine the
+absence of a promise is the absence of enforcement, not reversal: drop an
+entry and the thing keeps running. Every removal in a diff compiles to an
+explicit negative promise — the file deleted, the package absent,
+`service_policy => "stop"` — and a briefing renders a removal as what it
+will do, never as a blank space.
+
+**Silence means two different things, and the file says which.** In a domain
+the goal file declares comprehensive (§11), an entry that does not appear in
+the diff is unchanged. In a domain still marked `not-yet-migrated`, it is
+merely undescribed. The per-domain coverage declarations travel inside the
+goal file so that the validator and the briefing can keep those apart.
+
+**Unknown means refuse.** The goal file carries a schema version. A
+validator that meets a version above its ceiling, or an entry kind it does
+not recognize, refuses the whole file and keeps converging on the last state
+it approved — a visible, reportable stall, not a brick. Ignoring the
+unrecognized part instead would let an unreviewed change ride in on a
+reviewed diff. Devices are not stranded by that rule, because goal files are
+per-host: the compiler renders each host at the highest schema version that
+host last reported it can read (§6 is where that report comes from), and a
+schema change ships as two releases — the validator update first, as an
+ordinary diff, and the migration behind it.
+
+**Accept is all or nothing.** A refusal may name the entries that caused it;
+it never applies the remainder. The proposer withdraws the corresponding
+source changes, re-renders the complete goal file, re-runs the conflict
+check (§4), and offers a new diff. No device applies a state the compiler
+never rendered and never checked.
+
+**Two events produce a total diff**, and both are their own consent class
+rather than an ordinary review. The first is the goal file a device accepts
+at first run, bounded by what it may claim: it manages only the domains
+named aloud at that ceremony, and everything else enters as
+`not-yet-migrated` — which turns one unreviewable everything-diff into a
+sequence of ordinary ones, counted by the same backlog §11 already counts.
+The second is a schema migration, which is valid only if it changes nothing:
+migrating the old file and diffing it against the new one must come out
+empty apart from the version bump. Migration and meaning never move in the
+same release.
+
+**Some regions of the file are privileged.** Trust policy, advisor keys, the
+peer allowlist, the digest of the policy tree, the validator’s own version,
+and the schema version itself are a short, enumerable list of paths — and a
+diff that touches one of them needs a ceremony to match, not an ordinary
+accept. The list is the validator’s and lives on the device, because a
+privilege flag a proposer can set is a privilege flag a proposer can clear.
+
+**Anything fetched is named by its bytes, not by its name.** Where an entry
+points at content the device has to go and get, the goal file carries that
+content’s digest, the digest is part of what the person accepted, and the
+device re-checks it immediately before applying. A name can be repointed
+after approval; a digest cannot. This is the general rule; the specific
+inventory for the build cache is a later step (see the implementer map),
+and until it exists the rule binds the fetches the design already makes.
+
+**The stored baseline is the root of the gate.** Every diff is computed
+against the device’s copy of the currently-approved goal file, and every
+approval binds to it, so that document needs integrity-protected storage and
+is verified before anything else is. Corrupt or swap it and the device
+either refuses everything or — worse — presents a first-adoption-shaped
+total diff and launders an arbitrary state through the ceremony meant for
+day one.
+
+What the validator bounds is the state that is *described*, not every effect
+of reaching it. A package that installs runs its vendor’s scripts as root,
+and no comparison of two JSON documents refuses that. §17 says where that
+becomes the binding limit.
 
 Signing is a small subset of [The Update Framework](https://theupdateframework.io/),
-sized for one operator: an offline root, release signatures, a snapshot
-that binds the metadata set together, and an emergency role. Each client
+sized for one operator: an offline root with a 2-of-3 signing threshold,
+release signatures, a snapshot that binds the metadata set together, and
+an emergency role. Each client
 that applies a signed artifact keeps a high-water mark so replay, freeze,
 and downgrade are rejected.
 
@@ -350,12 +447,26 @@ do not need a local yes. Installing new targets still does, on
 `consented` devices. An optional enrolled policy “I pre-grant emergency
 security patches from role E” may exist; **default off**.
 
-On top of the verifiable plan sits a *semantic* layer — generated, cached,
+On top of the verifiable diff sits a *semantic* layer — generated, cached,
 written for a language model to read: “this bumps a TLS library across a
 CVE and restarts the public proxy.” That layer briefs a person and their
 advisor. **It never authorizes.** Where the prose can be filled in from the
-plan’s typed fields, it is. Where it has to be written freely, it must
+entries the diff carries, it is. Where it has to be written freely, it must
 point at the exact fields it is summarizing.
+
+Provenance belongs to that layer too. “Which source change produced this
+entry?” is answered on demand — re-render with the candidate change
+reverted, diff the renders, subtract — rather than asserted as a field
+inside the signed artifact, because a provenance claim carried in the
+artifact is one the device cannot check. For the same reason the diff format
+carries no grouping and no privilege flags: grouping may inform the display,
+and privilege is derived by the validator from a list it holds locally, but
+neither is something a proposer gets to assert.
+
+CFEngine’s own `cf-agent --simulate` can additionally show a person what a
+run would change on this device right now. It covers files and packages, not
+whether a service ends up loaded and running, so it confirms a diff rather
+than establishing one.
 
 ---
 
@@ -370,9 +481,10 @@ offer a change and accept a signed yes/no. Same shape as a
 - tendcf ships a **suggested default prompt** as a replaceable public file.
   They may append or replace it.
 - Modes: auto-review, or a conversation with them first.
-- Return path: `accept | reject`, signed by the enrolled key, bound to
-  that plan’s nonce. Timeout is deny. Advisor down → fail closed for
-  *installs* (revocation still applies, §7).
+- Return path: `accept | reject`, signed by the enrolled key, bound to both
+  goal-file hashes and to the nonce the device issued (§7). A `reject` may
+  name the entries that drove it. Timeout is deny. Advisor down → fail
+  closed for *installs* (revocation still applies, §7).
 - Custom tools (OpenPGP web of trust, a transparency log, a chain, gossip
   of signed apply-attestations) are theirs. Consensus among “everyone
   waiting for everyone else” is a separate project that consumes
@@ -840,9 +952,19 @@ narrower scope from.
 Every choice above is scoped to a specific envelope: a fleet small enough
 that no single role is dedicated to operating it, mixed enough that no
 OS-native tool covers it alone, and connected intermittently enough that
-waiting on a reachable central server is not an option. Three ceilings
-follow. Each names the point at which a *different* architecture — not a
-variant of this one — is the better choice.
+waiting on a reachable central server is not an option. This section names
+the points at which a *different* architecture — not a variant of this one
+— is the better choice.
+
+The first three bound the mechanisms borrowed from Bcfg2. They are the
+comfortable ones: there is prior art, a reader can check them, and this
+fleet is arguably already over two of them. The rest bound the trust and
+consent layer — the part with no prior art, the part the implementer map’s
+§0 calls the point, and the part with the most to lose. Each limit is stated
+with something the design could actually measure, because a limit nobody can
+observe themselves crossing is a disclaimer rather than a ceiling.
+
+**The mechanisms with prior art**
 
 - **Local-first reporting stops paying for itself once a fleet-wide query
   becomes routine rather than exceptional.** A JSONL record per device is
@@ -850,21 +972,92 @@ variant of this one — is the better choice.
   “did the rollout land everywhere” needs an answer with bounded staleness
   often enough to matter, the honest fix is a central statistics spine
   (the shape Bcfg2 already builds), not a federation layer retrofitted
-  onto a local-first design.
+  onto a local-first design. Measure the ratio of fleet-scope to host-scope
+  questions asked per month — and note that for a household fleet “are all
+  my phones up right now” is already the ordinary question, so this limit
+  may be behind us rather than ahead.
 - **Derived dependency edges stop being the cheaper mechanism once role
   interleaving is the common case rather than the exception.** Inference
   earns its keep where explicit edges would otherwise be rare, which is
   where roles are largely independent. A site where most roles genuinely
   depend on several others has an ordering problem that has become
   Puppet’s catalog-compilation problem, and a design built to resolve one
-  true graph deterministically is then the better fit.
+  true graph deterministically is then the better fit. Measure inferred
+  cross-role edges as a fraction of all edges — which cannot be measured
+  until the compiler’s inference stage exists (§18, step 3).
 - **The signed-release-as-artifact model stops being adequate once changes
   must land on a bounded clock across the whole fleet** — an
   active-incident patch under a compliance deadline, for instance.
   Ahead-of-time rendering optimizes for devices that are routinely
   unreachable at authoring time. A fleet whose devices are reliably
   reachable and whose changes carry real time pressure is better served by
-  render-on-request (Bcfg2’s model) or a push-capable policy server.
+  render-on-request (Bcfg2’s model) or a push-capable policy server. Measure
+  p95 release-to-converged latency by trust tier, with the count of devices
+  never reached — and note that patching the daily-driver Mac carries a
+  bounded clock every single time.
+
+**The trust and consent layer**
+
+- **The consent gate does not yet mean what §8 says it means, and that is a
+  standing limit rather than one this fleet grows into.** Every control in
+  the gate is authored, delivered, and evaluated by the party it exists to
+  constrain: the trust policy arrives in the release, the advisor key is
+  enrolled in site-private, the briefing is generated upstream, and the
+  nonce and the validator ship from the same place as the change. The one
+  artifact the consenting person genuinely contributes is a signature. That
+  defeats a network attacker and it produces an honest audit trail; it is
+  not sovereignty against the proposer. The smallest change that fixes the
+  class rather than the instances is a **device-local trust root the release
+  path cannot write** — advisor key, consent policy, peer allowlist, and the
+  device’s own resource policy established at first run into storage the
+  validator reads and no release can modify, with changes to any of them
+  requiring the current advisor key plus a local human act. Until that
+  exists, a site that needs the property §8 describes needs a different trust
+  architecture, not a better schema.
+- **Refusal is offered, not exercised, and nothing here has had to reconcile
+  a device that said no.** Every mechanism converges toward one authored
+  intent; the stated purpose is to let people diverge from it. There is no
+  reconciliation path, no protocol version, no skew budget, and no re-entry
+  of a personal branch into §4’s conflict check. The refuse-and-re-render
+  loop assumes refusal is the exception. Once per-device divergence is the
+  normal state, the fleet needs a design where shared invariants are
+  negotiated between sovereign devices rather than compiled from one source.
+  Measure refusals per release, and how many releases a refused device stays
+  behind.
+- **The signing model is sized for one operator and §1 promises more than
+  one.** The limit is the second operator who must author a release without
+  the first’s key: threshold signing, delegation, per-role scoping,
+  co-operator revocation. That is a different trust architecture, and it is
+  triggered by a condition §1 states as already true.
+- **A comparison of two documents bounds what is described, not what
+  happens on the way there.** The validator can refuse a declaration; it
+  cannot refuse an effect. A package install runs the vendor’s maintainer
+  scripts as root, and a `command:` is arbitrary code at launch. Where the
+  threat is hostile effects rather than hostile declarations, the answer is
+  OS-level confinement — a different enclosure, not a different plan format
+  — and this design does not have one.
+- **The threat model outgrows this design at the compromised authoring
+  agent.** Most of the configuration is written by AI agents (§9). A
+  prompt-injected authoring agent that produces a Site Model compiling to a
+  valid, signed goal file, briefed to the reviewer’s own model by a
+  generated semantic layer, is inside every control described here. Past
+  that point the answer is two-party authoring review, an independent party
+  reproducing the release from the Site Model, or n-of-m sign-off — none of
+  which is this design.
+- **Below some engineering budget, a much smaller system delivers most of
+  this.** Every limit above assumes the system exists; §18 says most of it
+  does not, and there is one builder. A signed tarball of rendered per-host
+  state plus a convergent applier is a large fraction of the value at a
+  fraction of the cost. A reader deciding whether to adopt needs that
+  boundary more than any of the others.
+- **The AI-authorship premise bounds the design from both sides.** If agents
+  become reliable over long contexts and tool-mediated lookup is cheap, the
+  local-knowledge scaffolding is unnecessary and an ordinary catalog
+  compiler wins. If agents are worse than assumed — fluent,
+  schema-conformant, and semantically wrong — then types are the wrong
+  defense, and what is needed is a review-and-test loop: property tests over
+  rendered output, differential runs against the previous release. §19 asks
+  this as a question; here it is the boundary.
 
 ---
 
@@ -886,8 +1079,9 @@ variant of this one — is the better choice.
 **Not built — this is most of it**
 
 The compiler, all three platform adapters, the signed release path, the
-ChangePlan executor, the consent surface, peer-action runtime, generic
-supervisor switch. No operational numbers of any kind.
+goal-file and diff schemas, the on-device validator, the consent surface,
+peer-action runtime, generic supervisor switch. No operational numbers of
+any kind.
 
 **Build order from here** (each step is meant to leave the system in a
 coherent, describable state):
@@ -900,7 +1094,7 @@ coherent, describable state):
 | 3 | `nix2cf` compiler | “What would device X receive?” first, then conflict check, extra-entry reporting, then inference. Inference waits until types exist on two platforms. |
 | 4 | Linux reference path | A stock distro, not NixOS. Distro choice is open until this step; Ubuntu Server is the working default. |
 | 5 | First real Linux host | A second node that can hold backup roles. Proves that roles are data. |
-| 6 | Signed releases, push-only | TUF-subset ceremony; ChangePlan generation; capability-enforcing executor. Operator hosts only. |
+| 6 | Signed releases, push-only | TUF-subset ceremony; goal-file render and diff; the on-device validator. Operator hosts only. |
 | 7 | Mac substrate (optional) | nix-darwin + home-manager if that path is chosen. Reversible. Services remain CFEngine from step 1. |
 | 8 | Pull | Any host with the role self-updates. The no-control-node end state, reached by editing `roles.yml`. |
 | 9 | Consent / sovereignty | Advisor slot + default prompt. Their AI, our accept/reject. |
@@ -939,14 +1133,72 @@ These are the places the current design is weakest.
    devices and treating the rest as unknown enough?**
 7. **Does edge origin information actually work?** Nobody has run it. If
    it does not, inference has a silent failure mode.
-8. **Does the ChangePlan’s capability list survive contact with real
-   operations?** A closed list the executor enforces is only as good as
-   its coverage. The pressure will be to add an escape hatch; the moment
-   one exists, the mechanism is decorative.
+8. **Does the goal-file schema keep up with real operations?** What cannot
+   be expressed in the goal file cannot be rendered *or* approved: the
+   compiler and the validator fail together, so coverage closes by
+   construction rather than by discipline. The pressure lands somewhere
+   else instead — on declaring a domain `not-yet-migrated` to get a change
+   out the door. That is question 3 above wearing a different hat, and it
+   is the same failure: reclassification, not accumulation.
 9. **Is the whole premise the wrong shape?** The design hardens the
    surface where a machine author lacks global context. If the real
    weakness is plausible-looking output that type systems do not catch,
    the schemas are defending the wrong wall.
+10. **Is a diff something a person can actually consent to?** “One service
+    installed, nothing else” is a sentence someone can hold in their head.
+    “Forty-one entries changed across your goal file” is not. Everything
+    that makes a large diff holdable — the on-demand provenance query,
+    display grouping, the briefing itself — is advisory machinery that
+    never widens what the validator accepts. That is what keeps it safe,
+    and also what makes it the first thing dropped under pressure. The test
+    is countable once real diffs exist: how many entries a typical release
+    touches, and how often a person reads past the first screen.
+11. **Do the total-diff events stay rare?** First adoption is bounded by
+    what it may claim, and a migration is valid only if it changes nothing.
+    A project with high schema churn still hands its reviewer a recurring
+    “everything moved, this one is fine” event, which is training for
+    exactly the rubber stamp the consent gate exists to prevent. Count
+    migration releases per year; if that number is not small, the ceremony
+    is being spent.
+12. **Does refusing actually cost the proposer anything?** A refusal buys a
+    re-render, not a stalemate — that is deliberate, since the alternative
+    is a partial apply of a state nobody checked. But nothing in the
+    mechanism stops the same bundle being offered again, and a proposer who
+    is patient wins once. The design’s answer is that persistent re-offers
+    of refused content are visible in the record. Whether visibility is
+    enough when the proposer and the person are the same operator is
+    untested.
+13. **What protects the stored baseline?** The device’s copy of the
+    currently-approved goal file is the root of the gate: everything is
+    diffed against it, every approval binds to it. Integrity-protected
+    storage is easy to write down and platform-specific to build, and
+    Android under Termux is the awkward case — the same place §6 already
+    has to solve ownership of the local record.
+14. **What holds the policy tree — which is code — inside the reviewed
+    state?** The generic bundle, and any hand-written `.cf` alongside it,
+    are what turn a goal file into promises. Nothing about the diff
+    constrains them unless the goal file carries the policy tree’s digest
+    as a privileged region. That is an obligation on a schema not yet
+    written, not a property the design has today.
+15. **Can the consent gate be made to mean what it says?** Comparing two
+    documents changes what the person is shown and what the device will
+    accept. It does not change who wrote the validator, who enrolled the
+    advisor key, who generates the briefing, or who decides what counts as
+    a privileged region — §17 states that limit and names the smallest fix.
+    Whether a device-local trust root the release path cannot write is
+    buildable across macOS, Linux, and Android by one person is open, and
+    the rest of the consent layer rests on the answer.
+16. **What confirms that a change took effect?** A device can compare
+    documents, and CFEngine can show what a run would change to files and
+    packages, but “the new unit is loaded and running” is not something the
+    device can confirm back to the person who approved it. That gap is
+    permanent at this layer, and every confirmation this design offers has
+    to be read with it in mind.
+
+The schemas most of the later questions turn on — goal file, diff, approval
+record — are not written yet. They are the artifact the implementer map
+holds at its §14.2 for independent adversarial review before anything is
+built on them.
 
 Token discovery (how an author finds the right name) is a mechanism
 (§15), not an open question. Whether authors actually use the lookup and

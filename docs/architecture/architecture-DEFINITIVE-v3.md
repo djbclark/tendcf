@@ -11,7 +11,7 @@
   guide disagree on the current design, **the guide wins**. Numbered
   v1/v2 files, panel drafts, and the v2 trust spec are archival — see
   `deprecated/README.md`.
-- **Date:** 2026-08-14
+- **Date:** 2026-08-15 (§9 rewritten for Model B; D43/D44 added)
 - **Tracker:** frdminc/tendcf#1.
 
 This document describes the **current design and what is planned next**.
@@ -75,9 +75,10 @@ cannot start its own privileged helper”).
                          Not the home of schemas or facts.
 
           ▼
-  Signed release         manifest + per-host typed ChangePlan
-                         (TUF-subset; executor refuses anything
-                         outside the plan)
+  Signed release         manifest + per-host canonical goal file
+                         (TUF-subset; the device diffs it against its
+                         approved baseline and the validator refuses
+                         anything outside the approved diff — §9)
 
           ▼
   CFEngine +             each device is its own policy hub.
@@ -108,7 +109,7 @@ error**. Only site-private may bind a winner or a short name.
   build zero-on-device-footprint artifacts only.
 - **R5** No bare-metal Nix. A mainstream stock distro is the reference.
   Ubuntu Server is the default answer, not the requirement.
-- **R7 / R10** Push and pull. Pull becomes user sovereignty: the person's
+- **R7 / R10** Push and pull. Pull becomes user sovereignty: the person’s
   own AI, suggested default prompt plus their extras, auto-review or a
   conversation. Generic layer publishable (GPL-3.0-or-later for code).
 - **R11** Preserve: worktrees for development; secretspec as sole secret
@@ -303,7 +304,7 @@ model.
 
 - Multi-input merge + conflict-as-error
 - `provides` / `requires` inference and origin
-- ChangePlan executor
+- Goal-file render, canonicalization, and the ChangePlan validator (§9)
 - Consent slot + default prompt (the advisor is theirs)
 - JSONL capture + agent SQLite
 - Generic bundle that picks a supervisor
@@ -400,17 +401,298 @@ it is converged to.
 
 ---
 
-## 9. Releases, ChangePlan, TUF (D41, D42)
+## 9. Releases, ChangePlan, TUF (D41, D42, D43, D44)
 
-Configuration reaches devices only as a versioned, signed release plus a
-per-host **ChangePlan**: closed `capability` vocabulary, exact
-`resources`, `target` bound to the host public key, rollback, expiry,
-nonce, attributed ordering edges. The executor refuses anything outside
-that set.
+Configuration reaches devices only as a versioned, signed release. The
+per-host payload of that release is the host’s **complete canonical goal
+file**: one fully resolved JSON document describing the whole managed
+state of that device. The **ChangePlan is the diff** between the goal
+file the device has already approved and the one the release proposes,
+and the on-device executor is a **validator** over that diff — it
+compares two canonical documents against an approved diff and performs
+no policy interpretation (**D43**).
+
+**Model A is superseded.** The former text of this section — a closed
+`capability` vocabulary, per-operation `resources`, and an executor that
+“refuses any effect outside that set” — is withdrawn, together with the
+vocabulary’s versioning and skew policy. CFEngine has no runtime
+capability confinement, so that executor could only exist as a pre-flight
+*interpreter* of the vocabulary plus a proof that the vocabulary
+describes what the rendered policy actually does; neither artifact exists
+nor is in budget. Authority: `e1-adjudication-xhigh-2026-08-15.md`, which
+is final and supersedes `e1-adjudication-2026-08-15.md`. Section
+references below of the form **E1 §5.x** are to that note.
+
+The compiler (§5) therefore gains a **render** stage: merge → conflict
+check → render of the complete per-host goal file. *Not settled by E1:*
+whether the goal file and the CFEngine Augments JSON (`def.json` /
+`host_specific.json`) are one document or a projection of one onto the
+other. Treat that as open until the schema family lands.
+
+### 9.1 Where the diff is computed (E1 §5.1)
+
+- The **full canonical goal file MUST be the signed wire artifact.** The
+  diff MUST NOT be shipped as the artifact: reconstructing
+  `new = old + patch` on the device would make patch application a second
+  interpreter, and would make the applied state derived rather than
+  directly signed.
+- The **authorizing diff MUST be computed device-side**, between the
+  device’s currently-approved goal file and the received one. This is
+  what makes the approved object equal the applied object at *any*
+  staleness: a device seven releases behind briefs and approves the one
+  true diff from its own signed baseline.
+- The **compiler-side diff is a preview** — author review, CI regression
+  artifact, cross-check. It MUST NOT be the object consent binds to.
+- When the device’s baseline equals the release’s expected baseline, the
+  device-computed diff MUST equal the compiler’s predicted diff.
+  Inequality is a **reportable integrity flag**, never a silent
+  condition.
+- Consequence, accepted: the advisor round trip happens **after** device
+  contact, and pre-generated briefings are previews rather than the
+  consent object.
+- **Baseline integrity is the root of the gate.** The stored approved
+  goal file MUST be integrity-protected and its verification MUST be a
+  validator precondition, ordered before the diff is computed. Corrupting
+  or swapping it either denies service or launders arbitrary state
+  through the baseline ceremony of §9.4.
+- The accept binds per DC-2, instantiated for the goal file:
+  `Sig_advisor( H(old_canonical) ‖ H(new_canonical) ‖ device_nonce [‖ H(briefing_bytes)] )`,
+  valid for exactly one target key. The validator MUST recompute every
+  hash. DC-2 applies in full: per-target validity, device nonce,
+  monotonic-counter single use, persisted rejects.
+- `cf-agent --simulate` remains an **optional human-facing confirmation**
+  of actual-state delta, never a mechanism of the gate. File the upstream
+  `--simulate-output=json` issue before Step 3 code.
+
+### 9.2 Canonicalization and the shape of the diff (E1 §5.2)
+
+Serialization noise is camouflage, so canonicalization is a consent
+property, not a testing nicety.
+
+- **Wire format is JSON.** YAML stays an authoring format for Site Model
+  sources and never appears on the wire (D23’s parse/re-serialize/diff
+  check was the symptom of why).
+- **Canonical form is RFC 8785 (JCS)** plus the structural rules JCS does
+  not give: every set-semantics collection is an array sorted by a
+  schema-declared key (entries by `(domain, kind, id)`); strings are NFC
+  normalized; no floats anywhere in the goal file; signatures detached;
+  and no nonces, timestamps, or other run-varying fields inside the
+  diffed object.
+- **The goal file is fully resolved and the schema defines no defaults.**
+  Every meaningful field is present with its explicit value; authoring
+  defaults are resolved by the compiler before render; empty collections
+  are invalid, so omission is the only representation of “none.” One
+  meaning therefore has exactly one byte representation, and a later
+  change to an authoring default can never reinterpret an already-signed
+  file.
+- **Refuse, never normalize.** Validator and lint MUST reject any goal
+  file that is not byte-identical to the canonicalization of itself.
+- **The diff is structural, not textual.** Hunks are at **entry**
+  granularity, addressed by the sort key, each carrying the full old
+  and/or new entry. Field-level diffs are derived for display. A text
+  diff of canonical bytes is a permitted rendering and never the
+  authoritative object.
+
+### 9.3 Accept is all-or-nothing (E1 §5.3)
+
+- A **partial accept MUST NOT be applied.** The accept verb is
+  all-or-nothing per proposal. No device applies a state the compiler did
+  not render and conflict-check.
+- The advisor MAY return a **refusal annotated with the hunks that drove
+  it**. The proposer then withdraws the corresponding source-level
+  changes, re-renders the complete goal file, re-runs the conflict check,
+  and offers a new diff.
+- **Dependency-grouped hunks are rejected** and MUST NOT carry apply
+  semantics. A correct dependency relation over hunks needs exactly the
+  global `provides`/`requires` knowledge the inference cut removed, and a
+  wrong grouping silently produces an unchecked applied state. Grouping
+  MAY exist later as a *display* aid in the preview layer only.
+- Bundling is defeated by cheap counter-proposal, not by partial apply:
+  refusal costs the proposer a re-render, not the person their patch. A
+  proposer who re-offers an annotated-refused bundle creates exactly the
+  record TC-19’s persistence rule exists to surface. The counter-proposal
+  loop is itself a fatigue channel to watch.
+
+### 9.4 The two total-diff events are baseline ceremonies (E1 §5.4)
+
+First adoption and schema migration present a total diff. They are a
+distinct consent class with their own rules, and what each may claim is
+bounded rather than pretended-reviewed.
+
+- **First adoption is governed by a minimal-claim rule.** The initial
+  goal file, accepted at D41’s first-run fingerprint ceremony, MAY manage
+  only the domains the operator explicitly enumerates at that ceremony.
+  Every other domain enters as `not-yet-migrated`. Each later domain
+  migration then arrives as an ordinary reviewable hunk set, and the
+  `not-yet-migrated` backlog counter (§4.1; guide §11) doubles as the
+  consent metric. The honest day-one goal file is small in **managed
+  surface**, which is already the correct day-one state.
+- **Schema migration MUST be semantics-preserving and mechanically
+  checked.** A migration release is valid iff `diff(migrate(old), new)`
+  is **empty** apart from the schema-version bump — a pure migration
+  presents as a one-line reviewable change. Mixing migration and semantic
+  change in one release is **forbidden**; split into two releases. The
+  migration function ships in the validator update, which itself arrives
+  as an ordinary diff under the old schema (§9.6).
+- The approval record MUST carry a **ceremony class** — ordinary,
+  privileged, or baseline — adequate to what is being approved.
+
+### 9.5 Hunk attribution is a query, not a field (E1 §5.5)
+
+Attribution (“which source layer produced this hunk”) **MUST NOT appear
+in the authoritative format** — not day one, not later. Three independent
+reasons, any one sufficient:
+
+1. It is **impossible** where the authoritative diff is computed: under
+   §9.1 the device computes it and the device has no source layers. In
+   the compiler’s preview it is proposer-asserted provenance the device
+   cannot verify — TC-07’s forgeable citation at the hunk level.
+2. Provenance plumbed through merge and render is the origin-tracking
+   machinery CUT-3 cut, returning at the value level.
+3. Attribution stored in the canonical artifact makes semantically
+   identical states byte-different when sources are refactored, breaking
+   §9.2’s one-meaning-one-representation property.
+
+What replaces it: render purity makes attribution **reconstructible on
+demand**. A compiler-side `explain-hunk` tool re-renders with a candidate
+source change reverted, diffs the renders, and subtracts; CI can
+attribute a whole preview diff mechanically and checkably, against actual
+renders rather than an assertion. Its output travels in the
+preview/briefing channel as DC-3-labelled untrusted context. The tool is
+due before the consent surface (Step 9). Fan-out fatigue is real and is
+mitigated here plus by §9.3’s counter-proposal loop — not by a signed
+field.
+
+### 9.6 Schema version and unknown entry kinds: fail closed (E1 §5.6)
+
+- The goal file carries a `schema_version`. Its contract is **stricter
+  than** `common.schema.json`’s `contract_version` rule: *any* change to
+  the entry-kind set, additive included, MUST bump the version, so that
+  an old validator can tell from the version alone whether it can fully
+  interpret the file.
+- A validator that sees a version above its ceiling, or an entry kind it
+  does not recognize, **MUST refuse the entire goal file** with a
+  distinct reported reason; the device keeps converging on its last
+  approved state. Refusal is a visible, reportable stall, not a brick.
+- **Ignore-unknown is rejected outright.** An ignored unknown entry is an
+  unreviewed change riding a reviewed diff — fail-open in exactly the
+  sense the validator exists to prevent.
+- Strandedness is prevented at the compiler, not the device: goal files
+  are per-host, so the compiler MUST render each host’s file at the
+  highest schema version that host’s **last-reported** validator supports.
+  A long-dark device is rendered at its old version until it reports back.
+  *Correction to E1 §5.6, which says the report rows already carry this:*
+  they do not. `report-row.schema.json` carries `release` and
+  `converged_release` but has no validator/agent version column, so the
+  reported field is a **schema addition D44 requires**, not an existing
+  property to read.
+- A schema bump ships in **two phases**: first the validator/agent update
+  as an ordinary diff under version N−1 — a privileged-region hunk, TC-25
+  class — then the migration release under §9.4’s empty-diff rule.
+  Release lint MUST enforce the phase order.
+
+Cost, accepted: the compiler carries multi-version render ability for a
+window and tracks per-host versions. The price is paid in one place
+rather than as device-side leniency on every device.
+
+### 9.7 Coverage travels in the goal file (E1 §5.7)
+
+The goal-file schema **MUST include the per-domain coverage
+declarations** (`comprehensive` / `opt_out_reason`, verbatim from
+`common.schema.json#/$defs/domain_coverage`; §4.1). The diff’s meaning
+depends on them: silence in a comprehensive domain means “no change,”
+silence in a `not-yet-migrated` domain means “not described,” and
+validator and briefing MUST NOT let the two read alike. A coverage
+transition is itself a hunk, and reclassification to
+`deliberately-unmanaged` (DC-37) is a distinct review class.
+
+Goal-file completeness is a **contract, not a given**: a diff over a
+non-comprehensive domain proves nothing about what else changed on the
+device.
+
+### 9.8 Privileged regions, removals, fetched content
+
+- **Privilege is validator-held, never proposer-set.** The diff format
+  carries no privilege flags — those would be forgeable. The validator
+  derives privilege from its own local list, whose floor is: trust
+  policy, advisor keys, peer allowlist, policy-tree digest,
+  agent/validator binary and version, device resource policy, and
+  `schema_version` itself. The approval record MUST carry a ceremony
+  class adequate to the derived privilege (§9.4).
+- **Removals compile to actuation.** Absence of a promise is absence of
+  enforcement, not reversal. Every remove-hunk MUST compile to explicit
+  negative promises (file delete, package absent,
+  `service_policy => "stop"`), a removal MUST NOT be smuggled as a
+  modify, and the briefing MUST render removals *as their actuation*, not
+  as absence.
+- **Fetched content binds bytes, not names.** Digest fields on fetched
+  artifacts (DC-11) are a schema obligation, covered by the accept and
+  re-verified immediately before apply. The policy tree / generic bundle
+  is code outside the goal file until the schema binds its digest as a
+  privileged region; that is an obligation this design takes on, not a
+  property it already has.
+
+### 9.9 The schema family, and the gate on it
+
+Three schemas, following the existing contract conventions (`$id`, draft
+2020-12, schema/example pairing, negative fixtures, cross-file lint):
+`schema/goal-file.schema.json`, `schema/goal-diff.schema.json`,
+`schema/approval-record.schema.json`, with `.json` fixtures **in
+canonical bytes** (the fixture is itself a canonicalization test). The
+goal-diff schema carries no attribution fields, no group fields, and no
+privilege flags — all three are derived. Lint gains `.json` example
+pairing and a canonicalization-idempotence check.
+
+**§14.2’s gate applies to this family with full force.** That clause
+originally named the artifact by its Model A description and has been
+restated; its function is unchanged and is what carries over — *the
+artifact the executor enforces and the person consents over gets
+independent adversarial review before build*. Write the schemas and
+fixtures first, then run that review **on the contract, before the
+validator is coded**, with a reviewer outside the lineage that wrote the
+schemas.
+
+### 9.10 What this does not fix
+
+Model B improves what the person is shown; it does not change who authors
+the machinery. These MUST NOT be presented as closed — the residue
+register R1–R18 of `e1-adjudication-xhigh-2026-08-15.md` §7 is the
+authority:
+
+- Every control is still operator-authored, -delivered, and -evaluated.
+  DC-1’s device-local trust root is untouched by this decision and is
+  still required.
+- **Effects versus declarations** (TC-23) is unsolved at this layer in
+  either model; enclosure needs OS confinement and is out of scope.
+- **The activation gap:** `--simulate` covers files and packages only.
+  The “loaded and running” half of a service change is
+  device-unconfirmable. This is a permanent honesty clause on
+  device-computed confirmations.
+- **Rollback** to a prior signed state fixes the *specification* problem,
+  not the *reversibility* problem: a prior state is always well-defined
+  as a target and not always achievable as a transition (package
+  downgrades, data migrations).
+- Per-host diffs hide fleet-level intent, and cross-entry transitions
+  (a port moving between services) ride retry-until-stable and can
+  transit conflicting intermediate states.
+
+### 9.11 Signing and delivery (D41, D42)
 
 Signing: [TUF](https://theupdateframework.io/) subset sized for one
 operator (offline root 2-of-3, targets, snapshot, emergency). High-water
-mark on every applying client.
+mark on every applying client. This layer authenticates the release; the
+goal file, its diff, and the approval record are what authorize a change
+to the device.
+
+The 2-of-3 is a **floor**, and it is a parameter, not a runbook. Two
+questions under it are open and belong to §14.4: whether a 2-of-3
+ceremony held by one operator means anything if all three keys live on
+the machine that also compiles and signs, and what the recovery path is
+when a genuinely offline root is lost and every `consented` device
+becomes unupdatable. DC-20 also asks for every root version to be
+retained and served, a written out-of-band runbook, and a
+machine-assisted fingerprint compare rather than an eyeball-hex one.
+None of those is built.
 
 **First-run root (D41).** The [TUF spec](https://theupdateframework.github.io/specification/latest/)
 assumes a good trusted `root.json` shipped with the updater, out of
@@ -427,9 +709,12 @@ run. They do not need a local yes. Installing new targets still does, on
 `consented` devices. An optional enrolled policy “I pre-grant emergency
 security patches from role E” may exist; **default off**.
 
-Verifiable layer authorizes. Semantic layer (template-filled from IR
-fields; free prose must cite those fields) briefs the advisor; never
-authorizes.
+Verifiable layer authorizes. Semantic layer (template-filled from the
+goal file and diff fields; free prose must cite those fields, and travels
+as DC-3-labelled untrusted text) briefs the advisor; never authorizes.
+Under §9.1 the briefing is generated over the **device-computed** diff,
+so a briefing produced at release time is a preview, not the object the
+accept binds to.
 
 Push: any host holding `deploy-origin`, to **operator** (and
 operator-chosen `managed`) hosts. Push to a `consented` device still
@@ -478,14 +763,16 @@ offer a change and accept a signed yes/no. Same shape as a
 - tendcf ships a **suggested default prompt** as a replaceable public
   file. They may append or replace it.
 - Modes: auto-review, or a conversation with them first.
-- Return path: `accept | reject`, signed by the enrolled key, bound to
-  that plan’s nonce. Timeout is deny. Advisor down → fail closed for
-  *installs* (revocation still applies, §9).
+- Return path: `accept | reject | withdraw` (DC-5), signed by the
+  enrolled key, bound to the baseline and proposed goal-file hashes and
+  the device nonce (§9.1). A reject MAY carry the hunks that drove it;
+  accept is all-or-nothing (§9.3). Timeout is deny. Advisor down → fail
+  closed for *installs* (revocation still applies, §9).
 - Custom tools (OpenPGP WoT, a transparency log, a chain, gossip of
   signed apply-attestations) are theirs. Deadlock among “everyone
   waiting for everyone else” is a separate project that consumes
-  attestations. tendcf owes: the ChangePlan IR, optional exportable
-  apply-attestations, the `accept | reject` slot.
+  attestations. tendcf owes: the goal file and its diff (§9), optional
+  exportable apply-attestations, the `accept | reject` slot.
 
 Proposing side and consenting side are different programs. The advisor
 never authorizes; the executor does, against the signed grant.
@@ -516,7 +803,11 @@ iPhone/wearables that consume artifacts; firmware as Nix-built
 artifacts; image-based appliances (RAUC / OSTree family).
 
 Nix store: never a multi-host `NIX_STORE_DIR` (D20). Cache role is
-`operator` only; NAR digests in the manifest (RT-05).
+`operator` only; NAR digests in the manifest (RT-05) — a floor for the
+builder/cache when it lands at Step 10+, not a control that exists today.
+The live, general form of that requirement is DC-11/§9.8: **every**
+fetched artifact binds a digest, covered by the accept and re-verified
+before apply.
 
 ---
 
@@ -532,7 +823,7 @@ Each step leaves a coherent system. Not a schedule.
 | 3 | nix2cf: `buildfile` first, conflict, extra-entry, then inference (needs steps 1–2). |
 | 4 | Linux reference path on a stock distro. |
 | 5 | First real Linux host; prove roles are data. |
-| 6 | Signed releases, push-only, ChangePlan executor. Operator hosts. |
+| 6 | Signed releases, push-only; goal-file render + diff + on-device validator (§9). Operator hosts. |
 | 7 | Optional Mac substrate (nix-darwin) if §14.1 says yes. |
 | 8 | Pull / self-update. |
 | 9 | Consent surface + default prompt + advisor slot. |
@@ -541,6 +832,11 @@ Each step leaves a coherent system. Not a schedule.
 Dry-run is the standing posture on the first platform (the machine that
 cannot easily be reimaged). Reporting is an adoption requirement.
 
+The §9.9 schema family and the §14.2 review of it **MUST** land before the
+Step 6 validator is coded. Nothing else gates them — no fleet, no
+compiler — so they may be written as soon as someone is free to write
+them.
+
 ---
 
 ## 14. Premium-token residue
@@ -548,8 +844,11 @@ cannot easily be reimaged). Reporting is an adoption requirement.
 Cheap models execute this document everywhere except:
 
 - **§14.1** nix-darwin on the Mac, yes or no (gates Step 7 only).
-- **§14.2** ChangePlan IR + executor capability vocabulary. Do not
-  improvise. Independent adversarial review before build.
+- **§14.2** The artifact the executor enforces and the person consents
+  over. Under D43 that is the §9.9 schema family — goal file, goal diff,
+  approval record — not the withdrawn capability vocabulary this clause
+  originally named. Do not improvise. Independent adversarial review on
+  the contract, before the validator is coded.
 - **§14.3** Advisor/personal-branch loop + AI-in-the-loop red-team
   (prompt injection, poisoned model, semantic layer as injection).
 - **§14.4** TUF-subset ceremony + recovery runbook, including the
@@ -588,8 +887,8 @@ Older “superseded by” archaeology lives in
 | D26 | Root AGENTS.md | Not on a performance rationale. Discoverability-only if ever added, hand-written. |
 | D27 | This file | ~~Edit protection via `Approved-change:` trailer.~~ **Reversed 2026-08-15:** every document here is mutable; no approval ceremony. Rationale: pre-mortem N9 / synthesis DC-44 — a trailer gate whose approver is the author makes changing your mind expensive, which is wrong for a design carrying open questions. |
 | D28 | Guardrail weight | Existence checks for the large IaC error class; extra entries for omission; schema for the tiny syntax class. |
-| D29 | Semantic layer | Template-fill from IR; free prose cites IR fields. |
-| D30 | `.cf` escape hatch | Prefer a grammar before lint-only, when that surface is exercised. |
+| D29 | Semantic layer | Template-fill from the goal file and diff fields; free prose cites those fields and travels as DC-3-labelled untrusted text. Briefs; never authorizes. |
+| D30 | `.cf` escape hatch | Prefer a grammar before lint-only, when that surface is exercised. Re-scoped by D43: goal-file coverage is closed by construction, so the *escape-hatch pressure* the capability vocabulary created is gone; what remains is the policy tree as code outside the goal file until the schema binds its digest as a privileged region (§9.8). |
 | D31 | Front or back | Critical fields at start or end of agent-facing artifacts. |
 | D32 | Compiler prior art | Mechanism common; Site Model → CFEngine is the pairing, not a novel compiler mechanism. |
 | D33 | No control node | Promise Theory’s; GitOps is the closest shape. |
@@ -601,6 +900,8 @@ Older “superseded by” archaeology lives in
 | D39 | Advisor | Their AI, their key, our slot. Default prompt replaceable. |
 | D41 | TUF bootstrap | Ceremony + fingerprint; not TOFU on consented devices. |
 | D42 | Emergency | Restrictive metadata without consent; new installs still gated. |
+| D43 | ChangePlan model | ~~Model A: a closed `capability` vocabulary per operation, executor refuses effects outside the declared set.~~ **Superseded 2026-08-15 by Model B** (synthesis finding E1, adjudicated in `e1-adjudication-xhigh-2026-08-15.md`, which is final and supersedes `e1-adjudication-2026-08-15.md`): the wire artifact is the complete canonical per-host **goal file**; the ChangePlan is the **diff** against the device’s approved baseline; the executor is a **validator** over that diff, not an interpreter. Rationale: CFEngine has no runtime capability confinement, so Model A’s executor requires an interpreter plus a vocabulary-to-policy correspondence proof that does not exist and is not in budget; and coverage closes by construction when compiler and validator share one schema. The vocabulary, its versioning, and its skew policy are dropped. See §9. |
+| D44 | Goal-file schema family | The consent artifact is three paired schemas (goal file, goal diff, approval record) with canonical-byte fixtures. Binding sub-decisions, all from E1 §5 and normative in §9: diff computed **device-side**, full file on the wire, compiler diff is preview (§9.1 / E1 §5.1); RFC 8785 canonical JSON, no defaults, no empty collections, refuse-never-normalize, entry-granular structural hunks (§9.2 / E1 §5.2); accept is all-or-nothing, refusal annotated, no dependency groups (§9.3 / E1 §5.3); first adoption and schema migration are bounded **baseline ceremonies**, migration must diff to empty (§9.4 / E1 §5.4); hunk attribution is **excluded from the format** — impossible device-side — and replaced by an `explain-hunk` query (§9.5 / E1 §5.5); `schema_version` fails closed on unknown kinds, strandedness prevented at the compiler, two-phase bumps (§9.6 / E1 §5.6); per-domain coverage travels **in** the goal file (§9.7 / E1 §5.7). §14.2’s pre-build review applies to this family. |
 
 Silence = proceed from Step 0. Objections amend this register.
 
@@ -608,10 +909,17 @@ Silence = proceed from Step 0. Objections amend this register.
 
 ## 16. Open questions (remaining)
 
-Same nine as the guide.
+Compressed from guide §19, in its order and numbering; the guide’s text
+governs. It ran to nine while §9 was Model A; D43 dissolved question 8
+**as posed** and added seven more, drawn from the residue register of
+`e1-adjudication-xhigh-2026-08-15.md` §7. None of those seven is closed
+by D43 — they are what Model B carries, and stating them as resolved
+would misrepresent the adjudication.
 
 1. Is inference justified, or is retry-until-stable already the local
-   answer?
+   answer? (E1 endorses the inference *cut* as severable — the fields
+   stay, D43 does not depend on the cut, and DC-41’s experiment can
+   revive the engine. The question itself is still open.)
 2. Is the writing rule an argument or a hypothesis?
 3. Do `not-yet-migrated` counts get ground down without a dedicated role?
 4. Is per-domain the right granularity for comprehensiveness?
@@ -621,10 +929,39 @@ Same nine as the guide.
    treating the rest as unknown enough?
 7. Does edge origin information actually turn “why is this waiting?”
    into a query?
-8. Does the ChangePlan capability list survive real operations without
-   an escape hatch?
+8. ~~Does the ChangePlan capability list survive real operations without
+   an escape hatch?~~ **Re-posed 2026-08-15 by D43:** does the *goal-file
+   schema* keep up with real operations? There is no capability list, and
+   coverage closes by construction — compiler and validator share one
+   schema and fail together — so the escape-hatch pressure relocates to
+   declaring a domain `not-yet-migrated` to get a change out. That is
+   question 3 wearing a different hat.
 9. If the real AI failure mode is plausible-looking output that types
    do not catch, are we hardening the wrong surface?
+10. Is a diff something a person can actually consent to? Everything that
+    makes a large diff holdable (`explain-hunk`, display grouping, the
+    briefing) is advisory machinery that never widens what the validator
+    accepts — which is what keeps it safe and what makes it the first
+    thing dropped under pressure. Countable once real diffs exist.
+11. Do the total-diff events stay rare? Count migration releases per year;
+    a project with high schema churn hands its reviewer a recurring
+    “everything moved, this one is fine” event (§9.4).
+12. Does refusing actually cost the proposer anything? Nothing stops the
+    same bundle being re-offered; the answer is that persistent re-offers
+    are visible in the record (§9.3, TC-19).
+13. What protects the stored baseline (§9.1)? Integrity-protected storage
+    is platform-specific to build, and Android under Termux is the awkward
+    case — the same ownership problem §8 already has.
+14. The policy tree is still code arriving outside the reviewed state,
+    until the goal file carries its digest as a privileged region (§9.8,
+    D30). An obligation on an unwritten schema, not a property.
+15. Nothing here changes who authors the machinery (§9.10). Whether a
+    device-local trust root the release path cannot write is buildable
+    across macOS, Linux, and Android by one person is open, and the rest
+    of the consent layer rests on the answer.
+16. What confirms that a change took effect? `--simulate` covers files and
+    packages; “loaded and running” is device-unconfirmable, permanently at
+    this layer (§9.10).
 
 Token discovery is **D40**, not open. Trust-tier-as-label (confusion
 with full mesh) is **D38**.
@@ -639,6 +976,13 @@ with full mesh) is **D38**.
   Must agree with the guide.
 - `README.md` — pointer.
 - `deprecated/` — v1/v2 and panel drafts. Do not update them.
+- `e1-adjudication-xhigh-2026-08-15.md` — the binding adjudication of
+  E1 (Model B) and of the schema-family decisions recorded as D43/D44.
+  Final; supersedes `e1-adjudication-2026-08-15.md`, which is kept for
+  delta context only. Its §7 residue register is the authority on what
+  Model B does **not** fix.
+- `cfengine-feasibility-of-diff-plan-2026-08-15.md` — the feasibility
+  evidence D43 rests on; its addendum controls over its body.
 - Dated `*-2026-08-13.md` research notes in this directory — evidence
   trail; the guide wins on conflict.
 - `docs/paper/tendcf-architecture-paper.md` — technical paper; the guide
