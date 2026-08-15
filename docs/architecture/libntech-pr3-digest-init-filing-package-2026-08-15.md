@@ -231,25 +231,42 @@ not exist, only the `.dylib`.
 
 ## Part 4 — what is blocked, and on what
 
-**The Jira ticket needs an Atlassian API token.** The CFE project is publicly
+**Jira authentication is now RESOLVED.** The CFE project is publicly
 *readable* without auth (`GET /rest/api/2/project/CFE` → 200, individual
 issues → 200), but creation is not: anonymous `GET
 /rest/api/3/issue/createmeta?projectKeys=CFE` returns an empty `projects`
 array, which is Jira's way of saying the caller may not create issues here.
-No Atlassian credentials are stored on this machine (nothing in `~/.netrc`,
-nothing in the login keychain for `northerntech.atlassian.net`).
 
-The account is a Google-SSO login. That still supports API tokens — mint one
-at <https://id.atlassian.com/manage-profile/security/api-tokens> and
-authenticate as `email:token` via basic auth. Either route works:
+The account is a Google-SSO login, which has no password — so an API token,
+minted at <https://id.atlassian.com/manage-profile/security/api-tokens>, is
+the only way in. Basic auth is `email:token`:
 
-- **Browser** — paste Part 1 into the CFE project's create-issue form.
-- **API** — provide the token out of band (not pasted into a transcript) and
-  the ticket can be created programmatically.
+- **Token** — `ATLASSIAN_CFENGINE_API_TOKEN`, declared and set through the
+  privilege-separated broker. Read it with
+  `sudo-secretspec get ATLASSIAN_CFENGINE_API_TOKEN --reason "<why>"`, never
+  by touching the store, the manifest, or `secretspec` directly. **`get` and
+  `export` stream values straight to stdout** — parse, never echo.
+- **Email** — `djbclark@gmail.com`. Recorded here rather than declared as a
+  credential: it is not secret, and a second declaration would be a second
+  piece of manifest drift to reconcile for no protective benefit.
 
 Filing is gated by the `~/.claude/hooks/upstream_review_gate.sh` PreToolUse
 hook, which denies tracker writes and `gh` writes against non-`djbclark`/
 `frdminc` repos. That gate is working as intended; approval is per-artifact.
+
+**Outstanding: manifest drift.** Declaring the token via
+`sudo-secretspec add` put the runtime manifest ahead of the tracked
+declarations file, so `sudo-secretspec template-check` now exits 1. This does
+NOT affect PR 3, the fork, the upstream PR, or the Jira ticket — it is purely
+local bookkeeping between two files. Its one real consequence is that
+`~/ops/stayturgid/control/bin/publish_secrets.sh` runs
+`sudo -n "$WRAPPER" source-template-check`, which is a `cmp -s` of the same
+two files, so **publishing fleet secrets from stayturgid will fail until the
+drift is reconciled.** Resolve either by mirroring the declaration into the
+tracked file (task worktree → PR → coordinated release; it cannot be edited
+in `~/ops`) or, once filing is done, by
+`sudo-secretspec delete ATLASSIAN_CFENGINE_API_TOKEN` followed by
+`undeclare`, in that order.
 
 **Then, in order:** amend `CFE-XXXX` → the real number, force-push to the
 fork, open the PR against `NorthernTechHQ/libntech` with the `CFE-NNNN:`
