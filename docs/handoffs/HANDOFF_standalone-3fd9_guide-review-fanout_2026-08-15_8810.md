@@ -264,6 +264,27 @@ red-team calls this the design's best security work. Three show real movement
 with a claim-vs-mechanism gap. Four substantially unchanged. RT-02's freeze half
 is flagged as **falsely claimed resolved**.
 
+**CFEngine feasibility of E1** (added after the reviews, from CFEngine primary
+docs — full note at `docs/architecture/cfengine-feasibility-of-diff-plan-2026-08-15.md`):
+
+- `cf-agent --simulate=<diff|manifest|manifest-full>` exists and is stronger than
+  `--dry-run` — it makes changes in a chroot and distinguishes safe from unsafe
+  functions. **Only files and packages promises are simulated**; not services,
+  not commands. Since services render as files, the content half of a service
+  change simulates and the activation half does not.
+- CFEngine has **no runtime capability confinement.** The guide §7 executor gate
+  ("refuses any effect outside that set") has no CFEngine implementation — in
+  either design. Under E1 it becomes a JSON-diff validator rather than a
+  vocabulary interpreter, which is why E1 is *cheaper* under the reuse-existing-
+  systems constraint, not more expensive.
+- Convergence means removals need generated negative promises (file `delete`,
+  package absent, `service_policy => "stop"`) — compiler work, not new machinery.
+- macOS/Termux service adapters will need `commands` promises calling `launchctl`
+  and `sv`. Unavoidable, but bounded to one bundle per supervisor. Guide §5
+  currently implies more purity than the platform allows.
+- TC-23 (refuse declarations, not effects) survives E1 and is unsolvable at this
+  layer — a package install runs the vendor's postinst script.
+
 **Quota consumed** (both accounts, 2026-08-15):
 - Account 1 `djbclark@mit.edu`: 5h window 36% → 82% (four reviewers + two
   in-session audits). Weekly 4% → 9%. Resets 13:49.
@@ -285,9 +306,13 @@ is flagged as **falsely claimed resolved**.
 
 ## Where We're Going
 
-1. **START HERE — write the ChangePlan schema, the capability enum, and the
-   trust-policy shape, with paired examples and negative fixtures, and exhibit
-   one plan end to end in guide §16. Add all three to Step 0.** Days of work.
+1. **START HERE — write the ChangePlan schema for BOTH candidate models (current
+   capability-vocabulary and E1 diff-derived), with paired examples and negative
+   fixtures, and exhibit one plan end to end in guide §16. Add to Step 0.** Days
+   of work. **Re-scoped 2026-08-15** — see
+   `docs/architecture/cfengine-feasibility-of-diff-plan-2026-08-15.md`: under E1
+   there is no capability enum to write, so writing both drafts is how you find
+   out which model is actually specifiable. Cheaper than an architecture debate.
    This is the synthesis's #1 of 8 and the highest-priority item in the corpus:
    ~30 of the red-team's 51 findings are *about* this artifact and cannot be
    adjudicated while it remains a phrase in a sentence (TC-02, TC-10, TC-11,
@@ -314,7 +339,13 @@ is flagged as **falsely claimed resolved**.
 6. **Decide E1** — adopt the diff-derived ChangePlan model or not. This is a
    real architecture call and should be made in a **fresh session at `xhigh`**
    reading the synthesis cold. Item 1 will change what this decision looks like,
-   so do item 1 first.
+   so do item 1 first. **The CFEngine feasibility question is already answered**
+   (`docs/architecture/cfengine-feasibility-of-diff-plan-2026-08-15.md`): E1 is
+   buildable on CFEngine primitives and is more CFEngine-native than the current
+   design. Two things in that note still need checking before committing —
+   whether `cf-agent --simulate=diff` output is machine-readable enough to feed
+   a briefing generator, and whether `--simulate` is Community or Enterprise
+   only.
 
 ## Open Questions
 
