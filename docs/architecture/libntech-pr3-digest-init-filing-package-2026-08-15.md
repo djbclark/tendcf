@@ -13,6 +13,7 @@ included in the upstream PR. Everything below is ready to paste.
 | Base | libntech master `0c0620d` — 1 ahead, **0 behind**, no rebase needed |
 | Build | clean; `hash_test` 6/6 pass |
 | Jira ticket | **BLOCKED** — needs an Atlassian API token (see "What is blocked") |
+| Fork PR | **djbclark/libntech#1** — review URL and diff |
 | Upstream PR | not opened; waits on the ticket number for the title |
 
 Operator decisions taken 2026-08-15: file a real CFE Jira ticket (not
@@ -69,59 +70,93 @@ Digest initialization failure is silently ignored in three hash functions, produ
 **Description:**
 
 ```
-libntech's libutils/hash.c calls EVP_DigestInit() or EVP_DigestInit_ex()
-in six places. Three of them do not handle failure, each in a different
-way, and none of the three logs anything:
+libntech's libutils/hash.c calls EVP_DigestInit() or EVP_DigestInit_ex() in six
+places. Three of them do not handle failure, each in a different way, and none of
+the three logs anything:
 
-  * HashFile() (via the static HashFile_Stream()) and HashPubKey() zero
-    their output digest up front and fill it in only on success. On
-    failure the caller receives an all-zero digest that is
-    indistinguishable from a real one. Both functions return void, so
-    the digest buffer is the only channel and it carries no success
-    indication.
+  * HashFile() (via the static HashFile_Stream()) and HashPubKey() zero their
+    output digest up front and fill it in only on success. On failure the caller
+    receives an all-zero digest that is indistinguishable from a real one. Both
+    functions return void, so the digest buffer is the only channel and it
+    carries no success indication.
 
-  * HashNew() ignores the return value entirely and then calls
-    EVP_DigestUpdate() and EVP_DigestFinal_ex() on an uninitialized
-    context. It returns a non-NULL Hash whose digest is meaningless.
+  * HashNew() ignores the return value entirely and then calls EVP_DigestUpdate()
+    and EVP_DigestFinal_ex() on an uninitialized context. It returns a non-NULL
+    Hash whose digest is meaningless.
 
-This is an oversight rather than a decision. All three functions arrived
-in libntech in the same commit, f277970 (2019-10-03, "Added hash
-functions from libpromises"). At that commit HashString() already had
-the else-branch that logs LOG_LEVEL_ERR in exactly this case, while
-HashFile_Stream() and HashPubKey() went straight to freeing the context
-with no else at all. The asymmetry has been there for six years and is
-still present on master (0c0620d).
+The affected code, on master (0c0620d):
 
-Impact. The most serious of the three is HashPubKey(), which computes
-the digest of a host's public key. In cfengine/core it feeds
-libpromises/lastseen.c, libpromises/crypto.c, libenv/sysinfo.c,
-cf-execd/cf-execd-runner.c, and is included by libcfnet/tls_generic.c
-and libcfnet/client_protocol.c. A public key digest that silently
-becomes a constant is a host identity that collides across every host
-that hits the failure. HashFile() has 12 call sites in core.
+  HashNew          https://github.com/NorthernTechHQ/libntech/blob/0c0620d6c5f8f8d1cae212f084b021cff0b86ce6/libutils/hash.c#L151
+  HashFile_Stream  https://github.com/NorthernTechHQ/libntech/blob/0c0620d6c5f8f8d1cae212f084b021cff0b86ce6/libutils/hash.c#L420
+  HashPubKey       https://github.com/NorthernTechHQ/libntech/blob/0c0620d6c5f8f8d1cae212f084b021cff0b86ce6/libutils/hash.c#L562
 
-Reachability. This is not theoretical. On OpenSSL 3,
-CryptoDeInitialize() unloads the default provider, after which every
-subsequent EVP_DigestInit() fails. Anything that hashes after that point
-is silently affected. That is how this was found.
+This is an oversight rather than a decision. All three functions arrived in
+libntech in the same commit, f277970 (2019-10-03, "Added hash functions from
+libpromises"). At that commit HashString() already had the else-branch that logs
+LOG_LEVEL_ERR in exactly this case, while HashFile_Stream() and HashPubKey() went
+straight to freeing the context with no else at all. The asymmetry has been there
+for six years and is still present on master.
 
-Reproduction. Call any of the three functions, then call
-CryptoDeInitialize(), then call it again. Observed on the second call,
-against unmodified master:
+The three siblings in the same file that already handle it correctly:
+
+  HashString            https://github.com/NorthernTechHQ/libntech/blob/0c0620d6c5f8f8d1cae212f084b021cff0b86ce6/libutils/hash.c#L511
+  HashNewFromDescriptor https://github.com/NorthernTechHQ/libntech/blob/0c0620d6c5f8f8d1cae212f084b021cff0b86ce6/libutils/hash.c#L186
+  HashNewFromKey        https://github.com/NorthernTechHQ/libntech/blob/0c0620d6c5f8f8d1cae212f084b021cff0b86ce6/libutils/hash.c#L251
+
+Impact. The most serious of the three is HashPubKey(), which computes the digest
+of a host's public key. In cfengine/core it feeds libpromises/lastseen.c,
+libpromises/crypto.c, libenv/sysinfo.c, cf-execd/cf-execd-runner.c, and is
+included by libcfnet/tls_generic.c and libcfnet/client_protocol.c. A public key
+digest that silently becomes a constant is a host identity that collides across
+every host that hits the failure. HashFile() has 12 call sites in core.
+
+Reachability. This is not theoretical. On OpenSSL 3, CryptoDeInitialize() unloads
+the default provider, after which every subsequent EVP_DigestInit() fails.
+Anything that hashes after that point is silently affected. That is how this was
+found.
+
+Reproduction. Call any of the three functions, then call CryptoDeInitialize(),
+then call it again. Observed on the second call, against unmodified master:
 
   HashFile     -> all-zero digest, nothing logged
   HashPubKey   -> all-zero digest, nothing logged
   HashNew      -> non-NULL Hash, meaningless digest, nothing logged
 
-Suggested fix. Each of the three has a sibling in the same file that
-already does the right thing: HashString() logs in exactly this case,
-and HashNewFromDescriptor() logs, destroys the context and returns NULL.
-Modelling each fix on its own in-file sibling keeps the change an
-oversight repair rather than a new opinion. A pull request doing this is
-linked below.
+Proposed fix. Each of the three is modelled on its own in-file sibling above:
+HashFile_Stream() and HashPubKey() gain the else-branch that HashString() already
+has, and HashNew() logs and returns NULL as HashNewFromDescriptor() already does.
+HashNew() already returns NULL on four other paths and has no callers in
+cfengine/core, so failing closed there breaks nothing. Modelling each fix on its
+own sibling keeps the change an oversight repair rather than a new opinion.
+21 insertions, 3 deletions, one file. Builds clean; libntech's hash_test passes
+(6 tests).
+
+  Pull request (review thread and diff):
+  https://github.com/djbclark/libntech/pull/1
+
+  Diff against upstream master:
+  https://github.com/NorthernTechHQ/libntech/compare/master...djbclark:libntech:silent-digest-failure
+
+  Commit:
+  https://github.com/djbclark/libntech/commit/da7d3d93d8d7b6e51c94cae1f8ac1ed1c6a21b6d
+
+The pull request above is on a fork, opened so the change has a stable review
+URL. Happy to open it against NorthernTechHQ/libntech directly whenever that
+is wanted.
+
+Making failure detectable by the callers of HashFile() and HashPubKey(), rather
+than merely visible in the log, would mean changing the return types of two void
+functions with callers across both repositories, and is deliberately left out.
+
+No unit test is included: forcing EVP_DigestInit() to fail requires
+CryptoDeInitialize(), which lives in cfengine/core's libpromises and is not
+available to libntech's own tests, and a libntech-level test could only assert
+the all-zero digest that is returned either way.
 ```
 
-**Link to add after the PR is open:** the `NorthernTechHQ/libntech` PR URL.
+**Fork PR:** <https://github.com/djbclark/libntech/pull/1> — opened so the change
+has a stable review URL and diff before it goes upstream. Add the
+`NorthernTechHQ/libntech` PR URL too, once that one exists.
 
 ---
 
