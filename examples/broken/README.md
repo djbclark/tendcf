@@ -14,7 +14,7 @@ Each directory replaces the happy-path file of the same name under
 | 4 | `04-nested-writer-prefix` | prefix `com.djbclark.caddy.*` nested in `com.djbclark.*` | cross-file |
 | 5 | `05-macos-no-launchd` | macOS service with no `launchd` block | schema (`if/then`) |
 | 6 | `06-literal-secret` | `OPENAI_API_KEY: sk-live-abc123` (literal, not a key name) | schema |
-| 7 | `07-typo-capability-kind` | `netwrok:tailnet` (typo'd capability kind) | schema |
+| 7 | `07-typo-token-kind` | `netwrok:tailnet` (typo'd token kind) | schema |
 | 8 | `08-unknown-role` | `role: llm-gatway` (unknown role) | cross-file |
 | 9 | `09-enforce-audit-outcome` | enforce-mode row with `outcome: compliant` | schema |
 | 10 | `10-invalid-release-stamp` | `release: NOT-A-STAMP` (outside the identifier pattern) | schema |

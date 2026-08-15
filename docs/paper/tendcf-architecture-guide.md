@@ -745,7 +745,7 @@ is a catalog, not a graph.
 Token *kinds* are a closed enum — `service`, `port`, `path`, `class`,
 `package`, `device`, `network`, `secret` — defined once in
 [`schema/common.schema.json`](../../schema/common.schema.json)
-(`$defs.capability_token`). That schema is the authority; if this list and
+(`$defs.token`). That schema is the authority; if this list and
 that pattern ever disagree, the schema is right. Token *values* are
 instance data, checked at compile time — not a schema enum that changes
 with every new service.

@@ -32,8 +32,8 @@
       "maxLength": 64
     },
 
-    "capability_token": {
-      "description": "A capability a type supplies or needs, stated locally (D16(b)). `kind:name`. The kind set is closed so a typo is a schema error rather than a silently-unmatched edge — map §0 rule 6, prefer machine-checkable to conventional. Extending the set is additive.",
+    "token": {
+      "description": "A name a type supplies or needs, stated locally (D16(b)). `kind:name`. A naming catalogue, not a permission: holding a token grants nothing. The kind set is closed so a typo is a schema error rather than a silently-unmatched edge — map §0 rule 6, prefer machine-checkable to conventional. Extending the set is additive.",
       "type": "string",
       "pattern": "^(service|port|path|class|package|device|network|secret):[^\\s]+$",
       "maxLength": 200
@@ -42,14 +42,14 @@
     "provides": {
       "description": "What this entry supplies. Local knowledge only: answerable from inside this one file (D16(b), R13).",
       "type": "array",
-      "items": { "$ref": "common.schema.json#/$defs/capability_token" },
+      "items": { "$ref": "common.schema.json#/$defs/token" },
       "uniqueItems": true
     },
 
     "requires": {
       "description": "What this entry needs. nix2cf infers ordering edges by matching these against other entries' `provides`. Every inferred edge carries the rule that produced it (D16(b), edge attribution is mandatory).",
       "type": "array",
-      "items": { "$ref": "common.schema.json#/$defs/capability_token" },
+      "items": { "$ref": "common.schema.json#/$defs/token" },
       "uniqueItems": true
     },
 
