@@ -1,0 +1,40 @@
+# Pass F — synthesis of all six reviews.
+# Sent 2026-08-15 to: claude --model claude-opus-5 --effort xhigh (Claude account 2)
+# Produced: 2026-08-15_opus-5-xhigh_SYNTHESIS.md
+
+Synthesis pass. Five independent reviews of one document were run today by separate agents that did not see each other's work. Your job is to merge, de-duplicate, and rank them into one actionable revision list. Do not use herdr or spawn any sub-agents.
+
+THE DOCUMENT UNDER REVIEW: /Users/djbclark/src/tendcf/docs/paper/tendcf-architecture-guide.md
+
+READ ALL SIX REPORTS in /Users/djbclark/src/tendcf/docs/paper/reviews/ dated 2026-08-15:
+- 2026-08-15_opus-5_consistency-audit.md - guide vs implementer map vs schemas vs lint
+- 2026-08-15_opus-5_guide-paper-parity.md - guide vs the technical paper
+- 2026-08-15_opus-5-xhigh_skeptical-review.md - skeptical peer review, whole document
+- 2026-08-15_opus-5-max_redteam-trust-consent.md - adversarial, sections 7-9 and 14-15, 51 findings
+- 2026-08-15_opus-5-high_premortem.md - pre-mortem, why the project dies
+- 2026-08-15_sonnet-5_exposition-structure.md - structure, prose, and two citation checks
+
+YOUR OUTPUT:
+
+1. THE SPINE. Several reviewers converged on the same underlying problem from different directions. Identify those convergences explicitly and name the smallest number of root causes that explain the largest number of findings. Convergence across independent reviewers is the strongest signal in this material; treat it as such.
+
+2. THE SPLIT. Rank every surviving finding into exactly two lists:
+   - DESIGN CHANGES: the architecture itself must change. These are expensive and some may be rejected on cost.
+   - DOCUMENT CHANGES: the design is fine, the document misstates or omits it. These are cheap and should mostly just be done.
+   A finding that looks like a document fix but is really a design gap in disguise belongs in the first list; say so when you move one.
+
+3. DE-DUPLICATION. Where two reviewers found the same thing, merge them and credit both. Where two reviewers contradict each other, say so plainly and give your own reading - do not average them.
+
+4. THE ORDERED LIST. What to fix first, with reasons. Assume one person with limited time.
+
+OPERATOR CONSTRAINTS - these are decided, do not re-litigate them:
+- The project is deliberately in a planning stage. There is no code yet and that is accepted. The pre-mortem computes a documentation-to-code ratio (53 of 55 commits are docs, 16,276 lines of prose against 1,024 lines of code) and treats it as evidence of a failure mode. DISCOUNT that specific framing. The prose-first state is intentional. Keep every other finding in that report, including the specific observations about the compiler repository being empty and about which build-order steps are underestimated - judge those on their merits.
+- The documents should be written as though the project works: confident present tense describing the designed system, with the existing not-yet-deployed caveats kept where they are. Do not recommend hedging the prose into conditionals.
+
+OUTPUT RULES:
+- Your deliverable is the ranked synthesis, not edits. Do not modify the guide or any other file except your own output file.
+- Do not add a verification or double-check step.
+- Where you drop a finding, say which and why, in a short section at the end. Do not silently discard anything.
+
+WRITE TO: /Users/djbclark/src/tendcf/docs/paper/reviews/2026-08-15_opus-5-xhigh_SYNTHESIS.md
+When done, reply with only the file path, the count of design changes vs document changes, and the single highest-priority item.

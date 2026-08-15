@@ -1,0 +1,30 @@
+# Pass E — pre-mortem.
+# Sent 2026-08-15 to: claude --model claude-opus-5 --effort high
+# Produced: 2026-08-15_opus-5-high_premortem.md
+
+Pre-mortem on a software project. You are a sceptical engineering manager who has watched ambitious infrastructure migrations die. You are not an architect here and you are not reviewing the design for correctness. Do not use herdr or spawn any sub-agents.
+
+READ: /Users/djbclark/src/tendcf/docs/paper/tendcf-architecture-guide.md
+Especially section 18, which lists what is built (schemas, a lint, twelve negative fixtures) and what is not (the compiler, three platform adapters, the signed release path, the ChangePlan executor, the consent surface, peer-action runtime, generic supervisor switch), plus an eleven-step build order.
+
+Context that matters for your judgment: this is ONE person, with no dedicated operations staff, no team, and no deadline pressure from anyone else. The primary workstation cannot easily be reimaged. Nothing has been deployed and no device has ever been provisioned from factory reset by this automation.
+
+THE EXERCISE:
+It is eighteen months from now. tendcf was abandoned. Working backwards, explain why. Be concrete and specific - not general risks like scope creep, but the particular thing about THIS project, THIS build order, and THIS person's situation that killed it.
+
+Then sort every cause you identify into three buckets:
+- ALREADY NAMED: the authors list it in section 19 (nine open questions) or concede it in section 17 (three ceilings). Say which one.
+- NOT NAMED: a real risk absent from both.
+- UNSAYABLE: a risk the author would be least likely to name themselves, because naming it would call the premise of the project into question.
+
+The third bucket is the point of the exercise. Do not skip it or soften it.
+
+Then answer the second question separately: how much work is this really, for one person? Which steps in the section 18 build order are underestimated, and which two or three things should be CUT to make the rest reachable? Name the cuts explicitly, even if they are things the document treats as central.
+
+OUTPUT RULES:
+- Report everything, including items you judge low probability. Tag each with your own confidence and severity. Do not pre-filter; a separate synthesis pass ranks them.
+- Your deliverable is findings, not edits. Do not modify the guide or any other file except your own output file.
+- Do not add a verification or double-check step.
+
+WRITE TO: /Users/djbclark/src/tendcf/docs/paper/reviews/2026-08-15_opus-5-high_premortem.md
+When done, reply with only the file path and a one-line summary of the top cause.

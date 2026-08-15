@@ -1,0 +1,28 @@
+# Pass D — exposition, structure, and citation verification.
+# Sent 2026-08-15 to: claude --model claude-sonnet-5 --effort medium
+# Produced: 2026-08-15_sonnet-5_exposition-structure.md
+
+Editorial and structural review of a technical design document. You are an independent reviewer. Do not use herdr or spawn any sub-agents.
+
+TARGET: /Users/djbclark/src/tendcf/docs/paper/tendcf-architecture-guide.md (964 lines, 19 sections)
+
+This is a plain-language companion to a technical paper. It is a draft for review, not published. Judge it as a document: does it earn its length, does it open well, is it structured so a reader can find and trust what they need?
+
+Assess:
+1. OPENING. Does section 1 establish why this matters before what it is? Would a reader who stops after section 2 know what the system does and why it is shaped that way?
+2. LENGTH AND STRUCTURE. 19 sections. Sections 10 through 13 (ordering, extra entries, interlocks, peer actions) are four mechanism sections in a row - do they earn four, or are they two? Name any section you would cut, merge, or move, with the reason.
+3. CLOSING. Section 19 lists nine open questions. Does it oversell or undersell the design's weaknesses? Does the document end on the right note for a reader deciding whether to take it seriously?
+4. ACCESSIBILITY OF THE ARGUMENT. Section 9 is the load-bearing claim (write for AI authors who lack global context). Is it introduced early enough for sections 10 through 15 to land, or does the reader hit mechanisms before the rationale?
+5. PROSE. Flag passages where the plain-language goal fails - jargon without introduction, sentences that need rereading, or places the register lurches between casual and formal.
+
+SEPARATELY, verify two numeric claims against their cited sources using web search, and say plainly if you cannot confirm them:
+- Section 11 quotes a Bcfg2 first client run as Total managed entries 0 and Unmanaged entries 2308, attributed to the USENIX Short Topics booklet, Configuration Management with Bcfg2, Desai and Lueninghoener 2008.
+- The technical paper at /Users/djbclark/src/tendcf/docs/paper/tendcf-architecture-paper.md section 7 cites Bcfg2 deployment figures: four months, one person, roughly three FTE of maintenance before and between a third and a half of an FTE after, across a division of about two hundred people.
+
+OUTPUT RULES:
+- Report everything you find including minor items; tag each with severity so a synthesis pass can rank them. Do not pre-filter.
+- Your deliverable is findings, not edits. Do not modify the guide.
+- Do not add a verification or double-check step.
+
+WRITE TO: /Users/djbclark/src/tendcf/docs/paper/reviews/2026-08-15_sonnet-5_exposition-structure.md
+When done, reply with only the file path and a one-line summary.

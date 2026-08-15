@@ -1,0 +1,27 @@
+# Pass B — skeptical peer review, whole document.
+# Sent 2026-08-15 to: claude --model claude-opus-5 --effort xhigh
+# Produced: 2026-08-15_opus-5-xhigh_skeptical-review.md
+
+Independent skeptical review of a technical design document. You are one of several reviewers working separately; form your own view and do not assume the authors are right. Do not use herdr or spawn any sub-agents.
+
+TARGET: /Users/djbclark/src/tendcf/docs/paper/tendcf-architecture-guide.md
+Supporting context if you want it: the technical paper at /Users/djbclark/src/tendcf/docs/paper/tendcf-architecture-paper.md and the implementer map at /Users/djbclark/src/tendcf/docs/architecture/architecture-DEFINITIVE-v3.md. Do not review those two; they are background.
+
+Review the whole document as a senior reviewer with a reputation for rigorous scrutiny and low tolerance for overclaimed conclusions. Return:
+
+1. THE THREE MOST VULNERABLE CLAIMS in the document, and for each, exactly what evidence would be needed to defend it. Nothing here is deployed and the authors say so, so judge the argument, not the absence of numbers.
+2. THE GAP between what the design can actually support and what the document concludes. Where does an argument reach further than its premises?
+3. TWO ALTERNATIVE DESIGNS that would meet the stated goals in section 1 (mixed fleet, often offline, multiple trusted actors, no ops staff, no always-on central server, AI-authored config, a person can refuse a change using their own AI). For each, say what it does better and what it gives up.
+4. THE MOST LIKELY REASON this receives a major-revision verdict rather than an accept.
+
+Press hardest on section 17, where the authors name three ceilings at which a different architecture wins. A self-declared limitations section is where authors systematically understate, and it is the cheapest place for a reviewer to find a hole the authors left open. Check whether the three ceilings are the real ones.
+
+Also assess section 9, the load-bearing claim that designs should require only local knowledge because AI agents lack global context, and section 10, which concedes three ways that rule may be wrong. Are those three the strongest counter-arguments, or the most comfortable ones?
+
+OUTPUT RULES:
+- Report every finding including ones you are uncertain about or judge low severity. Do NOT filter for importance or confidence; a separate synthesis pass ranks them. Tag each with your own confidence and severity.
+- Your deliverable is findings, not edits. Do not modify the guide or any other file except your own output file.
+- Do not add a verification or double-check step; write the review once, carefully.
+
+WRITE TO: /Users/djbclark/src/tendcf/docs/paper/reviews/2026-08-15_opus-5-xhigh_skeptical-review.md
+When done, reply with only the file path and a one-line verdict.

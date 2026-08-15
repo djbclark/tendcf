@@ -1,0 +1,23 @@
+# Pass C — adversarial review of the trust/consent layer.
+# Sent 2026-08-15 to: claude --model claude-opus-5 --effort max
+# Produced: 2026-08-15_opus-5-max_redteam-trust-consent.md
+
+Adversarial security review. You are an independent reviewer; ignore any framing you might infer about what the authors believe. Do not use herdr or spawn any sub-agents.
+
+TARGET: /Users/djbclark/src/tendcf/docs/paper/tendcf-architecture-guide.md
+SCOPE: sections 7, 8, 9, 14, and 15 ONLY. Sections 7-8 (signed plans, the person's own AI), 14 (per-device trust), 15 (token discovery). Section 9 is the design rule those rest on.
+
+PRIOR ART you must read and account for: /Users/djbclark/src/tendcf/docs/architecture/deprecated/redteam-trust-layer-openai-v1.md - an earlier red-team of an earlier draft, which returned nine findings including three Critical. For each of those nine, state explicitly whether the current guide RESOLVES it, RESTATES it without resolving, or has made it MOOT by design change. That comparison is a required part of your output.
+
+THE CENTRAL QUESTION nobody has asked yet: section 8 says the person evaluating a proposed change chooses their own AI advisor, and that we never see their model, prompt, or conversation. Attack that. Consider at minimum: prompt injection via the semantic layer described at the end of section 7; a compromised, cheap, or simply bad advisor model; a user who accepts everything; the advisor-down fail-closed rule interacting with the emergency/revocation carve-out; nonce and timeout handling; and whether the accept/reject signature actually binds to what the person was shown.
+
+Also attack: the closed capability list in section 7 (guide section 19 question 8 concedes pressure to add an escape hatch), the first-run root ceremony and TOFU exclusion, and the peer-allowlist model in section 14.
+
+OUTPUT RULES:
+- Report every finding you develop, including ones you are uncertain about or judge low severity. Do NOT filter for importance or confidence; a separate synthesis pass does that. Tag each finding with your own confidence and severity so it can be ranked downstream.
+- Your deliverable is findings, not edits. Do not modify the guide or any other file except your own output file.
+- Do not add a verification or double-check step; write the review once, carefully.
+- For each finding give: the attack, the preconditions it needs, what it gets the attacker, and the smallest design change that would close it.
+
+WRITE TO: /Users/djbclark/src/tendcf/docs/paper/reviews/2026-08-15_opus-5-max_redteam-trust-consent.md
+When done, reply with only the file path and a one-line count of findings by severity.
