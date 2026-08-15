@@ -49,7 +49,12 @@ docs/paper/reviews/2026-08-15_opus-5-high_premortem.md             40K
 docs/paper/reviews/2026-08-15_opus-5-xhigh_SYNTHESIS.md            61K
 ```
 
-Plus this handoff. All seven review docs are **uncommitted** at time of writing.
+**Update, later the same session:** all seven are now committed and **pushed**
+(`57387ab`), together with a rewritten `docs/paper/reviews/README.md` that
+splits the directory into the current 2026-08-15 round and the archival
+2026-08-13 round, and five `prompt_<pass>.txt` files carrying the verbatim
+prompt for each farmed-out pass. `origin/master` is at `57387ab`; the tree is
+clean apart from later edits to this file.
 
 Six passes ran. Two (A, A-2) in the orchestrator session; four in dedicated
 Herdr panes; one synthesis in a seventh pane on the second Claude account.
@@ -323,11 +328,10 @@ docs — full note at `docs/architecture/cfengine-feasibility-of-diff-plan-2026-
    state afterward. Note the irony worth stating in the commit message: guide §9
    rule 2 says a convention an agent must remember will break silently, and this
    vocabulary is currently exactly that.
-2. **Commit the seven review documents** (see Quick Start) and add a section to
-   `docs/paper/reviews/README.md` for the 2026-08-15 guide reviews — do **not**
-   fold them into the 2026-08-13 table, which is Archival and reviews a
-   different document. Save each pass's prompt as `prompt_<pass>.txt` alongside,
-   matching the existing `prompt_audit.txt` / `prompt_iclr.txt` convention.
+2. ~~Commit the seven review documents, add a README section, save the
+   prompts.~~ **DONE — `57387ab`, pushed.** The README now leads with a
+   two-round index; the 2026-08-13 material is unchanged and still marked
+   Archival.
 3. **Amend the precedence rule (S4), then reconcile the guide with the map** on
    the parameters the guide drops. Synthesis item 2: an hour, then an afternoon.
 4. **The thirteen cheap factual corrections** (synthesis item 5), which include
@@ -370,16 +374,17 @@ docs — full note at `docs/architecture/cfengine-feasibility-of-diff-plan-2026-
 
 ```bash
 cd /Users/djbclark/src/tendcf
-git log --oneline -3            # expect 37a37c4 at HEAD
-git status -s                   # expect the 7 untracked review docs + this handoff
+git log --oneline -4            # expect 57387ab at HEAD, pushed to origin/master
+git status -sb                  # expect clean, or only this handoff modified
 
 # Read in this order — synthesis first, sources only as needed:
+$PAGER docs/paper/reviews/README.md                              # two-round index, start here
 $PAGER docs/paper/reviews/2026-08-15_opus-5-xhigh_SYNTHESIS.md   # spine, split, ordered list
+$PAGER docs/architecture/cfengine-feasibility-of-diff-plan-2026-08-15.md  # is E1 buildable on CFEngine
 $PAGER docs/paper/reviews/2026-08-15_opus-5-max_redteam-trust-consent.md  # §1 and §10 only, unless acting on a specific TC
 
-# Commit the review corpus (item 2 above):
-git add docs/paper/reviews/ docs/handoffs/
-git commit -m "docs: six-reviewer audit of the vetted guide, plus synthesis"
+# The verbatim prompt behind each farmed-out pass, for re-running or adapting:
+ls docs/paper/reviews/prompt_*.txt
 
 # Quota before launching more reviewers:
 cswap list                      # NOT aiuse --json alerts; see What We Tried #2
