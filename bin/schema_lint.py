@@ -33,8 +33,8 @@ Six layers, cheapest first:
      applying its hunks to the baseline reproduces the proposed file byte
      for byte, and the approval record's asserted ceremony class equals
      the one the validator derives (§11);
-  6. each of the fifty-two deliberately broken fixtures in examples/broken/
-     and the five byte-class fixtures in examples/broken-bytes/ is caught
+  6. each of the fifty-nine deliberately broken fixtures in examples/broken/
+     and the six byte-class fixtures in examples/broken-bytes/ is caught
      BY THE LAYER IT NAMES. A lint that only accepts good input is not a
      check; a negative harness that accepts any objection at all is barely
      one, because a fixture that rewrites a file another layer reads makes
@@ -80,8 +80,8 @@ SCHEMA_DIR = REPO / "schema"
 EXAMPLE_DIR = REPO / "examples"
 BROKEN_DIR = EXAMPLE_DIR / "broken"
 BYTE_CLASS_DIR = EXAMPLE_DIR / "broken-bytes"
-EXPECTED_BROKEN = 52
-EXPECTED_BYTE_CLASS = 5
+EXPECTED_BROKEN = 59
+EXPECTED_BYTE_CLASS = 6
 
 # example file -> schema file. report-rows.yml is a sequence of rows, each
 # validated individually against the row schema. The goal-file family is
@@ -151,10 +151,12 @@ RULE_SCHEMA_META = "schema meta"
 RULE_PAIRING = "pairing"
 RULE_DISCRIMINATOR = "lint discriminator"
 RULE_CROSS_FILE = "cross-file"
+RULE_GOAL_CROSS_FILE = "goal cross-file"
 RULE_FAMILY_HASH = "family (hash)"
 RULE_FAMILY_APPLY = "family (apply)"
 RULE_FAMILY_CEREMONY = "family (ceremony)"
 RULE_FAMILY_HOST = "family (host)"
+RULE_FAMILY_REFUSED = "family (refused)"
 RULE_JCS = "JCS idempotence"
 RULE_DUPLICATE_KEY = "duplicate-key parse"
 RULE_NFC = "NFC check"
@@ -168,10 +170,12 @@ RULE_CLASSES = frozenset(
         RULE_PAIRING,
         RULE_DISCRIMINATOR,
         RULE_CROSS_FILE,
+        RULE_GOAL_CROSS_FILE,
         RULE_FAMILY_HASH,
         RULE_FAMILY_APPLY,
         RULE_FAMILY_CEREMONY,
         RULE_FAMILY_HOST,
+        RULE_FAMILY_REFUSED,
         RULE_JCS,
         RULE_DUPLICATE_KEY,
         RULE_NFC,
@@ -181,6 +185,17 @@ RULE_CLASSES = frozenset(
 )
 
 DETAILED_RULE_HEADS = frozenset({"family"})
+
+# The classes no negative fixture can declare, and why — checked by
+# check_class_coverage(), which requires every OTHER class to have at least
+# one case. All three are about the corpus's shape rather than a document's
+# content, and the negative harness's unit is a document overlay held in
+# memory: an overlay cannot unpair a schema, delete a fixture from disk, or
+# break the harness that is running it. Expressing them would need a second
+# fixture mechanism that replaces whole directories, which is a larger thing
+# than the coverage it would buy. Naming them here keeps the exemption
+# explicit and reviewable rather than implicit in a check that never runs.
+CLASSES_WITHOUT_FIXTURES = frozenset({RULE_PAIRING, RULE_SCHEMA_META, RULE_HARNESS})
 
 
 class Finding(NamedTuple):
@@ -423,6 +438,35 @@ def check_declared_class(
         )
         return False
     return True
+
+
+def check_class_coverage(declared: dict[str, str]) -> None:
+    """Every rule class this lint can emit has at least one fixture behind it.
+
+    The declarations make each case name its class; this asks the question
+    from the other end. A class with no case is a layer whose rules could all
+    be deleted without a red lint — the same hole the harness was targeted to
+    close, one level up. Exemptions are CLASSES_WITHOUT_FIXTURES, and they
+    are named there with their reason.
+    """
+    covered = set(declared.values())
+    for rule in sorted(RULE_CLASSES - covered - CLASSES_WITHOUT_FIXTURES):
+        fail(
+            f"rule class {rule!r} has no negative fixture — every class this "
+            "lint can emit needs at least one case, or an entry in "
+            "CLASSES_WITHOUT_FIXTURES saying why it cannot have one",
+            rule=RULE_HARNESS,
+        )
+    # The exemption list is the escape hatch, so it is held to being the
+    # smallest one that works. Adding a covered class to it would otherwise
+    # be the silent way to retire this check one class at a time — the same
+    # move, one level up, that the declarations exist to stop.
+    for rule in sorted(CLASSES_WITHOUT_FIXTURES & covered):
+        fail(
+            f"rule class {rule!r} is listed in CLASSES_WITHOUT_FIXTURES but "
+            "does have a fixture — drop it from the exemption list",
+            rule=RULE_HARNESS,
+        )
 
 
 def check_declaration_coverage(declared: dict[str, str], on_disk: set[str]) -> None:
@@ -860,7 +904,7 @@ def check_goal_file_cross_file(loaded: dict[str, Any], name: str) -> None:
             if prefix in seen_prefixes:
                 fail(
                     f"{label}: unit-writer prefix {prefix!r} declared twice",
-                    rule=RULE_CROSS_FILE,
+                    rule=RULE_GOAL_CROSS_FILE,
                 )
             seen_prefixes.add(prefix)
             writer = writer_entry.get("writer") if isinstance(writer_entry, dict) else None
@@ -877,7 +921,7 @@ def check_goal_file_cross_file(loaded: dict[str, Any], name: str) -> None:
                 fail(
                     f"{label}: domains/{domain_name}/entries/interlock/{interlock_id} "
                     f"bundle {bundle!r} is used by no present service",
-                    rule=RULE_CROSS_FILE,
+                    rule=RULE_GOAL_CROSS_FILE,
                 )
 
     # --- no unit-writer prefix nests inside another (one label namespace) --
@@ -889,7 +933,7 @@ def check_goal_file_cross_file(loaded: dict[str, Any], name: str) -> None:
             if inner.removesuffix("*").startswith(outer.removesuffix("*")):
                 fail(
                     f"{label}: unit-writer prefix {inner!r} nests inside {outer!r} — "
-                    "two writers over one namespace", rule=RULE_CROSS_FILE
+                    "two writers over one namespace", rule=RULE_GOAL_CROSS_FILE
                 )
 
     # --- comprehensive-domain services fall under a cfengine writer --------
@@ -907,13 +951,13 @@ def check_goal_file_cross_file(loaded: dict[str, Any], name: str) -> None:
                 fail(
                     f"{label}: domains/{domain_name}/entries/service/{service_id} "
                     "falls under no declared unit-writer prefix — the two-writers rail, "
-                    "applied to the goal file", rule=RULE_CROSS_FILE
+                    "applied to the goal file", rule=RULE_GOAL_CROSS_FILE
                 )
             elif not any(w == "cfengine" for _, w in matched):
                 fail(
                     f"{label}: domains/{domain_name}/entries/service/{service_id} "
                     "falls under a unit-writer prefix whose writer is not cfengine",
-                    rule=RULE_CROSS_FILE,
+                    rule=RULE_GOAL_CROSS_FILE,
                 )
 
 
@@ -1078,6 +1122,43 @@ def apply_diff(baseline: Any, diff: dict[str, Any], label: str) -> Any | None:
     return result if ok else None
 
 
+def check_refused_paths(
+    diff: dict[str, Any], record: dict[str, Any], label: str
+) -> None:
+    """Every `refused` annotation names something the diff actually proposes.
+
+    §11 makes `refused` annotation only — it does not change what was
+    refused, which is all of it (§9.3's all-or-nothing rule) — but it exists
+    for a purpose: telling the proposer what to re-render. A key-path that
+    resolves to no hunk and no coverage change tells them to re-render
+    nothing, which is the one thing an annotation must not do. It is also the
+    shape a stale record takes after the diff it answers has moved on.
+
+    The two reviewable sections are the two addressable ones: a hunk at
+    `hunks/<domain>/<kind>/<id>`, and a coverage transition at
+    `coverage_changes/<domain>` — a distinct section precisely so it cannot
+    be lost in entry noise (§9.7), and so refusable on its own. The id is
+    taken as the remainder rather than the next segment, so an id carrying a
+    `/` addresses correctly.
+    """
+    hunks: dict[str, Any] = diff.get("hunks") or {}
+    coverage: dict[str, Any] = diff.get("coverage_changes") or {}
+    for path in record.get("refused") or []:
+        parts = path.split("/", 3)
+        if parts[0] == "hunks" and len(parts) == 4:
+            if parts[3] in ((hunks.get(parts[1]) or {}).get(parts[2]) or {}):
+                continue
+        elif parts[0] == "coverage_changes" and len(parts) == 2:
+            if parts[1] in coverage:
+                continue
+        fail(
+            f"{label}: refused path {path!r} names no hunk and no coverage "
+            "change in the diff — an annotation that tells the proposer to "
+            "re-render nothing",
+            rule=RULE_FAMILY_REFUSED,
+        )
+
+
 def check_goal_file_family(loaded: dict[str, Any]) -> None:
     """The family fixtures must describe one another exactly.
 
@@ -1164,6 +1245,8 @@ def check_goal_file_family(loaded: dict[str, Any]) -> None:
                 rule=RULE_FAMILY_CEREMONY,
             )
 
+        check_refused_paths(diff, record, label)
+
 
 def check_goal_file_forbidden_refs(schemas: dict[str, dict]) -> None:
     """goal-file.schema.json must restate, never `$ref`, the forbidden defs.
@@ -1228,6 +1311,7 @@ def main() -> int:
             if BYTE_CLASS_DIR.is_dir():
                 on_disk |= {p.name for p in BYTE_CLASS_DIR.glob("*.json")}
             check_declaration_coverage(declared, on_disk)
+            check_class_coverage(declared)
 
     if findings:
         print(f"schema-lint: {len(findings)} finding(s)")

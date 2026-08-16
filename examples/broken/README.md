@@ -1,12 +1,12 @@
 # Negative fixtures
 
-Fifty-two deliberately broken overlays, plus five byte-class fixtures in
+Fifty-nine deliberately broken overlays, plus six byte-class fixtures in
 the sibling `examples/broken-bytes/`. `bin/schema_lint.py` must catch
 every one; a case that validates is a lint failure.
 
 Each directory here replaces the happy-path file of the same name under
 `examples/`. The rest of the Site Model (cases 1-12) or the goal-file
-family (cases 13-57) stays as in the happy path.
+family (cases 13-65) stays as in the happy path.
 
 **The "Caught by" column is executable.** `bin/schema_lint.py` reads these
 tables back and requires each case to be caught by the class its row
@@ -146,6 +146,8 @@ while the accept stays honest.
 | --- | --- | --- | --- |
 | 56 | `56-reject-without-annotations` | `verdict: reject` with no `refused` | schema (`if/then`) |
 | 57 | `57-accept-with-annotations` | `verdict: accept` **with** a `refused` | schema (`if/else`) |
+| 59 | `59-refused-path-names-no-hunk` | `refused` naming a hunk the diff lacks | family (refused) |
+| 60 | `60-record-for-another-host` | a record signed for a different device | family (host) |
 
 Case 57 is why the `else` branch is spelled `{"refused": false}` rather
 than §11's more obvious `{"not": {"required": ["refused"]}}`. The two are
@@ -157,9 +159,56 @@ array and nothing else. Neither form yields an instance path better than
 `<root>` (jsonschema drops it for boolean subschemas), which is the
 harness's problem rather than the schema's.
 
+Case 59 is the rule that makes `refused` more than decoration. §11 makes
+the annotation advisory — it does not change what was refused, which is
+all of it (§9.3) — but it exists so the proposer knows what to re-render,
+and a key-path resolving to no hunk and no coverage change tells them to
+re-render nothing. It is also the shape a stale record takes once the diff
+it answers has moved on. Both addressable sections count:
+`hunks/<domain>/<kind>/<id>` and `coverage_changes/<domain>`, the latter
+because §9.7 makes coverage a section of its own precisely so it cannot be
+lost in entry noise — which makes it refusable on its own.
+
+Cases 61-65 are the goal file's own cross-entry rules, which had no
+fixtures at all until the class-coverage check below asked for them. Each
+overlays `goal-file.json`, so the family layer objects too; the
+declaration is what keeps that noise from standing in for the rule under
+test.
+
+| # | Case | Broken input | Caught by |
+| --- | --- | --- | --- |
+| 61 | `61-interlock-bundle-unused` | an interlock naming a bundle no present service uses | goal cross-file |
+| 62 | `62-nested-unit-writer-prefix` | `com.tendcf.caddy.main.*` nested in `com.tendcf.caddy.*` | goal cross-file |
+| 63 | `63-service-under-no-prefix` | a `com.rogue.*` service under no declared prefix | goal cross-file |
+| 64 | `64-service-under-non-cfengine-writer` | a comprehensive-domain prefix with `writer: homebrew` | goal cross-file |
+| 65 | `65-unit-writer-prefix-twice` | one prefix declared under two state domains | goal cross-file |
+
+Both of those needed a second draft, and the reason is worth keeping. Case
+64 first said `writer: launchd`, which is not in the writer enum at all —
+so it was case 36 wearing a cross-file label, and the rule it claimed to
+test could have been deleted with the case still red. `homebrew` is a
+writer the schema admits and this rail does not. Case 65 first put the
+duplicate prefix under `device-trust`, which is a `trust_domain` and
+admits no `unit-writer` kind; expressing "one prefix, two domains" at all
+needs a third state domain, which is why the fixture grows a `packaging`
+one. A negative fixture that fails for a reason other than its own is the
+thing this whole section exists to catch, and it caught these.
+
+## Every class has a fixture
+
+`check_class_coverage()` asks the declarations' question from the other
+end: a rule class with no case behind it is a layer whose rules could all
+be deleted without a red lint. Three classes are exempt, named with their
+reason in `CLASSES_WITHOUT_FIXTURES` — `pairing`, `schema meta`, and
+`harness` are about the corpus's shape rather than a document's content,
+and this harness's unit is a document overlay held in memory. An overlay
+cannot unpair a schema, delete a fixture from disk, or break the harness
+running it. Everything else must have a case, which is where 58-65 came
+from.
+
 ## Byte-class fixtures (`../broken-bytes/`)
 
-The five §13 byte-class negatives. These are not overlays: each is a whole
+The five §13 byte-class negatives, plus one for bytes that are not JSON. These are not overlays: each is a whole
 alternate `goal-file.json` checked as **raw bytes, before the parse**, and
 `bin/schema_lint.py` runs only its byte layer over them.
 
@@ -186,6 +235,15 @@ why §2.1 puts NFC in the lint rather than leaving it to the canonicalizer.
 | 46 | `46-duplicate-keys.json` | `schema_version` stated twice | duplicate-key parse |
 | 47 | `47-non-nfc-path.json` | `working_dir` `/Users/josé/srv` in NFD | NFC check |
 | 48 | `48-float-spelling-of-integer.json` | `"timeout_seconds":30.0` | JCS idempotence |
+| 58 | `58-not-json.json` | a trailing comma — not JSON at all | parse |
+
+Case 58 sits out of sequence with its neighbours because the numbering is
+one series across both directories, and it was written last. It is 46's
+sibling: both arrive through the same `except ValueError`, since
+`JSONDecodeError` is one, and they are not the same finding. Bytes that
+are not JSON are a proposer or transport bug; bytes that are two documents
+in a trench coat are the §2.1 hazard, and rounding the second into the
+first would lose exactly the distinction that layer exists to draw.
 
 Case 48 is §13's "`15.0` spelling of `15`" instantiated on the integer this
 fixture actually carries. Cases 44 and 48 are the pair §2.1 describes as
