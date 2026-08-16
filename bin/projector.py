@@ -69,10 +69,16 @@ a mapping bug becomes a refusal rather than a file on a device.
 
 Two limits of that checker, stated here rather than discovered later:
 
-  - N-5 is enforced as "no container but the two, and no object key spelled
-    like a digest". Trust content pasted into a *value* inside an otherwise
-    legal service body is not distinguishable from legitimate content without
-    re-reading the schema, which these bytes do not carry.
+  - N-5 is enforced as "no container but the two, and nothing spelled like a
+    digest in either key or value position". Measured against the corpus's own
+    four device-trust bodies, that catches three: `advisor-key` (digest in the
+    key), `agent` and `policy-tree` (digest in the value). It does NOT catch
+    `trust-policy`, whose body is `{"local_yes_required": true, "state":
+    "present", "tier": "consented"}` — no digest anywhere, and nothing in
+    those bytes distinguishes it from a legal service body without the schema,
+    which a projection does not carry. Three of four, stated as a number
+    because the earlier wording said only "trust in a value is not caught" and
+    that understated it to one of four (F7).
   - N-9 is enforced by id shape, and shape only catches what no goal file
     could spell. Interlock ids are kebab, so canonification (`_`) is visible;
     the service-id pattern admits `_`, so a canonified service id is NOT
@@ -158,10 +164,21 @@ ENTRY_ID_MAX_LENGTH = {"service": 128, "interlock": 64}
 # value ending in a newline, which is a value and not a name.
 SECRETSPEC_NAME = re.compile(r"^[A-Z][A-Z0-9_]*\Z")
 
-# device-trust's ids and digests are key-position in the goal file: an
-# `ed25519:` advisor-key id, a `sha256:` digest. A key spelled this way in a
-# projection is trust content that reached `vars` (N-5).
+# device-trust's ids and digests: an `ed25519:` advisor-key id, a `sha256:`
+# digest. A key spelled this way in a projection is trust content that
+# reached `vars` (N-5).
 TRUST_SHAPED_KEY = re.compile(r"^(ed25519|sha256):")
+
+# F7: key position alone caught ONE of the corpus's four device-trust bodies.
+# Only `advisor-key` puts its digest in the key; `agent` and `policy-tree`
+# use the key `"sha256"` with the digest in the VALUE, so the agent binary pin
+# projected with zero findings. Values are held to the schema's own digest
+# patterns (goal-file.schema.json:16, :351) rather than to the key rule's bare
+# prefix: a projection key is a variable name and nothing legitimate is named
+# `sha256:…`, whereas a value is free text where a prefix alone is weak
+# evidence. Restating the full pattern keeps this from being stricter than the
+# goal file it came from — the same discipline as ENTRY_ID_PATTERNS.
+TRUST_SHAPED_VALUE = re.compile(r"^(ed25519|sha256):[0-9a-f]{64}\Z")
 
 
 class ProjectionRefused(Exception):
@@ -515,13 +532,19 @@ def check_projection(raw: bytes) -> list[ProjectionFinding]:
                     "key, every projected variable on the host (N-3, E-5)",
                 )
                 break
-        if pointer.endswith(" (key)") and TRUST_SHAPED_KEY.match(node):
+        if pointer.endswith(" (key)"):
+            trust_shaped = TRUST_SHAPED_KEY.match(node)
+            where = "a device-trust digest or key id"
+        else:
+            trust_shaped = TRUST_SHAPED_VALUE.match(node)
+            where = "a device-trust digest, in value position (F7)"
+        if trust_shaped:
             flag(
                 RULE_PROJECTION,
-                f"{pointer}: a device-trust digest or key id. Every projected "
-                "byte is readable by every bundle and dumped by --show-vars, "
-                "so trust content here is a second read path for the one "
-                "region the validator and agent read alone (N-5, P-1, E-1)",
+                f"{pointer}: {where}. Every projected byte is readable by "
+                "every bundle and dumped by --show-vars, so trust content "
+                "here is a second read path for the one region the validator "
+                "and agent read alone (N-5, P-1, E-1)",
             )
 
     return found
