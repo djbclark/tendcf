@@ -345,7 +345,13 @@ form of that file, that the difference from its stored baseline is exactly
 the difference that was approved, and — where the device’s tier requires a
 local yes (§14) — that the approval is signed by the enrolled advisor key,
 bound to this device’s public key, to both document hashes, and to a nonce
-this device issued. Then it lets CFEngine converge on the new state.
+this device issued. Then it lets CFEngine converge on the new state — by
+way of a device-side **projection**, not by reading the goal file directly.
+CFEngine’s Augments layer never sees the goal file; a policy-free
+projection step, run only after approval, re-keys the approved state into
+the narrow `{"vars": {…}}` shape Augments actually consumes (§16.A). The
+goal file is the object consent binds to; the projection is derived from
+it, not signed itself, and is not the whole document.
 Nothing in that path has to decide what an operation *means*, because there
 are no operations: there are two states and an approved difference between
 them.
