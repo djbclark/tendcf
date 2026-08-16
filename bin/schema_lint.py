@@ -728,11 +728,21 @@ def check_projector_properties(projector: Any, loaded: dict[str, Any]) -> None:
     """N-1 and N-11: the two invariants no single fixture can express.
 
     N-1 is the R21 tripwire made mechanical. Flipping one entry's `state`
-    must change exactly that value and leave the key structure identical; a
-    projector that grew a tombstone branch would move the entry to a
-    different container and fail here. N-11 is purity: same bytes in, same
-    bytes out. Both are properties over two runs, which is precisely why
-    they are checked and not fixtured — see check_projection_fixtures().
+    must change exactly that value and NOTHING ELSE — not the key structure,
+    and not any other leaf. A projector that grew a tombstone branch would
+    move the entry to a different container and fail here. N-11 is purity:
+    same bytes in, same bytes out. Both are properties over two runs, which
+    is precisely why they are checked and not fixtured — see
+    check_projection_fixtures().
+
+    F4: this compared _shape(), which erased every leaf value and reduced a
+    list to its length, so a `state` branch could rewrite argv ORDER and the
+    check saw two identical shapes. `goal-file.schema.json:101` calls that
+    order semantic — "An array because order is meaning" — so a permutation
+    is a different command, and N-1's whole subject is a value deciding
+    output. The golden cannot cover the gap either: the example's only absent
+    entry is `state`-only, so it has no argv to permute. The comparison is
+    now the exact set of differing pointers, which must be the one `state`.
     """
     goal = loaded.get("goal-file.json")
     if goal is None:
@@ -776,21 +786,53 @@ def check_projector_properties(projector: Any, loaded: dict[str, Any]) -> None:
         fail(f"project() raised on the N-1 state flip: {exc}", rule=RULE_PROJECTION)
         return
 
-    if _shape(before) != _shape(after):
+    container = projector.container_name("service")
+    permitted = f"vars/{container}/{target}/state"
+    differing = sorted(_differing_pointers(before, after))
+    if differing != [permitted]:
+        unexpected = [p for p in differing if p != permitted]
+        detail = (
+            f"it also changed {', '.join(unexpected)}"
+            if unexpected
+            else f"it did not change {permitted} at all"
+        )
         fail(
-            f"flipping {target} to absent changed the projection's structure "
-            "— a value decided the shape, which is R21's tripwire (N-1)",
+            f"flipping {target} to absent must change {permitted} and nothing "
+            f"else — {detail}. A value decided output beyond its own key, "
+            "which is R21's tripwire (N-1)",
             rule=RULE_PROJECTION,
         )
 
 
-def _shape(node: Any) -> Any:
-    """The key structure of a document, with every leaf value erased."""
-    if isinstance(node, dict):
-        return {key: _shape(value) for key, value in sorted(node.items())}
-    if isinstance(node, list):
-        return [_shape(item) for item in node]
-    return None
+def _differing_pointers(before: Any, after: Any, path: str = "") -> list[str]:
+    """Every pointer at which two documents disagree.
+
+    Deliberately reports the pointer rather than a diff of values: N-1's
+    question is *where* a value reached, not what it became, and a message
+    naming a path is one a reader can go look at. A container whose type or
+    length changed is reported at the container, not exploded into a pointer
+    per child, so a moved entry reads as one finding.
+    """
+    here = path or "<root>"
+    if type(before) is not type(after):
+        return [here]
+    if isinstance(before, dict):
+        if before.keys() != after.keys():
+            return [here]
+        out: list[str] = []
+        for key in before:
+            out += _differing_pointers(
+                before[key], after[key], f"{path}/{key}" if path else key
+            )
+        return out
+    if isinstance(before, list):
+        if len(before) != len(after):
+            return [here]
+        out = []
+        for i, (b, a) in enumerate(zip(before, after)):
+            out += _differing_pointers(b, a, f"{path}/{i}" if path else str(i))
+        return out
+    return [] if before == after else [here]
 
 
 def load_schemas() -> tuple[dict[str, dict], Registry]:
