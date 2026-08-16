@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "host": "ed25519:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+  "domains": {
+    "device-trust": {
+      "coverage": "comprehensive",
+      "entries": {
+        "policy-tree": {
+          "tree": {
+            "state": "present",
+            "sha256": "sha256:c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+          }
+        },
+        "trust-policy": {
+          "consent": {
+            "state": "present",
+            "tier": "consented",
+            "local_yes_required": true
+          }
+        },
+        "agent": {
+          "tendcf-agent": {
+            "state": "present",
+            "version": "ops-v1.0.0",
+            "sha256": "sha256:d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"
+          }
+        }
+      }
+    },
+    "supervision": {
+      "coverage": "comprehensive",
+      "entries": {
+        "service": {
+          "com.tendcf.caddy.main": {
+            "state": "present",
+            "bundle": "caddy",
+            "run_as": "caddy",
+            "command": [
+              "/opt/homebrew/bin/caddy",
+              "run",
+              "--config",
+              "/etc/caddy/Caddyfile"
+            ],
+            "env": {
+              "CADDY_ADMIN_TOKEN": "CADDY_ADMIN_TOKEN"
+            },
+            "working_dir": "/",
+            "unit": {
+              "launchd": {
+                "run_at_load": true,
+                "keep_alive": true
+              }
+            }
+          },
+          "com.tendcf.caddy.retired": {
+            "state": "absent"
+          }
+        },
+        "interlock": {
+          "caddy-config-valid": {
+            "state": "present",
+            "bundle": "caddy",
+            "pre_action": {
+              "command": [
+                "/opt/homebrew/bin/caddy",
+                "validate",
+                "--config",
+                "/etc/caddy/Caddyfile"
+              ],
+              "expect_exit": 0,
+              "timeout_seconds": 30
+            },
+            "defines_class": "caddy_config_ok",
+            "blocks": "enclosing-bundle",
+            "report": true
+          }
+        },
+        "unit-writer": {
+          "com.tendcf.caddy.*": {
+            "state": "present",
+            "writer": "cfengine"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/frdminc/tendcf/schema/approval-record.schema.json",
+  "title": "Approval record — the signed consent object (D44, C-5)",
+  "description": "Outline from goal-file-schema-reconciliation-2026-08-15.md §11 (§18 item 1); not this document's tested surface — §14.2 review and the fixture set land with the family, not this pass. The signed object is the JCS bytes of this record with `signature` removed (C-5, replacing E1 §5.1's hash-concatenation formula, whose optional briefing member was an encoding-ambiguity hazard). DC-2 applies in full: per-target validity, device nonce, monotonic-counter single use, persisted rejects. Grok's `H(projected_augments)` extension is dropped — with the device-side projector there is no shipped projection to bind (map §9 preamble).",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "description": "Family version, shared with goal-file and goal-diff (§11).",
+      "const": 1
+    },
+    "host": {
+      "description": "The target key this record is valid for — DC-2's per-target validity.",
+      "type": "string",
+      "pattern": "^ed25519:[0-9a-f]{64}$"
+    },
+    "baseline_sha256": {
+      "description": "H(old canonical goal file). Absent ONLY at first adoption, where there is no prior approved baseline to name — a named §14.2 review target (TC-11/TC-20 territory), not a property this outline claims to have fully worked out.",
+      "$ref": "goal-file.schema.json#/$defs/sha256"
+    },
+    "proposed_sha256": {
+      "description": "H(new canonical goal file) — what `verdict` is a verdict about.",
+      "$ref": "goal-file.schema.json#/$defs/sha256"
+    },
+    "nonce": {
+      "description": "Device-issued, single-use (DC-2). Exact byte encoding is residue, not decided here — this outline states only that it is present and opaque.",
+      "type": "string",
+      "minLength": 1
+    },
+    "approval_seq": {
+      "description": "Monotonic counter, DC-2 single-use: the validator rejects any record whose approval_seq does not exceed the last persisted one for this host.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "briefing_sha256": {
+      "description": "Optional: binds the record to the briefing bytes the person actually saw, when one was shown.",
+      "$ref": "goal-file.schema.json#/$defs/sha256"
+    },
+    "verdict": {
+      "description": "What the approver decided about proposed_sha256.",
+      "enum": [
+        "accept",
+        "reject",
+        "withdraw"
+      ]
+    },
+    "refused": {
+      "description": "Hunk key-paths the refusal is annotated with. Present iff verdict is reject; annotation only — it does not change what was refused (all of it, §9.3's all-or-nothing rule), only explains why, so the proposer knows what to re-render.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "ceremony_class": {
+      "description": "Asserted by the approver, checked against the validator's own DERIVED requirement (map §9.8) — a mismatch is refused, never silently upgraded or downgraded.",
+      "enum": [
+        "ordinary",
+        "privileged",
+        "baseline"
+      ]
+    },
+    "signature": {
+      "description": "Detached signature over the JCS bytes of this record with this member removed (C-5). Exact encoding is residue, not decided here.",
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "host",
+    "proposed_sha256",
+    "nonce",
+    "approval_seq",
+    "verdict",
+    "ceremony_class",
+    "signature"
+  ],
+  "additionalProperties": false,
+  "if": {
+    "properties": {
+      "verdict": {
+        "const": "reject"
+      }
+    },
+    "required": [
+      "verdict"
+    ]
+  },
+  "then": {
+    "required": [
+      "refused"
+    ]
+  },
+  "else": {
+    "not": {
+      "required": [
+        "refused"
+      ]
+    }
+  }
+}

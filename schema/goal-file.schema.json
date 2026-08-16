@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/frdminc/tendcf/schema/goal-file.schema.json",
+  "title": "Goal file — canonical per-host intended state (D43/D44)",
+  "description": "One fully resolved JSON document per host: compiler output, consent object, validator input (guide §7; map §9; D43/D44). Landed from goal-file-schema-reconciliation-2026-08-15.md §10, per §18 item 3. Canonical form is RFC 8785 (JCS) plus the rules in that reconciliation’s §2; the validator refuses any file not byte-identical to the canonicalization of itself. No defaults anywhere: every scalar is required with its explicit value; collections are present iff non-empty; entries are maps keyed by device-natural id, so JCS member ordering IS the entry ordering and the hunk address (domain, kind, id) is the key path.",
+
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "description": "Goal-file family version (shared with goal-diff and approval-record). Stricter than contract_version: ANY shape change, additive included, bumps it (E1 §5.6). A const, so a file claiming any other version fails this schema structurally; the validator dispatches on the value first and reports version-above-ceiling distinctly from schema-invalid.",
+      "const": 1
+    },
+    "host": {
+      "description": "Device public key — host identity is the key, not the hostname (map §3). First-line cross-device replay check (TC-11): a validator refuses a goal file whose host is not itself before computing any diff. Immutable: re-keying is re-enrollment, a baseline ceremony (DC-22 residue). One spelling: fixed prefix, lowercase hex.",
+      "type": "string",
+      "pattern": "^ed25519:[0-9a-f]{64}$"
+    },
+    "domains": {
+      "description": "Every domain this file makes claims about, each with its coverage stated. An entry cannot exist without its domain's coverage: 'silent because unchanged' vs 'silent because not described' is decided structurally (E1 §5.7). A domain absent from this map is UNDECLARED — semantically not-yet-migrated without a name; declaring it is the act of naming the backlog item, and its first appearance is a coverage_changes item in the diff. device-trust is always present and always comprehensive.",
+      "type": "object",
+      "propertyNames": { "$ref": "common.schema.json#/$defs/identifier" },
+      "properties": {
+        "device-trust": { "$ref": "#/$defs/trust_domain" }
+      },
+      "required": ["device-trust"],
+      "additionalProperties": { "$ref": "#/$defs/state_domain" }
+    }
+  },
+  "required": ["schema_version", "host", "domains"],
+  "additionalProperties": false,
+
+  "$defs": {
+    "coverage": {
+      "description": "One enum, not common.schema.json's boolean+reason pair: the goal file admits no defaults and no second spelling of one meaning (E1 §5.2 as corrected), and a single field makes the boolean/reason contradiction unrepresentable instead of if/then-guarded. Same three meanings as domain_coverage; the Site Model keeps its authoring shape and the compiler resolves to this one. No prose: signed prose is the intent channel DC-3 keeps out of the verifiable layer.",
+      "enum": ["comprehensive", "not-yet-migrated", "deliberately-unmanaged"]
+    },
+
+    "state_domain": {
+      "description": "A domain of device state. entries present iff at least one entry is described — omission is the only spelling of none (E1 §5.2). A deliberately-unmanaged domain cannot carry entries: 'not ours to describe', with descriptions in it, is a contradiction made unrepresentable.",
+      "type": "object",
+      "properties": {
+        "coverage": { "$ref": "#/$defs/coverage" },
+        "entries": { "$ref": "#/$defs/state_entries" }
+      },
+      "required": ["coverage"],
+      "additionalProperties": false,
+      "if": {
+        "properties": { "coverage": { "const": "deliberately-unmanaged" } },
+        "required": ["coverage"]
+      },
+      "then": { "not": { "required": ["entries"] } }
+    },
+
+    "state_entries": {
+      "description": "kind -> id -> entry. Kinds are a closed set per schema_version: an unknown kind is a structural violation, the belt-and-braces half of fail-closed (E1 §5.6). v1 carries exactly what Steps 1–6 actuate: services, their interlocks, and the unit-writer registry the device-side extra-entry detector reads. file and package are named omissions (reconciliation §8), each a counted bump when it lands.",
+      "type": "object",
+      "properties": {
+        "service": { "$ref": "#/$defs/service_map" },
+        "interlock": { "$ref": "#/$defs/interlock_map" },
+        "unit-writer": { "$ref": "#/$defs/unit_writer_map" }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+
+    "absent": {
+      "description": "A tombstone: this thing must not exist, converged on every run. Removal is a state, not an event — the negative promise renders from THIS file, so it survives crashes, re-runs, stale catch-up, and identical re-releases, which a diff-driven removal does not (reconciliation §6, correcting E1 R4). Valid in any coverage mode that admits entries: extra-entry detection in a comprehensive domain REPORTS, it does not remove, so the tombstone is the only actuated removal path there too. state is the only field: absent-with-a-stale-body would be a second spelling of absence.",
+      "type": "object",
+      "properties": { "state": { "const": "absent" } },
+      "required": ["state"],
+      "additionalProperties": false
+    },
+
+    "service_map": {
+      "type": "object",
+      "propertyNames": {
+        "description": "The device-natural unit name — the promiser: launchd label, systemd unit, runit service dir. Not the Site Model service name, which is a source-layer concept (reconciliation §3). Modify-vs-remove+add in the diff then matches modify-vs-unload+load in actuation. Lint: on a comprehensive domain the id must fall under a unit-writer prefix whose writer is cfengine.",
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9@._-]*$",
+        "maxLength": 128
+      },
+      "additionalProperties": {
+        "oneOf": [
+          { "$ref": "#/$defs/service_present" },
+          { "$ref": "#/$defs/absent" }
+        ]
+      },
+      "minProperties": 1
+    },
+
+    "service_present": {
+      "type": "object",
+      "properties": {
+        "state": { "const": "present" },
+        "bundle": {
+          "description": "Re-verification scope and interlock blast radius (D16(c)). A bundle exists by being referenced; there is no bundle kind (reconciliation §8). Cross-checked by lint: every interlock's bundle is used by at least one entry.",
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "run_as": { "type": "string", "pattern": "^[a-z_][a-z0-9_-]*$", "maxLength": 32 },
+        "command": {
+          "description": "argv. An array because order is meaning — with pre_action.command, the only arrays in the file whose order is semantic.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "env": {
+          "description": "Secret NAMES only, resolved by secretspec at run time — reused verbatim from common because env_map is canonical-safe (no defaults, no optional booleans).",
+          "$ref": "common.schema.json#/$defs/env_map",
+          "minProperties": 1
+        },
+        "working_dir": {
+          "description": "REQUIRED, unlike the Site Model: an optional scalar whose omission means 'the supervisor's default' is a hidden default and a second spelling of that default's value (reconciliation §9, F-1). The compiler resolves the per-supervisor default ('/' for launchd and systemd system services, the service directory for runit) and states it.",
+          "$ref": "#/$defs/abs_path"
+        },
+        "unit": { "$ref": "#/$defs/unit" }
+      },
+      "required": ["state", "bundle", "run_as", "command", "working_dir", "unit"],
+      "additionalProperties": false
+    },
+
+    "unit": {
+      "description": "Exactly one supervisor rendering, fully resolved: every knob the adapter renders is present with its explicit value. The unit's name is the entry id and is NOT repeated in the body — one source of identity (contrast the Site Model's launchd.label, which lint must otherwise force equal to the id). Growing any flavor's field set is a schema_version bump by the strict rule; that is Q11's meter working.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "launchd": {
+              "type": "object",
+              "properties": {
+                "run_at_load": { "type": "boolean" },
+                "keep_alive": { "type": "boolean" }
+              },
+              "required": ["run_at_load", "keep_alive"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["launchd"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "systemd": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" }
+              },
+              "required": ["enabled"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["systemd"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "runit": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" }
+              },
+              "required": ["enabled"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["runit"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "interlock_map": {
+      "type": "object",
+      "propertyNames": { "$ref": "common.schema.json#/$defs/identifier" },
+      "additionalProperties": { "$ref": "#/$defs/interlock_entry" },
+      "minProperties": 1
+    },
+
+    "interlock_entry": {
+      "description": "Same semantics as common.schema.json#/$defs/interlock, restated canonical-form: expect_exit and timeout_seconds lose their defaults and become required; description prose stays in the Site Model (that is why this cannot $ref the common def — reconciliation §15, C-1). blocks and report stay consts — a proposer cannot narrow the blast radius or silence the report by construction. Present-only: an interlock has no device-state footprint to tombstone; deleting one is a remove hunk the briefing must render as 'guard removed'.",
+      "type": "object",
+      "properties": {
+        "state": { "const": "present" },
+        "bundle": { "$ref": "common.schema.json#/$defs/identifier" },
+        "pre_action": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1
+            },
+            "expect_exit": { "type": "integer", "minimum": 0, "maximum": 255 },
+            "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 3600 }
+          },
+          "required": ["command", "expect_exit", "timeout_seconds"],
+          "additionalProperties": false
+        },
+        "defines_class": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "blocks": { "const": "enclosing-bundle" },
+        "report": { "const": true }
+      },
+      "required": ["state", "bundle", "pre_action", "defines_class", "blocks", "report"],
+      "additionalProperties": false
+    },
+
+    "unit_writer_map": {
+      "description": "One writer per unit-name prefix, carried in the goal file because the DEVICE runs extra-entry detection and the device does not have the Site Model (Grok opinion §10, adopted). Present-only: a writer declaration is detector data, not actuated state. repo/note prose stays in the Site Model. Lint: no prefix nests inside another — the existing rail, applied to the goal file.",
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(\\.[A-Za-z0-9][A-Za-z0-9_-]*)+\\.\\*$"
+      },
+      "additionalProperties": { "$ref": "#/$defs/unit_writer_entry" },
+      "minProperties": 1
+    },
+
+    "unit_writer_entry": {
+      "type": "object",
+      "properties": {
+        "state": { "const": "present" },
+        "writer": {
+          "enum": ["cfengine", "mise", "nix-darwin", "homebrew", "apple", "third-party"]
+        }
+      },
+      "required": ["state", "writer"],
+      "additionalProperties": false
+    },
+
+    "trust_domain": {
+      "description": "The privileged region as one reserved, always-present, always-comprehensive domain. The validator's privilege derivation is 'any hunk under device-trust', plus the header — and in v1 nothing else, because no state kind carries gate machinery (reconciliation §7). Privilege is derived against the BASELINE's structure, never the proposal's. The validator and agent read their own configuration ONLY from here, so trust content misfiled elsewhere is inert, not covert; the trust kinds are structurally inexpressible outside this domain.",
+      "type": "object",
+      "properties": {
+        "coverage": {
+          "description": "Const: a device-trust domain that is not comprehensive is a hole in the gate.",
+          "const": "comprehensive"
+        },
+        "entries": {
+          "type": "object",
+          "properties": {
+            "policy-tree": { "$ref": "#/$defs/policy_tree_map" },
+            "trust-policy": { "$ref": "#/$defs/trust_policy_map" },
+            "advisor-key": { "$ref": "#/$defs/advisor_key_map" },
+            "agent": { "$ref": "#/$defs/agent_map" }
+          },
+          "required": ["policy-tree", "trust-policy", "agent"],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "trust-policy": {
+                "properties": {
+                  "consent": {
+                    "properties": { "local_yes_required": { "const": true } },
+                    "required": ["local_yes_required"]
+                  }
+                },
+                "required": ["consent"]
+              }
+            },
+            "required": ["trust-policy"]
+          },
+          "then": {
+            "required": ["advisor-key"],
+            "$comment": "A device whose consent policy requires a local yes, with no enrolled advisor key, is a device nobody can say yes for — a stall shipped as configuration. Unrepresentable instead of discovered in the field. (Reconciliation §7, N-1; none of the three opinions caught this.)"
+          }
+        }
+      },
+      "required": ["coverage", "entries"],
+      "additionalProperties": false
+    },
+
+    "policy_tree_map": {
+      "description": "R8 paid at the schema layer: a goal file without a policy-tree digest is invalid, so the generic bundle and any .cf alongside it are bound — as bytes — into what the person approved. Singleton. The byte sequence the digest is computed over (tree serialization) MUST be specified before Step 6 and is named residue R23. Verification order (baseline first, tree at load) is validator work, R10-adjacent.",
+      "type": "object",
+      "propertyNames": { "const": "tree" },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "state": { "const": "present" },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        },
+        "required": ["state", "sha256"],
+        "additionalProperties": false
+      },
+      "minProperties": 1
+    },
+
+    "trust_policy_map": {
+      "description": "The consent gate class, as an ordinary privileged entry rather than a header field: a tier change is then an ordinary (privileged) hunk, and the diff schema needs no header-hunk machinery beyond the migration version_bump (reconciliation §7, contra the Grok opinion's header placement).",
+      "type": "object",
+      "propertyNames": { "const": "consent" },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "state": { "const": "present" },
+          "tier": { "enum": ["operator", "managed", "consented"] },
+          "local_yes_required": {
+            "description": "Fully resolved: the tier's default is resolved by the compiler, both fields present, no implication left to the validator.",
+            "type": "boolean"
+          }
+        },
+        "required": ["state", "tier", "local_yes_required"],
+        "additionalProperties": false
+      },
+      "minProperties": 1
+    },
+
+    "advisor_key_map": {
+      "description": "id IS the key: for keys, content is identity, so rotation is remove+add — the honest actuation of a rotation, not a scary artifact of it. state 'absent' is a revocation tombstone.",
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^ed25519:[0-9a-f]{64}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": { "state": { "enum": ["present", "absent"] } },
+        "required": ["state"],
+        "additionalProperties": false
+      },
+      "minProperties": 1
+    },
+
+    "agent_map": {
+      "description": "The comparator/projector binary itself — TC-25 class, digest-bound (DC-11 for the one binary that matters most; bytes arrive as a TUF target, not via a package-manager chain). This entry is what makes E1 §5.6's two-phase rule EXPRESSIBLE in v1: the validator update is a privileged hunk on this entry, riding as an ordinary diff under version N−1. Without a package kind there is otherwise nothing for that update to be a hunk ON (reconciliation §7, N-2). Present-only: removing the agent is leaving management, not a goal-file operation. One binary, one entry — validator and projector version together.",
+      "type": "object",
+      "propertyNames": { "const": "tendcf-agent" },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "state": { "const": "present" },
+          "version": { "$ref": "common.schema.json#/$defs/release_stamp" },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        },
+        "required": ["state", "version", "sha256"],
+        "additionalProperties": false
+      },
+      "minProperties": 1
+    },
+
+    "abs_path": {
+      "description": "Canonical absolute path: no '//', no trailing slash, no '.' or '..' segments — every path has one spelling. Bare '/' is admitted explicitly (the Fable sketch's pattern could not spell the filesystem root, which the required working_dir needs — reconciliation §15, F-1). Symlink aliasing cannot be excluded textually and is named residue R20; non-ASCII and control characters in segments are a §14.2 review target.",
+      "type": "string",
+      "pattern": "^/$|^(?!.*/\\.\\.?(/|$))(/[^/]+)+$",
+      "maxLength": 1024
+    },
+
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

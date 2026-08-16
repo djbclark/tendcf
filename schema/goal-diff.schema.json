@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/frdminc/tendcf/schema/goal-diff.schema.json",
+  "title": "Goal diff — device-computed authority, compiler preview, CI golden artifact (D44)",
+  "description": "Outline from goal-file-schema-reconciliation-2026-08-15.md §11 (§18 item 1); not this document's tested surface — §14.2 review and the fixture set land with the family, not this pass. The AUTHORITATIVE diff is computed device-side between the device's approved baseline and the received goal file (§9.1); this schema is that object's shape, reused verbatim for the compiler-side preview and the CI golden artifact. Canonical form is the goal file's own JCS rules. Carries no attribution, no dependency groups, and no privilege flags — all three are derived by the validator, never asserted here (E1 §5.5, map §9.8). An empty diff is not a document: hash equality between baseline and proposed short-circuits before one is produced. A migration diff is `version_bump` alone — `hunks` and `coverage_changes` absent is the mechanical predicate for §9.4's empty-apart-from-the-bump rule. The diff never ships in a release; only the full goal file does (§9.1).",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "description": "Family version, shared with goal-file and approval-record (§11).",
+      "const": 1
+    },
+    "host": {
+      "description": "Device public key, same identity rule as goal-file.schema.json#/properties/host.",
+      "type": "string",
+      "pattern": "^ed25519:[0-9a-f]{64}$"
+    },
+    "baseline_sha256": {
+      "description": "H(old canonical goal file) — the device's currently-approved baseline. Always present: a diff object presupposes a baseline to diff against, which is exactly what first adoption does not have (§9.4) — first adoption has no goal-diff object at all, only an approval record with no baseline_sha256.",
+      "$ref": "goal-file.schema.json#/$defs/sha256"
+    },
+    "proposed_sha256": {
+      "description": "H(new canonical goal file).",
+      "$ref": "goal-file.schema.json#/$defs/sha256"
+    },
+    "version_bump": {
+      "description": "Present iff this is a migration release — the ONLY header change a diff can carry. When present, `hunks` and `coverage_changes` MUST be absent (§9.4's empty-apart-from-the-bump rule, made mechanical).",
+      "type": "object",
+      "properties": {
+        "old": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "new": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "old",
+        "new"
+      ],
+      "additionalProperties": false
+    },
+    "coverage_changes": {
+      "description": "Present iff non-empty. A coverage transition is a DISTINCT reviewable section the briefing MUST NOT fold into entry-hunk noise (§9.7). `undeclared` is legal on either side: a domain's first appearance has `old: \"undeclared\"`; a retreat out of `comprehensive` can have `new: \"undeclared\"` (§4.3).",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/identifier"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "old": {
+            "$ref": "#/$defs/coverage_or_undeclared"
+          },
+          "new": {
+            "$ref": "#/$defs/coverage_or_undeclared"
+          }
+        },
+        "required": [
+          "old",
+          "new"
+        ],
+        "additionalProperties": false
+      },
+      "minProperties": 1
+    },
+    "hunks": {
+      "description": "Present iff non-empty; mirrors the goal file's own nesting. Hunk address is the key path (domain, kind, id) — not a field (§9.2). At least one of old/new per hunk; presence IS the operation (both present = modify/replace — what a tombstone transition \"present → absent\" looks like, since removal is a replace hunk, not a deletion, §6; new only = add). An op field would be a second spelling of what presence already says.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/identifier"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "description": "kind -> id -> hunk, same kind set as goal-file.schema.json#/$defs/state_entries (plus device-trust's own kinds where the domain is device-trust).",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/hunk"
+          }
+        }
+      },
+      "minProperties": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "host",
+    "baseline_sha256",
+    "proposed_sha256"
+  ],
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "required": [
+        "version_bump"
+      ]
+    },
+    {
+      "required": [
+        "hunks"
+      ]
+    },
+    {
+      "required": [
+        "coverage_changes"
+      ]
+    }
+  ],
+  "if": {
+    "required": [
+      "version_bump"
+    ]
+  },
+  "then": {
+    "not": {
+      "anyOf": [
+        {
+          "required": [
+            "hunks"
+          ]
+        },
+        {
+          "required": [
+            "coverage_changes"
+          ]
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "coverage_or_undeclared": {
+      "description": "goal-file.schema.json#/$defs/coverage plus `undeclared`, the silence class a domain absent from the map carries (§9.7 / §4.1 C-10). Not reused via $ref from goal-file.schema.json because that enum deliberately excludes `undeclared` — a goal file cannot state it, only a diff can report a transition into or out of it.",
+      "enum": [
+        "undeclared",
+        "comprehensive",
+        "not-yet-migrated",
+        "deliberately-unmanaged"
+      ]
+    },
+    "hunk": {
+      "description": "The full old and/or new entry, same shape as the corresponding goal-file.schema.json#/$defs entry for that (domain, kind) — e.g. #/$defs/service_present or #/$defs/absent under `service`, #/$defs/interlock_entry under `interlock`. Not constrained to those shapes here: which one applies depends on the grandparent `kind` key, which JSON Schema cannot express without duplicating goal-file.schema.json's per-kind $defs inline. Left as a generic object outline (§11); the precise per-kind union is part of the tested surface this document defers, not a decision made here.",
+      "type": "object",
+      "properties": {
+        "old": {
+          "type": "object"
+        },
+        "new": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "old"
+          ]
+        },
+        {
+          "required": [
+            "new"
+          ]
+        }
+      ]
+    }
+  }
+}

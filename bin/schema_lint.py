@@ -3,26 +3,40 @@
 # requires-python = ">=3.11"
 # dependencies = ["pyyaml", "jsonschema>=4.21", "rfc3339-validator"]
 # ///
-"""Lint the tendcf Site Model contract.
+"""Lint the tendcf Site Model and goal-file contracts.
 
 Five layers, cheapest first:
 
   1. every schema/*.schema.json is itself a valid JSON Schema 2020-12;
   2. every schema is paired with an example and every example with a
      schema, derived from the filesystem — a new schema with no fixture
-     is a finding, not a convention someone has to remember;
-  3. every happy-path examples/*.yml instance validates against its schema;
+     is a finding, not a convention someone has to remember. Examples are
+     bilingual: `.yml` for the Site Model, `.json` for the goal-file
+     family, whose canonical form IS JSON (reconciliation §13);
+  3. every happy-path examples/*.{yml,json} instance validates against its
+     schema;
   4. cross-file rules JSON Schema cannot express on its own — domain and
      bundle references resolve, service names are unique, launchd labels
      fall under a declared writer prefix, no writer prefix nests inside
-     another;
-  5. each of the twelve deliberately broken fixtures in examples/broken/
-     is caught. A lint that only accepts good input is not a check.
+     another; on the goal-file side, every interlock's bundle is used by
+     at least one service, comprehensive-domain services fall under a
+     `cfengine`-writer unit-writer prefix, and goal-file.schema.json
+     itself never `$ref`s a def whose defaults would reintroduce
+     ignore-unknown (reconciliation §13, Grok 8.6);
+  5. each of the forty-three deliberately broken fixtures in
+     examples/broken/ is caught. A lint that only accepts good input is
+     not a check.
 
 Layer 4 is the point. Layers 1-3 catch a broken or unpaired schema; layer
 4 is what keeps a valid-but-wrong Site Model out of a render (map §0 rule
 6: prefer machine-checkable to conventional). Layer 5 is why we believe
 layer 4.
+
+What this does NOT yet do (reconciliation §18 item 5, not built here):
+the byte-class fixture mechanism (raw-byte comparison before parsing, for
+canonicalization violations like non-NFC strings or a `15.0` spelling of
+`15`), JCS idempotence checking, and projector-goldens — the last needs
+an actual projector implementation, which does not exist yet.
 
 Exit 0 clean, 1 findings, 2 cannot read/parse.
 Run from repo root:  bin/schema_lint.py
@@ -46,15 +60,30 @@ REPO = Path(__file__).resolve().parent.parent
 SCHEMA_DIR = REPO / "schema"
 EXAMPLE_DIR = REPO / "examples"
 BROKEN_DIR = EXAMPLE_DIR / "broken"
-EXPECTED_BROKEN = 12
+EXPECTED_BROKEN = 43
 
 # example file -> schema file. report-rows.yml is a sequence of rows, each
-# validated individually against the row schema.
+# validated individually against the row schema. goal-file.json is JSON
+# because that IS the goal file's canonical wire form (reconciliation §13);
+# everything else here is YAML authoring shape.
 EXAMPLES: dict[str, tuple[str, bool]] = {
     "services.yml": ("services.schema.json", False),
     "roles.yml": ("roles.schema.json", False),
     "launchd-writers.yml": ("launchd-writers.schema.json", False),
     "report-rows.yml": ("report-row.schema.json", True),
+    "goal-file.json": ("goal-file.schema.json", False),
+    "goal-diff.json": ("goal-diff.schema.json", False),
+    "approval-record.json": ("approval-record.schema.json", False),
+}
+
+# Defs the goal-file schema must never $ref: each carries a default, an
+# optional field, or required prose that would reintroduce a second
+# spelling of one meaning or an ignore-unknown reading (reconciliation
+# §15 C-1, §13 Grok 8.6).
+GOAL_FILE_FORBIDDEN_REFS = {
+    "common.schema.json#/$defs/contract_version",
+    "common.schema.json#/$defs/domain_coverage",
+    "common.schema.json#/$defs/interlock",
 }
 
 # Schemas that hold only shared $defs and describe no document of their own,
@@ -98,6 +127,23 @@ def load_yaml(path: Path) -> Any:
         die(f"cannot read {path.relative_to(REPO)}: {exc}")
 
 
+def load_any(path: Path) -> Any:
+    """Load a fixture by extension: raw JSON for `.json`, YAML otherwise.
+
+    The goal-file family's canonical form is JSON (reconciliation §13);
+    everything else here is authored as YAML. `json.loads` is used
+    directly for `.json` rather than routing through `yaml.safe_load`, so
+    a `.json` fixture that happens to be invalid YAML (arbitrary UTF-8 in
+    a string, e.g.) still loads correctly.
+    """
+    if path.suffix == ".json":
+        try:
+            return json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            die(f"cannot read {path.relative_to(REPO)}: {exc}")
+    return load_yaml(path)
+
+
 def load_schemas() -> tuple[dict[str, dict], Registry]:
     schemas: dict[str, dict] = {}
     for path in sorted(SCHEMA_DIR.glob("*.schema.json")):
@@ -132,7 +178,9 @@ def check_pairing(schemas: dict[str, dict]) -> None:
     added the schema remembered. Reading both directories closes that.
     """
     on_disk_schemas = {p.name for p in SCHEMA_DIR.glob("*.schema.json")}
-    on_disk_examples = {p.name for p in EXAMPLE_DIR.glob("*.yml")}
+    on_disk_examples = {p.name for p in EXAMPLE_DIR.glob("*.yml")} | {
+        p.name for p in EXAMPLE_DIR.glob("*.json")
+    }
     paired_schemas = {schema_name for schema_name, _ in EXAMPLES.values()}
 
     for name in sorted(on_disk_schemas - paired_schemas - DEFINITION_ONLY_SCHEMAS):
@@ -198,7 +246,7 @@ def load_happy_examples() -> dict[str, Any]:
         if not path.exists():
             fail(f"examples/{example_name} is missing — the schema has no fixture")
             continue
-        loaded[example_name] = load_yaml(path)
+        loaded[example_name] = load_any(path)
     return loaded
 
 
@@ -227,6 +275,7 @@ def validate_loaded(
         else:
             validate(data, schema, registry, label)
     check_cross_file(loaded)
+    check_goal_file_cross_file(loaded)
 
 
 def check_negative_fixtures(
@@ -250,9 +299,9 @@ def check_negative_fixtures(
         )
     caught = 0
     for case in cases:
-        overlays = sorted(case.glob("*.yml"))
+        overlays = sorted(case.glob("*.yml")) + sorted(case.glob("*.json"))
         if not overlays:
-            fail(f"examples/broken/{case.name}: no overlay .yml")
+            fail(f"examples/broken/{case.name}: no overlay .yml/.json")
             continue
         loaded = {name: copy.deepcopy(doc) for name, doc in happy.items()}
         for overlay in overlays:
@@ -261,7 +310,7 @@ def check_negative_fixtures(
                     f"examples/broken/{case.name}: {overlay.name} is not a Site Model file"
                 )
                 continue
-            loaded[overlay.name] = load_yaml(overlay)
+            loaded[overlay.name] = load_any(overlay)
         with capture_findings(silent=True) as case_findings:
             validate_loaded(
                 loaded, schemas, registry, label_prefix=f"examples/broken/{case.name}"
@@ -368,6 +417,123 @@ def check_cross_file(loaded: dict[str, Any]) -> None:
             )
 
 
+def check_goal_file_cross_file(loaded: dict[str, Any]) -> None:
+    """Cross-entry rules goal-file.schema.json cannot express alone.
+
+    The goal file has no separate Site Model to check against — domain,
+    bundle, and writer-prefix facts all live inside the one document, at
+    its map-of-maps shape, so this mirrors check_cross_file()'s Site
+    Model rules rather than sharing code with it (reconciliation §13).
+    """
+    goal_file = loaded.get("goal-file.json")
+    if not isinstance(goal_file, dict):
+        return
+    domains: dict[str, Any] = goal_file.get("domains") or {}
+
+    # (domain, prefix, writer) for every unit-writer entry, plus the
+    # present service ids each domain declares.
+    prefixes: list[tuple[str, str, str | None]] = []
+    seen_prefixes: set[str] = set()
+    service_ids_by_domain: dict[str, list[str]] = {}
+    bundles_in_use: set[str] = set()
+
+    for domain_name, domain in domains.items():
+        if not isinstance(domain, dict):
+            continue
+        entries = domain.get("entries") or {}
+        for service_id, service in (entries.get("service") or {}).items():
+            if isinstance(service, dict) and service.get("state") == "present":
+                service_ids_by_domain.setdefault(domain_name, []).append(service_id)
+                bundle = service.get("bundle")
+                if bundle:
+                    bundles_in_use.add(bundle)
+        for prefix, writer_entry in (entries.get("unit-writer") or {}).items():
+            if prefix in seen_prefixes:
+                fail(f"goal-file: unit-writer prefix {prefix!r} declared twice")
+            seen_prefixes.add(prefix)
+            writer = writer_entry.get("writer") if isinstance(writer_entry, dict) else None
+            prefixes.append((domain_name, prefix, writer))
+
+    # --- every interlock's bundle is used by >= 1 present service ----------
+    for domain_name, domain in domains.items():
+        if not isinstance(domain, dict):
+            continue
+        entries = domain.get("entries") or {}
+        for interlock_id, interlock in (entries.get("interlock") or {}).items():
+            bundle = interlock.get("bundle") if isinstance(interlock, dict) else None
+            if bundle not in bundles_in_use:
+                fail(
+                    f"goal-file: domains/{domain_name}/entries/interlock/{interlock_id} "
+                    f"bundle {bundle!r} is used by no present service"
+                )
+
+    # --- no unit-writer prefix nests inside another (one label namespace) --
+    all_prefixes = [p for _, p, _ in prefixes]
+    for outer in all_prefixes:
+        for inner in all_prefixes:
+            if outer == inner:
+                continue
+            if inner.removesuffix("*").startswith(outer.removesuffix("*")):
+                fail(
+                    f"goal-file: unit-writer prefix {inner!r} nests inside {outer!r} — "
+                    "two writers over one namespace"
+                )
+
+    # --- comprehensive-domain services fall under a cfengine writer --------
+    for domain_name, domain in domains.items():
+        if not isinstance(domain, dict) or domain.get("coverage") != "comprehensive":
+            continue
+        domain_prefixes = [(p, w) for d, p, w in prefixes if d == domain_name]
+        for service_id in service_ids_by_domain.get(domain_name, []):
+            matched = [
+                (p, w)
+                for p, w in domain_prefixes
+                if service_id.startswith(p.removesuffix("*"))
+            ]
+            if not matched:
+                fail(
+                    f"goal-file: domains/{domain_name}/entries/service/{service_id} "
+                    "falls under no declared unit-writer prefix — the two-writers rail, "
+                    "applied to the goal file"
+                )
+            elif not any(w == "cfengine" for _, w in matched):
+                fail(
+                    f"goal-file: domains/{domain_name}/entries/service/{service_id} "
+                    "falls under a unit-writer prefix whose writer is not cfengine"
+                )
+
+
+def check_goal_file_forbidden_refs(schemas: dict[str, dict]) -> None:
+    """goal-file.schema.json must restate, never `$ref`, the forbidden defs.
+
+    A future edit that `$ref`s `contract_version` (or `domain_coverage` /
+    `interlock`) silently readopts that def's default or optional field —
+    exactly the second-spelling-of-one-meaning hazard the goal file exists
+    to close (reconciliation §13, Grok 8.6; §15 C-1).
+    """
+    schema = schemas.get("goal-file.schema.json")
+    if schema is None:
+        return
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str):
+                normalized = ref.split("/schema/")[-1]
+                if normalized in GOAL_FILE_FORBIDDEN_REFS:
+                    fail(
+                        f"schema/goal-file.schema.json: $ref {ref!r} reuses a def "
+                        "the goal file must restate instead of referencing"
+                    )
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(schema)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -382,6 +548,7 @@ def main() -> int:
         die("no schemas found in schema/")
 
     check_schemas_valid(schemas)
+    check_goal_file_forbidden_refs(schemas)
     caught = 0
     if not args.schemas_only:
         check_pairing(schemas)

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "host": "ed25519:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+  "domains": {
+    "device-trust": {
+      "coverage": "comprehensive",
+      "entries": {
+        "policy-tree": {
+          "tree": {
+            "state": "present",
+            "sha256": "sha256:c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+          }
+        },
+        "trust-policy": {
+          "consent": {
+            "state": "present",
+            "tier": "consented",
+            "local_yes_required": true
+          }
+        },
+        "advisor-key": {
+          "ed25519:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": {
+            "state": "present"
+          }
+        },
+        "agent": {
+          "tendcf-agent": {
+            "state": "present",
+            "version": "ops-v1.0.0",
+            "sha256": "sha256:d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"
+          }
+        }
+      }
+    },
+    "supervision": {
+      "coverage": "comprehensive",
+      "entries": {}
+    }
+  }
+}
