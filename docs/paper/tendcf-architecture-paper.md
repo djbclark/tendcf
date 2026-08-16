@@ -304,19 +304,29 @@ depend on — verbatim: `success`/`repaired`/`error`/`n-a` in enforce mode,
 `compliant`/`noncompliant`/`error`/`n-a` in audit mode. It is a well-tested
 structured vocabulary and only the sink is changing.
 
-### 2.5 Releases carry a typed plan the executor may not exceed
+### 2.5 Releases carry a goal file; the device applies only an approved diff
 
-Configuration reaches devices only as a versioned, signed release. Each
-release additionally publishes a per-host **typed ChangePlan**: a list of
-operations, each declaring a `capability` drawn from a closed vocabulary,
-the exact `resources` it may touch (checked against the port and path
-registries), a `target` bound to the host's public key, plus rollback,
-expiry, and nonce. The on-device executor maps declared capabilities to an
-allowlist and **mechanically refuses any effect outside the declared set**.
+Configuration reaches devices only as a versioned, signed release. The
+per-host payload of that release is the device's **complete canonical goal
+file**: one fully resolved JSON document describing the whole managed state
+of that host. The device computes the **diff** between the goal file it has
+already approved and the one the release proposes — that diff *is* the
+ChangePlan — and the on-device executor is a **validator** over it,
+comparing two canonical documents against the approved diff and performing
+no policy interpretation.
+
+An earlier design put a closed `capability` vocabulary and per-operation
+`resources` in the plan and had the executor refuse any effect outside the
+declared set. It is withdrawn. CFEngine has no runtime capability
+confinement, so such an executor could only be a pre-flight *interpreter* of
+the vocabulary plus a proof that the vocabulary describes what the rendered
+policy actually does; neither artifact exists, and neither is in budget for
+one unfunded builder. Coverage instead closes by construction: compiler and
+validator share one schema and fail together.
 
 The distinction we are drawing is between "apply this bundle because its
-hash is signed" and "apply only these operations, on these resources,
-because the plan says so." The first authenticates the author; only the
+hash is signed" and "apply only this difference, because a person approved
+exactly it." The first authenticates the author; only the
 second constrains the effect. Signing itself is an unremarkable TUF [26]
 subset sized for one operator, plus a durable per-client high-water mark so
 replay, freeze, and downgrade are closed. The first trusted root is enrolled
@@ -1052,7 +1062,7 @@ Three ways we can see it being wrong, offered rather than rebutted:
    we have argued ourselves into building a graph in order to achieve a
    property the thing underneath it already had.
 2. **`provides`/`requires` may only relocate the global knowledge.** Naming
-   a capability token that another type must name identically is a shared
+   a token that another type must name identically is a shared
    vocabulary; agreeing on a vocabulary across files is a coordination
    problem wearing local clothing. The mitigation is auto-provide of
    `service:<name>`, a lookup CLI against the compiled catalog, and compile
@@ -1258,7 +1268,7 @@ correct input demonstrates nothing about whether it catches incorrect input,
 so the schemas are tested against twelve deliberately broken fixtures in
 `examples/broken/` — an opt-out with no reason, a rogue launchd label, a
 nested writer prefix, a literal secret where a key name belongs, a typo'd
-capability token kind, an enforce-mode row carrying an audit-mode outcome —
+token kind, an enforce-mode row carrying an audit-mode outcome —
 and each is caught. The lint fails if any of those twelve is accepted. Two of
 the twelve exposed error messages that were useless (`is not valid under any
 of the given schemas`, with no field pointer): the failure §3 rules out for
@@ -1333,10 +1343,12 @@ turns "why is this waiting?" into a query. Nobody has run it. If it does not
 work, inference has a silent failure mode and §5.1's argument gets much
 worse.
 
-**8.8 Does the ChangePlan's capability vocabulary survive contact with real
-operations?** A closed vocabulary that the executor enforces is only as good
-as its coverage; the pressure will be to add an escape-hatch capability, and
-the moment one exists the mechanism is decorative.
+**8.8 Does the goal-file schema keep up with real operations?** There is no
+capability list to outgrow, and coverage closes by construction — compiler
+and validator share one schema and fail together — so the escape-hatch
+pressure does not disappear, it relocates: the way to get a change out
+without extending the schema is to declare a domain `not-yet-migrated`. That
+is question 8.3 wearing a different hat.
 
 **8.9 Is the whole premise the wrong shape?** The design optimizes for
 machine authors on the assumption that they are the primary authors and that
