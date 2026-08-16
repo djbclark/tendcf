@@ -1,0 +1,70 @@
+ADVERSARIAL REVIEW, read-only. Work in /Users/djbclark/src/tendcf. Modify
+nothing. Run no state-changing git command. Your output is your report.
+
+You are trying to REFUTE a decision, not to praise it. Default to "this is
+wrong" and make the decision earn its place. A review that finds nothing is
+only useful if you genuinely tried to break it and failed — say which
+attacks you ran and why each failed.
+
+## The decision under attack
+
+Tonight `docs/architecture/projector-reconciliation-2026-08-16.md` was
+written. Read it in full, plus the R21 passages it interprets:
+
+- `docs/architecture/architecture-DEFINITIVE-v3.md` ~lines 450-462
+- `docs/architecture/goal-file-schema-reconciliation-2026-08-15.md` ~lines 520-540
+  and the R21 register entry near line 1233
+
+The contested move is **R21.1**, in the reconciliation's §3. In short:
+
+Residue R21 says the projector is "a structural re-keying only (entries → the
+generic bundle's containers, tombstones → the negative-promise lists, trust
+entries → the agent's own config)" and in the same breath that "any change
+that inspects entry *values* to decide output *structure* is the interpreter
+returning."
+
+Three independent models each concluded these two halves contradict, because
+routing tombstones on `state` IS a value deciding structure. Rather than
+amend the decided text, the adjudication resolved it by ruling that R21's
+arrow chain describes **system-level dataflow**, not projector output
+structure — the argument being that the THIRD arrow ("trust entries → the
+agent's own config") cannot possibly be projector output, since the projector
+writes exactly one file and that file is not the agent's config; therefore at
+least one arrow already crosses out of projector-output space, so the second
+arrow may too.
+
+## Attack it
+
+1. **Is the third-arrow argument sound?** It carries the whole resolution. Is
+   there a reading in which "trust entries → the agent's own config" IS
+   consistent with all three arrows describing projector output? Does the
+   inference "one arrow is dataflow, therefore another may be" actually
+   follow, or is it a fallacy of composition?
+2. **Does R21.1 prove too much?** If arrows can be dataflow rather than
+   output spec, what else in R21 dissolves? Could the same move be used later
+   to explain away the tripwire itself? A reading that can excuse anything is
+   worth nothing.
+3. **Is there a better reading?** The adjudication considered and rejected
+   four alternatives (they are enumerated in the source material it was built
+   from: tripwire-scopes-to-changes-not-baseline; state-is-a-type-discriminator-
+   not-a-value; the-parenthetical-is-drafting-residue; the-design-is-genuinely-
+   over-constrained-and-must-be-amended). Argue for whichever you think is
+   stronger than R21.1, if any.
+4. **Was calling it a "clarification, not an amendment" honest?** The
+   adjudication claims no decided text changes. Is that true, or has it
+   effectively overridden a clause while declining to file a correction? The
+   corpus has a §15 corrections register precisely for overrides. Should this
+   have gone there instead?
+5. **Consequences.** If R21.1 is wrong, what breaks in the decided mapping —
+   does P-3 (tombstones stay in their container) fall with it, or does P-3
+   survive on independent grounds?
+
+## Rules
+
+- Quote exact text with file:line. An attack that misquotes the target is
+  itself refuted.
+- Distinguish "I disagree" from "this is internally inconsistent". Only the
+  second is a defect.
+- If after genuine effort you conclude R21.1 is correct, say so and give the
+  strongest surviving objection anyway.
+- Be concise. Argument, not volume.

@@ -45,7 +45,7 @@ canonified: the id is the promiser and the launchd label, and rewriting it
 would be a second spelling of identity.
 
 WHY TOMBSTONES STAY PUT. An entry with `state: "absent"` sits in its kind
-container like any other entry, with its `state` copied (P-3, R21.1). There
+container like any other entry, with its `state` copied (P-3, C-1). There
 is no parallel absent-list and nothing is dropped for being absent: dropping
 it would mean "stop managing" where the goal file says "converge to absent",
 which in a comprehensive domain leaves a removal with no actuated path. The

@@ -16,7 +16,7 @@ in what bytes.
 `goal-file-schema-reconciliation-2026-08-15.md`, the document this one
 continues; the guide and the map are named where cited. This document's own
 clauses are never `§N` — they are `P-n` (decisions), `N-n` (negatives), `E-n`
-(measured CFEngine behaviour) and `R2n` (register), so a bare `§` never
+(measured CFEngine behaviour) and `C-n` / `R2n` (register), so a bare `§` never
 points inward.
 
 ## 0. Method, and why the CFEngine claims here are load-bearing
@@ -154,27 +154,85 @@ same breath, that "any change that inspects entry *values* to decide output
 on an entry value selecting an output container. Read as a specification of
 projector output, the two halves cannot both hold.
 
-**Resolution: R21's arrow chain is system-level dataflow, not projector output
-structure.** The third arrow settles it — "trust entries → the agent's own
-config" cannot be projector output, because the projector writes exactly one
-file and that is not it. At least one arrow therefore already describes where
-a thing ends up *in the running system* rather than which container the
-projector emits. Arrow two reads the same way: entries reach the generic
-bundle's containers, and out of those containers CFEngine renders the negative
-promises at evaluation time. The projector emits one container per kind; the
-`.cf` policy builds the negative-promise list from `state`. Nothing in the
-projector branches on a value, and the sentence keeps its plain meaning.
+**Resolution: C-1 — the second arrow is withdrawn as a sketch-promotion
+error. It is an amendment, and is filed as one.**
 
-This is a **clarification of R21, not an amendment** — no decided text
-changes, and the tripwire keeps full force as a mechanical test (see N-1).
-The reading is recorded as **R21.1** so the next reader does not re-derive it.
+An earlier draft of this document resolved the tension by reading R21's arrow
+chain as system-level dataflow rather than projector output — arguing that
+since arrow three ("trust entries → the agent's own config") cannot be
+projector output, arrow two need not be either, so CFEngine renders the
+negative promises from `state` at evaluation time. That reading was
+adversarially reviewed and **refuted**. It is recorded here rather than
+quietly deleted, because the refutation is the reason this clause is now an
+amendment instead of a clarification.
 
-Substantively this is also the only safe answer. Omitting a tombstone would
-mean "stop managing" rather than "converge to absent", which in a
-comprehensive domain leaves a removal with no actuated path — R4 reborn
-(§6, and `reconciliation:354`). The briefing's distinction between "stops
-being managed; the thing REMAINS" and "will be stopped and unloaded"
-(`reconciliation:343–345`) depends on the tombstone being visible to policy.
+It failed on three counts:
+
+1. **The inference does not follow.** That arrow three is not projector output
+   establishes only that the list is *not uniformly* an output spec. It does
+   not select dataflow over the other candidates. The audit this document was
+   built from said "if arrow three is not projector output, arrow two *need
+   not* be either"; the draft upgraded that to "arrow two reads the same way".
+   Possibility is not identity, and a heterogeneous list does not become
+   uniformly dataflow because one member is.
+2. **It was special pleading.** §1 of this document uses arrow three as a
+   *binding output constraint* — the reason trust entries are routed away
+   from the projection. §3 used the same arrow as proof the chain is *not* an
+   output spec. The extra hop was granted only to the arrow that would
+   otherwise force a tombstone split.
+3. **Provenance inverts it.** The parenthetical is compressed from Fable's
+   opinion, which reads "tombstones → the negative-promise lists **the generic
+   bundle iterates**, trust entries → the *validator's* own config"
+   (`goal-file-schema-opinion-fable.md:393–396`). "Iterates" names an *input
+   the bundle walks* — projector output — not something the bundle renders at
+   eval time. The 2026-08-15 copy dropped that qualifier
+   (`reconciliation:527–529`). The dataflow reading does not recover a meaning
+   the text always had; it inverts the words that were dropped.
+
+The same provenance supplies the correct resolution. Fable's arrow one reads
+"entries → `nix2cf_services`-style containers" — the guide §16.A preview-channel
+vocabulary that this corpus has *already* demoted once, as C-9, for describing a
+shape that does not load. The arrow chain is an illustrative sketch that was
+promoted into decided prose without the ILLUSTRATIVE stamp §16.A received, and
+lost a load-bearing qualifier on the way.
+
+**So: the second arrow, read as a specification of projector output
+containers, is withdrawn.** The tripwire in the same sentence is untouched and
+keeps full force — it is now mechanical, as N-1. Arrow one stands and is what
+P-2 implements. Arrow three stands and is what P-1 relies on. R21's filed
+register entry (`reconciliation:1233`) already states the residue with **no
+arrows at all** — "policy-free by discipline, not construction; value-inspecting
+structure decisions are the interpreter returning" — so withdrawing the arrow
+costs the register nothing.
+
+This is an override of decided text, and calling it a clarification would have
+been false: either the three opinions refused decided text, in which case the
+operative meaning has changed, or they refused a misreading, in which case
+"a 3-0 refusal of decided text" above would itself be wrong. The first is
+true. C-1 is therefore filed in the same genre as the 2026-08-15 §15 register
+(C-4 "corrected as written", C-9 the guide's Augments illustration), not
+buried as a residue id — residue ids carry new costs, and are not the house
+form for recording that yesterday's sentence has been overruled.
+
+**P-3 does not depend on any of this.** It is independently forced, which is
+why the mapping, the projector and the golden are unaffected by the refutation:
+
+1. **C-4.** The tombstone persists in the goal file and the negative promise
+   renders from the file; the projector is a function of the new goal file
+   alone (`reconciliation:336–340`).
+2. **R4 reborn if omitted.** Extra-entry detection reports and does not
+   remove, so a comprehensive domain with no projected tombstone has a
+   removal with no actuated path (`reconciliation:347–355`).
+3. **Briefing honesty.** The distinction between "stops being managed; the
+   thing REMAINS" and "will be stopped and unloaded"
+   (`reconciliation:343–345`) is a lie if the mutation engine cannot see the
+   tombstone.
+4. **3-0 on the mapping**, reached on those grounds rather than on any reading
+   of R21.
+
+What the refutation removes is only the claim that R21 *already said* P-3. The
+decided mapping does not move, and the tripwire is cleaner for having the
+sketch retired rather than reinterpreted.
 
 ## 4. P-4 — Secrets project as names, and `@{` is now a load-breaking negative
 
@@ -290,9 +348,16 @@ is the point of goldens.
 
 ## 10. Register
 
+### Corrections
+
+| id | Correction |
+|---|---|
+| C-1 | R21's second arrow, `tombstones → the negative-promise lists`, is **withdrawn** as a specification of projector output. The arrow chain is an illustrative sketch (Fable `:393–396`) promoted into decided prose without §16.A's ILLUSTRATIVE stamp, losing the qualifier "the generic bundle iterates" that made the lists projector *input*. Arrows one and three stand; the tripwire in the same sentence stands and is mechanical as N-1; R21's filed register entry (`reconciliation:1233`) carries no arrows and is unaffected. P-3 rests on C-4, R4-reborn and briefing honesty, not on this. |
+
+### Residues
+
 | id | Residue |
 |---|---|
-| R21.1 | R21's arrow chain is system-level dataflow, not a specification of projector output containers. Established by arrow three, which cannot be projector output. Tombstones stay in their kind container; CFEngine renders negative promises from `state` at eval time. |
 | R22 | The reference projector in `bin/` is a second implementation site to tendcf-agent's. The golden bytes are the anti-drift oracle. |
 | R23 | The kind-token `-`→`_` rule is convention with no mechanical force; hyphens are legal in `vars` keys on 3.27.1 (measured). Do not re-derive a mechanical justification for it. |
 
