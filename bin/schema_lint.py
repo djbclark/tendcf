@@ -222,6 +222,11 @@ DETAILED_RULE_HEADS = frozenset({"family"})
 # explicit and reviewable rather than implicit in a check that never runs.
 CLASSES_WITHOUT_FIXTURES = frozenset({RULE_PAIRING, RULE_SCHEMA_META, RULE_HARNESS})
 
+# The reserved privileged region. Named once here because two checks key on
+# it and a second spelling of the domain name would be exactly the defect
+# check_trust_inexpressible() exists to catch.
+TRUST_DOMAIN = "device-trust"
+
 
 class Finding(NamedTuple):
     rule: str
@@ -1779,6 +1784,110 @@ def check_goal_file_forbidden_refs(schemas: dict[str, dict]) -> None:
     walk(schema)
 
 
+def check_trust_inexpressible(
+    loaded: dict[str, Any], schemas: dict[str, dict], registry: Registry
+) -> None:
+    """`trust_domain`'s "structurally inexpressible outside this domain", measured.
+
+    The validator's privilege derivation is positional — "any hunk under
+    `device-trust`", and in v1 nothing else (reconciliation §7) — so trust
+    content is privileged by WHERE IT SITS, never by what it says. F7
+    measured how little the bytes carry on their own: of the corpus's four
+    trust bodies, `trust-policy`'s `{"local_yes_required", "state", "tier"}`
+    has nothing in it that a legal service body could not also have. Position
+    is therefore the whole of the enforcement, and the schema's promise that
+    misfiled trust content is "inert, not covert" holds only while no
+    ordinary domain can spell a trust kind or accept a trust body.
+
+    That promise was prose, tested nowhere, and it is true today by a
+    mechanism one edit away from silent removal: `state_entries` closes its
+    kind set with `additionalProperties: false`. A future kind added to that
+    set, or that `false` relaxed, reopens the region without touching a word
+    of `trust_domain` — and the failure is silent, because nothing downstream
+    re-derives it.
+
+    A property rather than fixtures because it must extend itself to a fifth
+    trust kind that does not exist yet. Fixtures would pin the four spellings
+    someone thought to write down, which is the coverage that decays.
+    """
+    goal = loaded.get("goal-file.json")
+    schema = schemas.get("goal-file.schema.json")
+    if goal is None or schema is None:
+        return
+
+    domains = goal.get("domains", {})
+    trust = domains.get(TRUST_DOMAIN, {}).get("entries", {})
+    hosts = sorted(
+        name
+        for name, domain in domains.items()
+        if name != TRUST_DOMAIN and domain.get("entries")
+    )
+    if not trust or not hosts:
+        fail(
+            f"goal-file.json carries no {TRUST_DOMAIN} entries, or no ordinary "
+            "domain with entries to smuggle them into — the inexpressibility "
+            "claim cannot be checked, so the enforcement trick is unguarded",
+            rule=RULE_HARNESS,
+        )
+        return
+    host = hosts[0]
+
+    def admitted(candidate: Any) -> bool:
+        validator = Draft202012Validator(
+            schema, registry=registry, format_checker=FormatChecker()
+        )
+        return not any(validator.iter_errors(candidate))
+
+    for kind, entries in sorted(trust.items()):
+        smuggled = copy.deepcopy(goal)
+        smuggled["domains"][host]["entries"][kind] = copy.deepcopy(entries)
+        if admitted(smuggled):
+            fail(
+                f"the trust kind {kind!r} is admitted under domains/{host} — "
+                f"privilege is derived from position ({TRUST_DOMAIN}) and from "
+                "nothing in the entry, so a trust kind spellable elsewhere is "
+                "trust content the validator never classifies as privileged",
+                rule=RULE_SCHEMA,
+            )
+
+        # The body alone, wearing an id the host kind already admits, so a
+        # refusal can only be about the body. A fresh id would leave the two
+        # possible causes tangled and the measurement would prove less than
+        # it appeared to.
+        for body in entries.values():
+            for host_kind, host_entries in sorted(
+                goal["domains"][host]["entries"].items()
+            ):
+                if not host_entries:
+                    continue
+                host_id = sorted(host_entries)[0]
+                smuggled = copy.deepcopy(goal)
+                smuggled["domains"][host]["entries"][host_kind][host_id] = copy.deepcopy(
+                    body
+                )
+                if admitted(smuggled):
+                    fail(
+                        f"a {kind!r} body is admitted as domains/{host}/entries/"
+                        f"{host_kind}/{host_id} — the body carries no marker of "
+                        "its own (F7), so an ordinary kind whose shape it fits "
+                        "makes misfiled trust content live rather than inert",
+                        rule=RULE_SCHEMA,
+                    )
+
+    # The whole domain under a second name. Refused by the same closed kind
+    # set rather than by the name, which is why it is checked separately: a
+    # relaxation shows up here first if the kind loop is ever narrowed.
+    renamed = copy.deepcopy(goal)
+    renamed["domains"][f"{host}-trust"] = copy.deepcopy(domains[TRUST_DOMAIN])
+    if admitted(renamed):
+        fail(
+            f"the {TRUST_DOMAIN} domain is admitted verbatim as "
+            f"domains/{host}-trust — a second, unprivileged copy of the region "
+            "the validator and agent read their own configuration from",
+            rule=RULE_SCHEMA,
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1801,6 +1910,7 @@ def main() -> int:
         loaded = load_happy_examples()
         validate_loaded(loaded, schemas, registry)
         if not findings:
+            check_trust_inexpressible(loaded, schemas, registry)
             declared = read_declared_classes()
             caught = check_negative_fixtures(loaded, schemas, registry, declared)
             byte_caught = check_byte_class_fixtures(declared)
