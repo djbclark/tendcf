@@ -506,6 +506,14 @@ def check_declared_claim(label: str, case: str, found: list[Finding]) -> bool:
     the wrong sibling branch of a `oneOf` it did reach. Tightening that would
     mean ranking branch failures by relevance, which is a judgement the error
     does not carry.
+
+    F6 narrowed the evidence sets those measurements were taken over, and the
+    numbers moved a lot: case 43 from 5 admissible tokens to 2, case 34 from
+    5 to 2, case 5 from 4 to 3, cases 24 and 27 from 10 each to 7. What the
+    remaining width is made of is now almost entirely the `oneOf` looseness
+    above — a service entry is a oneOf over present/absent, so both branches'
+    causes are honestly reportable — rather than ancestor container defs that
+    were on the path by construction.
     """
     want = claims.get(case)
     if not want:
@@ -928,13 +936,19 @@ BRANCH_LOCATORS = {"then": "if/then", "else": "if/else", "not": "if/not"}
 # back. `properties` and `additionalProperties` are deliberately absent —
 # they are navigation on nearly every path, and admitting them would let a
 # cell claim `additionalProperties` for almost any failure.
+#
+# F6(b): `items` was here and belongs with them, not with `contains`. It says
+# only "this went through an array", which is navigation into a subschema and
+# not a rule that rejected anything — ``schema (`items`)`` passed on case 5,
+# whose actual cause is a macOS service missing its required `launchd` block.
+# `prefixItems` and `contains` stay: those DO reject (a tuple position's
+# schema, an at-least-one-match requirement) rather than merely descend.
 APPLICATORS = frozenset(
     {
         "propertyNames",
         "patternProperties",
         "contains",
         "prefixItems",
-        "items",
         "dependentSchemas",
         "dependentRequired",
         "unevaluatedProperties",
@@ -954,29 +968,43 @@ def _refs_along(root: Any, path: list[Any]) -> set[str]:
     resolved without a human going and reading the schema.
 
     The names are still in the schema document, so walk that alongside the
-    error's schema_path and collect every `$ref` stepped through. This is
-    what lets examples/broken/README.md keep saying `abs_path` — a claim a
-    reader can act on — instead of degrading to `pattern` to stay checkable.
+    error's schema_path and return the INNERMOST `$ref` stepped through —
+    the definition that actually carries the failing keyword. This is what
+    lets examples/broken/README.md keep saying `abs_path` — a claim a reader
+    can act on — instead of degrading to `pattern` to stay checkable.
+
+    F6(a): this collected every name stepped through, so every ancestor
+    container def was claimable too. Case 43 (`timeout_seconds: 30.5`)
+    admitted `state_domain`, `state_entries` and `interlock_map` alongside
+    the `type` that actually fired, and ``schema (`state_domain`)`` passed —
+    a cell saying nothing whatever about why a float was rejected. An
+    ancestor is on the path by construction, so admitting it is the same
+    objection APPLICATORS raises against `properties`: true of nearly
+    everything, and therefore evidence for nothing.
+
+    Sub-errors keep their own innermost def, because collect() calls this
+    once per error with that error's own path. A failing `oneOf` therefore
+    still offers each branch's definition, which is the documented looseness
+    check_declared_claim() relies on.
     """
-    node, seen = root, set()
+    node, last = root, None
     if not isinstance(root, dict):
-        return seen
+        return set()
     for step in path:
         if isinstance(node, dict) and "$ref" in node:
             target = node["$ref"]
-            name = target.rsplit("/", 1)[-1]
             # Only local `#/$defs/...` refs resolve here; a cross-document ref
             # would need the registry, and no cell names one.
             if target.startswith("#/$defs/"):
-                seen.add(name)
-                node = root.get("$defs", {}).get(name, node)
+                last = target.rsplit("/", 1)[-1]
+                node = root.get("$defs", {}).get(last, node)
         try:
             node = node[step]
         except (KeyError, IndexError, TypeError):
-            return seen
+            return {last} if last else set()
     if isinstance(node, dict) and node.get("$ref", "").startswith("#/$defs/"):
-        seen.add(node["$ref"].rsplit("/", 1)[-1])
-    return seen
+        last = node["$ref"].rsplit("/", 1)[-1]
+    return {last} if last else set()
 
 
 def schema_evidence(error: Any, root: Any) -> frozenset[str]:
