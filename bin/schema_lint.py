@@ -590,13 +590,38 @@ def check_pairing(schemas: dict[str, dict]) -> None:
         )
 
 
+def error_location(error: Any) -> str:
+    """Where a schema violation is, in whichever coordinate space still has it.
+
+    jsonschema drops the instance path for a boolean subschema: `descend()`
+    short-circuits on `schema is False` and yields the error without
+    appending the property it descended through, so a violation that is
+    genuinely about one field arrives with `error.path == []`. Case 57
+    measures it — `refused` under the `else` branch of
+    approval-record.schema.json's refused-iff-reject rule reports
+    `path=[]`, `schema_path=['else', 'properties']` — and the finding then
+    named the offending value but nowhere at all.
+
+    `error.schema_path` survives that, so it is added when the instance
+    path is empty. Added, not substituted, and labelled: an instance path
+    and a schema path are different coordinate spaces, and a reader who
+    took `else/properties` for a field name in the document would be worse
+    off than with the bare `<root>` this replaces. `<root>` alone remains
+    the answer when both are empty.
+    """
+    where = "/".join(str(p) for p in error.path)
+    if where:
+        return where
+    schema_where = "/".join(str(p) for p in error.schema_path)
+    return f"<root> (schema {schema_where})" if schema_where else "<root>"
+
+
 def validate(instance: Any, schema: dict, registry: Registry, label: str) -> None:
     validator = Draft202012Validator(
         schema, registry=registry, format_checker=FormatChecker()
     )
     for error in sorted(validator.iter_errors(instance), key=lambda e: list(e.path)):
-        where = "/".join(str(p) for p in error.path) or "<root>"
-        fail(f"{label}: {where}: {error.message}", rule=RULE_SCHEMA)
+        fail(f"{label}: {error_location(error)}: {error.message}", rule=RULE_SCHEMA)
 
 
 # row_type -> the $defs branch of report-row.schema.json that describes it.
