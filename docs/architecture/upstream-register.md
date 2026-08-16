@@ -25,7 +25,16 @@ Per the operator, each item gets the same treatment PR 3 got:
 2. **A tracking artifact on the fork** — an issue where issues are enabled
    (`djbclark/core`), a pull request where they are not (`djbclark/libntech`).
 3. **Email** — links to both, sent to **contact@northern.tech** for ordinary
-   bugs and **security@northern.tech** for security-relevant ones.
+   bugs and **security@northern.tech** for security-relevant ones. **When in
+   doubt, security@** (operator, 2026-08-16).
+
+**A second opinion is required before upstream is contacted** (operator,
+2026-08-16). This is the same adversarial-review discipline the corpus already
+applies to its own decisions — see the `*-opinion-{fable,gemini,grok}.md` panels
+and the refutations they produced. A fork issue filed without one is not a
+problem in itself, because the fork is not upstream; the rule is that **no email
+goes out until the item has been second-opinioned and the issue updated with
+whatever that review found.**
 
 Nothing is filed on an upstream tracker yet, by necessity rather than choice.
 
@@ -33,18 +42,20 @@ Nothing is filed on an upstream tracker yet, by necessity rather than choice.
 
 Legend: **done** · *pending* · — not applicable.
 
-| id | Item | Repo | Fix | Fork branch | Fork artifact | Email | Upstream |
-|---|---|---|---|---|---|---|---|
-| B-1 | Poll loops count iterations instead of measuring elapsed time; `exec_timeout` reports a timed-out command as *promise kept* | core | **done** `26634ac1f` | **done** [`fix/exec-timeout-commands`](https://github.com/djbclark/core/tree/fix/exec-timeout-commands) | **done** [#4](https://github.com/djbclark/core/issues/4) | *pending* — **security@**, see "Blocked on" | *pending* |
-| B-2 | Descendants not signalled on timeout; grandchild holds the pipe, so `exec_timeout` does not bound wall clock | core | **done** `cb2561584` | **done** [`fix/timeout-process-group`](https://github.com/djbclark/core/tree/fix/timeout-process-group) | **done** [#5](https://github.com/djbclark/core/issues/5) | *pending* — **contact@** | *pending* |
-| B-3 | No `process_darwin.c`; macOS uses the stub, so `GetProcessState()` never reports ZOMBIE/STOPPED and `SafeKill()`'s PID-recycling guard is disabled | core | *not started* | — | — | — | — |
-| B-4 | JSON reals truncated to 2 decimals (`0.00049` → `0.00`), including through mustache templating; `%.2f` and `%.4f` disagree | libntech | *not started* | — | — | — | — |
-| B-5 | Rejected CMDB file names no key/value/path, and one bad key drops every variable on the host | core | *not started* | — | — | — | — |
-| B-6 | `eval()` returns `%lf` for integral results, so arithmetic cannot feed any function taking a count | core | *not started* | — | — | — | — |
-| B-7 | Dotted CMDB keys silently become scope paths, with no warning | core | *not started* | — | — | — | — |
-| P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** | `simulate-keep-chroot` `5dbd295f6` | **done** [#2](https://github.com/djbclark/core/issues/2) | *unknown* | *pending* |
-| P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** | `simulate-json` `071f85987` | **done** [#3](https://github.com/djbclark/core/issues/3) | *unknown* | *pending* |
-| P-3 | Silent digest-initialization failure when hashing | libntech | **done** `da7d3d9` | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) | **done** (operator, manually) | *pending* |
+`2nd` is the required second opinion; an item may not be emailed until it is done.
+
+| id | Item | Repo | Fix | Fork branch | Fork artifact | 2nd | Email | Upstream |
+|---|---|---|---|---|---|---|---|---|
+| B-1 | Poll loops count iterations instead of measuring elapsed time; `exec_timeout` reports a timed-out command as *promise kept* | core | **done** `26634ac1f` | **done** [`fix/exec-timeout-commands`](https://github.com/djbclark/core/tree/fix/exec-timeout-commands) | **done** [#4](https://github.com/djbclark/core/issues/4) | *pending* | *pending* — **security@**, see "Blocked on" | *pending* |
+| B-2 | Descendants not signalled on timeout; grandchild holds the pipe, so `exec_timeout` does not bound wall clock | core | **done** `cb2561584` | **done** [`fix/timeout-process-group`](https://github.com/djbclark/core/tree/fix/timeout-process-group) | **done** [#5](https://github.com/djbclark/core/issues/5) | *pending* | *pending* — **security@** (in doubt → security) | *pending* |
+| B-3 | No `process_darwin.c`; macOS uses the stub, so `GetProcessState()` never reports ZOMBIE/STOPPED and `SafeKill()`'s PID-recycling guard is disabled | core | *not started* | — | — | *pending* | — | — |
+| B-4 | JSON reals truncated to 2 decimals (`0.00049` → `0.00`), including through mustache templating; `%.2f` and `%.4f` disagree | libntech | *not started* | — | — | *pending* | — | — |
+| B-5 | Rejected CMDB file names no key/value/path, and one bad key drops every variable on the host | core | *not started* | — | — | *pending* | — | — |
+| B-6 | `eval()` returns `%lf` for integral results, so arithmetic cannot feed any function taking a count | core | *not started* | — | — | *pending* | — | — |
+| B-7 | Dotted CMDB keys silently become scope paths, with no warning | core | *not started* | — | — | *pending* | — | — |
+| P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** | `simulate-keep-chroot` `5dbd295f6` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | *unknown* | *pending* |
+| P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** | `simulate-json` `071f85987` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | *unknown* | *pending* |
+| P-3 | Silent digest-initialization failure when hashing | libntech | **done** `da7d3d9` | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) | *not done* | **done** (operator, manually) | *pending* |
 
 `djbclark/core` [#1](https://github.com/djbclark/core/issues/1) is the
 investigation trail behind P-1/P-2 and is not itself a defect.
@@ -68,6 +79,12 @@ B-1's full evidence is in
   mid-session is not visible to a session that was already running — MCP servers
   are fixed at startup. Deferred deliberately to the next session, where it is
   the **first thing to do** after the handoff/quit/baton cycle.
+- **Second opinions on B-1 and B-2.** Both were filed before this rule was
+  stated. They must be reviewed — ideally by a non-Claude model, as the corpus
+  does elsewhere — and `#4`/`#5` updated with anything the review finds, *before*
+  either email is sent. The uncertainties already flagged in those issues
+  (`setpgid` versus Ctrl-C, the unconditional group SIGKILL, the test's clock
+  mock) are the obvious things to put in front of a reviewer.
 - **Which address.** B-1 is a fail-open — a guard whose verification timed out is
   reported as satisfied — so it goes to **security@northern.tech** unless the
   operator says otherwise; under-reporting is the worse error, and upstream can
