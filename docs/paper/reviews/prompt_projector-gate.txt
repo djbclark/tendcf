@@ -1,0 +1,58 @@
+ADVERSARIAL CODE REVIEW. Work in /Users/djbclark/src/tendcf. READ-ONLY: modify
+nothing, run no state-changing git command. Your output is your report.
+
+You are reviewing seven commits landed in one session by an orchestrator and
+its subagents. Assume they are wrong until you have checked. The session
+already caught itself being wrong once (630a4ed withdrew an argument the
+session itself had made), so the bar is "what did it still miss", not "does
+it look tidy".
+
+    git log --oneline 9325d0b..HEAD
+    git diff 9325d0b..HEAD
+
+## What matters most, in order
+
+1. **`bin/projector.py` correctness.** It is 534 lines, written in one pass
+   by an agent that hit its quota and died before testing it. A later audit
+   said it was faithful, but that audit was itself a single pass. Read the
+   code against `docs/architecture/projector-reconciliation-2026-08-16.md`
+   (decisions P-1..P-7, negatives N-1..N-12) and look for:
+   - inputs that produce WRONG bytes rather than a refusal
+   - a refusal that should be an acceptance (over-strict)
+   - any place the code and the reconciliation disagree
+   - crashes on malformed-but-plausible goal files
+   Probe it with real inputs in a temp dir outside the repo. `./bin/projector.py
+   examples/goal-file.json` runs it; `validate_projection(raw)` is importable.
+
+2. **Can you defeat the gate?** This is the highest-value question. Construct
+   a projection that is WRONG under the reconciliation but which
+   `validate_projection()` accepts, or a change to `bin/projector.py` that
+   produces wrong output while `bin/schema_lint.py` still reports OK. The
+   session claims eight mutations all bite; find a ninth that does not.
+
+3. **The new `schema (...)` parenthetical check** (505393e). It walks the RAW
+   schema to recover `$defs` names. Look for: paths where `_refs_along()`
+   walks wrong or silently returns nothing; `APPLICATORS` being too narrow or
+   too broad; a wrong cell that still passes. The commit admits one known
+   hole (`oneOf` sibling branches). Find another.
+
+4. **`check_projector_properties()`** claims to enforce N-1 by flipping one
+   entry's `state` and comparing key structure. Is `_shape()` actually
+   sufficient? Can a projector branch on `state` in a way that changes real
+   behaviour but leaves `_shape()` equal?
+
+5. **Did the linters get weaker anywhere?** Two scope carve-outs were added:
+   `FROZEN` in xref_lint (b12ee79) and `OUTPUT_ONLY_EXAMPLES` in schema_lint
+   (d699fd6). Each is argued as policy, not suppression. Check that argument
+   — is any LIVE document or authored fixture now escaping a check it used to
+   face? `bin/xref_lint.py --all` and `--why-frozen` exist.
+
+## Rules
+
+- Ground every claim in file:line, and RUN things rather than reasoning about
+  them where running is possible.
+- Rank findings by severity, most severe first. Separate "this is a bug" from
+  "I would have done it differently" — only the first is a finding.
+- A clean review is an acceptable result ONLY if you tried the attacks in 2
+  and 3 and they failed; say which you tried.
+- Be concise. Evidence, not volume.
