@@ -19,3 +19,15 @@ jobs:
       - name: Schema lint
         run: bin/schema_lint.py
 
+      # Runs the projector too: schema_lint imports bin/projector.py and gates
+      # project(goal-file.json) against examples/host_specific.json, which is
+      # reconciliation §13's "CI invokes the agent's own projector".
+      #
+      # xref_lint gates the LIVE corpus only; handoffs, reviews, deprecated
+      # designs and frozen opinions are out of scope by policy (--why-frozen
+      # prints the reason for each). Its default has been clean since b12ee79
+      # and is mutation-checked, so a finding here is a real dangling
+      # reference rather than the 52-finding backlog it used to report.
+      - name: Cross-reference lint
+        run: bin/xref_lint.py
+
