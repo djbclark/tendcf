@@ -250,3 +250,42 @@ fixture actually carries. Cases 44 and 48 are the pair §2.1 describes as
 the joint float rule's two halves: the schema catches a true fraction
 (case 43, `30.5`), byte identity catches the float *spelling* of an
 integer — neither alone is enough.
+
+## Projection class (`examples/broken-projection/`)
+
+These are not broken *inputs*. Each is a broken **output** — a
+`host_specific.json` a faulty or hostile projector might emit — and the
+layer that refuses them is `validate_projection()` in `bin/projector.py`,
+invoked over raw bytes for the same reason the byte class is: a
+pretty-printed projection, a trailing newline and a float spelling all
+parse to the document the golden parses to, so nothing downstream of the
+parse can see them.
+
+The mapping these enforce is decided in
+`docs/architecture/projector-reconciliation-2026-08-16.md`; the `N-n` ids
+below are that document's negatives.
+
+| # | Case | Broken output | Caught by |
+| --- | --- | --- | --- |
+| 66 | `66-sibling-variables-key.json` | a `variables` key beside `vars` (N-2) | projection |
+| 67 | `67-expansion-sequence.json` | a `$(` sequence in a value (N-3) | projection |
+| 68 | `68-resolved-secret-value.json` | a real secret where a key name belongs (N-4) | projection |
+| 69 | `69-device-trust-container.json` | trust content reaching `vars` (N-5) | projection |
+| 70 | `70-pretty-printed-projection.json` | the golden, indented (N-6) | projection |
+| 71 | `71-trailing-newline-projection.json` | golden bytes plus `\n` (N-6) | projection |
+| 72 | `72-float-in-projection.json` | a float in the output (N-7) | projection |
+| 73 | `73-canonified-interlock-id.json` | an entry id rewritten (N-9) | projection |
+| 74 | `74-duplicate-id-across-containers.json` | one id under both kinds (N-10) | projection |
+| 75 | `75-goal-file-under-vars.json` | the whole goal file under `vars` (N-12) | projection |
+
+Three of the twelve negatives have no row, and deliberately. N-1 (structure
+must not change when only `state` flips) and N-11 (two runs agree) are
+properties over *two* projections, not shapes one document can have; they
+are checked by `check_projector_properties()` instead of being faked as
+fixtures. N-8 is the 5 MiB ceiling, which a fixture could only express by
+checking in a 5 MiB file.
+
+Case 75 earns its place even though it is the shape a losing opinion
+proposed: it is what a future editor reaches for when the include table
+feels arbitrary, and it satisfies every check §13 had before the projector
+layer existed.

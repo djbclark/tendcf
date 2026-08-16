@@ -62,6 +62,7 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import importlib.util
 import json
 import re
 import sys
@@ -80,8 +81,12 @@ SCHEMA_DIR = REPO / "schema"
 EXAMPLE_DIR = REPO / "examples"
 BROKEN_DIR = EXAMPLE_DIR / "broken"
 BYTE_CLASS_DIR = EXAMPLE_DIR / "broken-bytes"
+PROJECTION_DIR = EXAMPLE_DIR / "broken-projection"
+GOLDEN = EXAMPLE_DIR / "host_specific.json"
+PROJECTOR = Path(__file__).resolve().with_name("projector.py")
 EXPECTED_BROKEN = 59
 EXPECTED_BYTE_CLASS = 6
+EXPECTED_PROJECTION = 10
 
 # example file -> schema file. report-rows.yml is a sequence of rows, each
 # validated individually against the row schema. The goal-file family is
@@ -98,6 +103,18 @@ EXAMPLES: dict[str, tuple[str, bool]] = {
     "approval-record.json": ("approval-record.schema.json", False),
     "approval-record-reject.json": ("approval-record.schema.json", False),
 }
+
+# Fixtures that are PRODUCED, not authored, so no schema pairs with them.
+# examples/host_specific.json is the projector golden: its correctness is
+# "project(goal-file.json) emits exactly these bytes", checked by
+# check_projector_golden(), not "it conforms to a shape". Writing a schema
+# for it would be a second, weaker statement of the mapping that
+# projector-reconciliation-2026-08-16.md already fixes — and one that could
+# drift from the projector while still passing, which is the two-spellings
+# defect the corpus keeps refusing. The pairing rail still holds for
+# everything else; this list is checked for existence and for overlap with
+# EXAMPLES so it cannot quietly widen.
+OUTPUT_ONLY_EXAMPLES = frozenset({"host_specific.json"})
 
 # Both answers to one ceremony, held to the same rules. §11 requires a
 # reject-with-annotations fixture, and one accept fixture cannot supply it:
@@ -162,6 +179,13 @@ RULE_DUPLICATE_KEY = "duplicate-key parse"
 RULE_NFC = "NFC check"
 RULE_PARSE = "parse"
 RULE_HARNESS = "harness"
+# One class, not two. A golden that no longer matches and a projection that
+# violates an N-series invariant are the same defect seen from two sides —
+# the bytes reaching $(sys.workdir)/data/host_specific.json are not the bytes
+# the ceremony approved. Splitting them would buy a second class that only
+# ever fires from one call site, and would need its own fixture to satisfy
+# check_class_coverage() when the golden's "fixture" is the golden itself.
+RULE_PROJECTION = "projection"
 
 RULE_CLASSES = frozenset(
     {
@@ -181,6 +205,7 @@ RULE_CLASSES = frozenset(
         RULE_NFC,
         RULE_PARSE,
         RULE_HARNESS,
+        RULE_PROJECTION,
     }
 )
 
@@ -520,6 +545,193 @@ def check_byte_class_fixtures(declared: dict[str, str]) -> int:
     return caught
 
 
+def load_projector() -> Any | None:
+    """Import bin/projector.py as a module.
+
+    Not a package import: both files are `uv run --script` entry points with
+    their own PEP-723 metadata, and bin/ is deliberately not importable. The
+    projector is loaded by path so this lint runs the SAME code a device
+    would, rather than a copy of its rules restated here — a restatement
+    would be the second spelling that projector-reconciliation §9 (R22)
+    names as the cost of a second implementation site.
+    """
+    if not PROJECTOR.is_file():
+        fail(
+            "bin/projector.py is missing — the projector goldens of §13 have "
+            "nothing to invoke",
+            rule=RULE_HARNESS,
+        )
+        return None
+    spec = importlib.util.spec_from_file_location("tendcf_projector", PROJECTOR)
+    if spec is None or spec.loader is None:  # pragma: no cover - import plumbing
+        fail(f"cannot load {PROJECTOR.name} as a module", rule=RULE_HARNESS)
+        return None
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:  # noqa: BLE001 - report, don't crash the lint
+        fail(f"bin/projector.py failed to import: {exc}", rule=RULE_HARNESS)
+        return None
+    return module
+
+
+def check_projector_golden(projector: Any, loaded: dict[str, Any]) -> bool:
+    """project(goal-file.json) must be byte-equal to the checked-in golden.
+
+    This is §13's "CI invokes the agent's own projector" made real. The
+    comparison is on BYTES, not on parsed equality: the projection is
+    hash-bound on the approval record, so a reordering or a respelling that
+    parses the same is still a different artifact from the one consented to.
+    """
+    goal = loaded.get("goal-file.json")
+    if goal is None:
+        return False
+    if not GOLDEN.is_file():
+        fail(
+            "examples/host_specific.json is missing — there is no golden to "
+            "compare the projection against",
+            rule=RULE_HARNESS,
+        )
+        return False
+    try:
+        produced = projector.project(goal)
+    except Exception as exc:  # noqa: BLE001 - a refusal here is a finding
+        fail(
+            f"project(examples/goal-file.json) raised {type(exc).__name__}: {exc}",
+            rule=RULE_PROJECTION,
+        )
+        return False
+    expected = GOLDEN.read_bytes()
+    if produced != expected:
+        fail(
+            "project(examples/goal-file.json) does not match "
+            f"examples/host_specific.json ({len(produced)} bytes produced, "
+            f"{len(expected)} expected)",
+            rule=RULE_PROJECTION,
+        )
+        return False
+    stray = projector.validate_projection(expected)
+    if stray:
+        fail(
+            f"examples/host_specific.json is itself refused: {stray[0]}",
+            rule=RULE_PROJECTION,
+        )
+        return False
+    return True
+
+
+def check_projection_fixtures(projector: Any, declared: dict[str, str]) -> int:
+    """Each examples/broken-projection/*.json must be refused as a projection.
+
+    Raw bytes, like the byte-class fixtures and for the same reason: several
+    of the N-series invariants (pretty-printing, a trailing newline, a float
+    spelling) are invisible after a parse, so a fixture that went through
+    json.loads first would prove nothing about them.
+
+    Note what is NOT here. N-1 (structure must not change when only `state`
+    flips) and N-11 (two runs agree) are properties of the projector over
+    TWO inputs, not shapes a single projection can have, so they are checked
+    in check_projector_properties() instead of pretending to be fixtures.
+    """
+    if not PROJECTION_DIR.is_dir():
+        fail(
+            "examples/broken-projection/ is missing — the projection "
+            "negatives are gone",
+            rule=RULE_HARNESS,
+        )
+        return 0
+    cases = sorted(PROJECTION_DIR.glob("*.json"))
+    if len(cases) != EXPECTED_PROJECTION:
+        fail(
+            f"examples/broken-projection/: expected {EXPECTED_PROJECTION} "
+            f"cases, found {len(cases)}",
+            rule=RULE_HARNESS,
+        )
+    caught = 0
+    for case in cases:
+        label = f"examples/broken-projection/{case.name}"
+        with capture_findings(silent=True) as case_findings:
+            for msg in projector.validate_projection(case.read_bytes()):
+                fail(f"{label}: {msg}", rule=RULE_PROJECTION)
+        if not case_findings:
+            fail(
+                f"{label}: was not caught (validate_projection accepted it)",
+                rule=RULE_HARNESS,
+            )
+        elif check_declared_class(label, case.name, declared, case_findings):
+            caught += 1
+    return caught
+
+
+def check_projector_properties(projector: Any, loaded: dict[str, Any]) -> None:
+    """N-1 and N-11: the two invariants no single fixture can express.
+
+    N-1 is the R21 tripwire made mechanical. Flipping one entry's `state`
+    must change exactly that value and leave the key structure identical; a
+    projector that grew a tombstone branch would move the entry to a
+    different container and fail here. N-11 is purity: same bytes in, same
+    bytes out. Both are properties over two runs, which is precisely why
+    they are checked and not fixtured — see check_projection_fixtures().
+    """
+    goal = loaded.get("goal-file.json")
+    if goal is None:
+        return
+
+    try:
+        if projector.project(goal) != projector.project(goal):
+            fail(
+                "project() is not deterministic — two runs over identical "
+                "bytes disagreed",
+                rule=RULE_PROJECTION,
+            )
+    except Exception as exc:  # noqa: BLE001
+        fail(f"project() raised on the determinism check: {exc}", rule=RULE_PROJECTION)
+        return
+
+    services = (
+        goal.get("domains", {})
+        .get("supervision", {})
+        .get("entries", {})
+        .get("service", {})
+    )
+    present = sorted(
+        eid for eid, body in services.items() if body.get("state") == "present"
+    )
+    if not present:
+        fail(
+            "goal-file.json has no present service — N-1 cannot be checked, "
+            "so the tripwire is unguarded",
+            rule=RULE_HARNESS,
+        )
+        return
+
+    flipped = copy.deepcopy(goal)
+    target = present[0]
+    flipped["domains"]["supervision"]["entries"]["service"][target]["state"] = "absent"
+    try:
+        before = json.loads(projector.project(goal))
+        after = json.loads(projector.project(flipped))
+    except Exception as exc:  # noqa: BLE001
+        fail(f"project() raised on the N-1 state flip: {exc}", rule=RULE_PROJECTION)
+        return
+
+    if _shape(before) != _shape(after):
+        fail(
+            f"flipping {target} to absent changed the projection's structure "
+            "— a value decided the shape, which is R21's tripwire (N-1)",
+            rule=RULE_PROJECTION,
+        )
+
+
+def _shape(node: Any) -> Any:
+    """The key structure of a document, with every leaf value erased."""
+    if isinstance(node, dict):
+        return {key: _shape(value) for key, value in sorted(node.items())}
+    if isinstance(node, list):
+        return [_shape(item) for item in node]
+    return None
+
+
 def load_schemas() -> tuple[dict[str, dict], Registry]:
     schemas: dict[str, dict] = {}
     for path in sorted(SCHEMA_DIR.glob("*.schema.json")):
@@ -573,9 +785,22 @@ def check_pairing(schemas: dict[str, dict]) -> None:
             f"EXAMPLES pairs against schema/{name}, which does not exist",
             rule=RULE_PAIRING,
         )
-    for name in sorted(on_disk_examples - set(EXAMPLES)):
+    for name in sorted(on_disk_examples - set(EXAMPLES) - OUTPUT_ONLY_EXAMPLES):
         fail(
-            f"examples/{name} is paired with no schema — register it in EXAMPLES",
+            f"examples/{name} is paired with no schema — register it in EXAMPLES, "
+            "or list it in OUTPUT_ONLY_EXAMPLES if it is a produced artifact "
+            "rather than an authored instance",
+            rule=RULE_PAIRING,
+        )
+    for name in sorted(OUTPUT_ONLY_EXAMPLES - on_disk_examples):
+        fail(
+            f"OUTPUT_ONLY_EXAMPLES names examples/{name}, which does not exist",
+            rule=RULE_PAIRING,
+        )
+    for name in sorted(OUTPUT_ONLY_EXAMPLES & set(EXAMPLES)):
+        fail(
+            f"examples/{name} is both output-only and paired in EXAMPLES — "
+            "one or the other",
             rule=RULE_PAIRING,
         )
     for name in sorted(DEFINITION_ONLY_SCHEMAS - on_disk_schemas):
@@ -1320,7 +1545,7 @@ def main() -> int:
 
     check_schemas_valid(schemas)
     check_goal_file_forbidden_refs(schemas)
-    caught = byte_caught = 0
+    caught = byte_caught = projection_caught = 0
     if not args.schemas_only:
         check_pairing(schemas)
         check_family_canonical_bytes()
@@ -1330,11 +1555,18 @@ def main() -> int:
             declared = read_declared_classes()
             caught = check_negative_fixtures(loaded, schemas, registry, declared)
             byte_caught = check_byte_class_fixtures(declared)
+            projector = load_projector()
+            if projector is not None:
+                check_projector_golden(projector, loaded)
+                check_projector_properties(projector, loaded)
+                projection_caught = check_projection_fixtures(projector, declared)
             on_disk: set[str] = set()
             if BROKEN_DIR.is_dir():
                 on_disk |= {p.name for p in BROKEN_DIR.iterdir() if p.is_dir()}
             if BYTE_CLASS_DIR.is_dir():
                 on_disk |= {p.name for p in BYTE_CLASS_DIR.glob("*.json")}
+            if PROJECTION_DIR.is_dir():
+                on_disk |= {p.name for p in PROJECTION_DIR.glob("*.json")}
             check_declaration_coverage(declared, on_disk)
             check_class_coverage(declared)
 
@@ -1344,6 +1576,8 @@ def main() -> int:
     extra = f", {caught} negative fixtures" if caught else ""
     if byte_caught:
         extra += f", {byte_caught} byte-class fixtures"
+    if projection_caught:
+        extra += f", {projection_caught} projection fixtures"
     print(f"schema-lint: OK ({len(schemas)} schemas{extra})")
     return 0
 
