@@ -199,8 +199,15 @@ Facts and intent in data; behavior in generic code; adapters translate.
 
 - **`provides` / `requires`** per type. A service named `caddy`
   **auto-provides** `service:caddy` unless it opts out (D40). Explicit
-  `depends_on` remains available and wins. Edges in compiled output
-  carry origin (authored with location, or inferred with the rule).
+  `depends_on` remains available and wins. Origin-bearing edges
+  (authored with location, or inferred with the rule) are **preview-channel
+  only** — compiler output the person and the advisor see, never the goal
+  file (corrected from this section's earlier text, which said edges in
+  compiled output carry origin without scoping which compiled output:
+  that collides with §9.5's no-attribution rule once the goal file is the
+  compiled output the device consumes. Resolution: the goal file carries
+  no edges in v1, and origin-stripped edges at most if edges are ever
+  added to it; C-8, reconciliation §8).
 - **`interlocks`** per bundle — precondition → CFEngine guard +
   bundle-scoped refusal. Blast radius and reporting are schema
   constants.
@@ -424,10 +431,34 @@ is final and supersedes `e1-adjudication-2026-08-15.md`. Section
 references below of the form **E1 §5.x** are to that note.
 
 The compiler (§5) therefore gains a **render** stage: merge → conflict
-check → render of the complete per-host goal file. *Not settled by E1:*
-whether the goal file and the CFEngine Augments JSON (`def.json` /
-`host_specific.json`) are one document or a projection of one onto the
-other. Treat that as open until the schema family lands.
+check → render of the complete per-host goal file. **Decided** (this
+paragraph left open until the schema family landed; closed by
+`goal-file-schema-reconciliation-2026-08-15.md` §9): the goal file and
+the CFEngine Augments JSON (`def.json` / `host_specific.json`) are not
+one document. The goal file is the signed wire artifact and the object
+consent binds to; Augments JSON is produced from it by a **device-side
+projection**, run inside tendcf-agent after approval, and never appears
+on the wire. The projector's target is
+`$(sys.workdir)/data/host_specific.json` and nothing else; its output is
+`{"vars": {…}}` with no sibling keys — no `variables`, no `classes`, no
+`inputs`, no top-level `data`. `def.json` remains MPF glue under the
+policy-tree digest (§9.8) and is never a per-host slot: 3.27.1 drops its
+unknown keys silently, the worst of the candidate targets. A
+compiler-shipped projection sibling, hash-bound on the approval record,
+was considered and rejected — it reopens the approved-equals-applied gap
+Model B exists to close, since no one *reviews* a hash-bound sibling the
+way the goal-file diff is reviewed, and the projector must exist under
+either option, so putting it device-side costs one implementation with
+two call sites (the agent binary, invoked directly and by CI for golden
+tests) rather than a second wire artifact, a per-host TUF sibling target,
+and an approval-record hash extension. The projector **MUST be
+policy-free** — a structural re-keying only (entries → the generic
+bundle's containers, tombstones → the negative-promise lists, trust
+entries → the agent's own config) — carried as residue R21; any change
+that inspects entry *values* to decide output *structure* is the
+interpreter returning and is a named §14.2 review target. `def.json`'s
+own digest binding is unmoved (§9.8); `augments_digest` inside the goal
+file stays rejected as circular.
 
 ### 9.1 Where the diff is computed (E1 §5.1)
 
@@ -455,11 +486,26 @@ other. Treat that as open until the schema family lands.
   validator precondition, ordered before the diff is computed. Corrupting
   or swapping it either denies service or launders arbitrary state
   through the baseline ceremony of §9.4.
-- The accept binds per DC-2, instantiated for the goal file:
+- The accept binds per DC-2, instantiated for the goal file as an
+  **approval record**, not a hash concatenation (corrected from this
+  section's earlier formula
   `Sig_advisor( H(old_canonical) ‖ H(new_canonical) ‖ device_nonce [‖ H(briefing_bytes)] )`,
-  valid for exactly one target key. The validator MUST recompute every
-  hash. DC-2 applies in full: per-target validity, device nonce,
-  monotonic-counter single use, persisted rejects.
+  whose optional briefing member was an encoding-ambiguity hazard — a
+  variable-arity concatenation does not fix which bytes were signed when
+  the optional member is absent; C-5, reconciliation §11). The signed
+  object is the **JCS bytes of the approval record with the `signature`
+  member removed**. The record carries: `schema_version`, `host` (the
+  target key), `baseline_sha256` (absent only at first adoption, a named
+  §14.2 review target), `proposed_sha256`, `nonce` (device-issued),
+  `approval_seq` (monotonic, DC-2 single-use), optional
+  `briefing_sha256`, `verdict` (`accept` | `reject` | `withdraw`),
+  `refused` (hunk key-paths, present iff reject, annotation only),
+  `ceremony_class` (`ordinary` | `privileged` | `baseline`, asserted by
+  the approver and checked against the validator's own derived
+  requirement, §9.8), and `signature`, valid for exactly one target key.
+  The validator MUST recompute every hash. DC-2 applies in full:
+  per-target validity, device nonce, monotonic-counter single use,
+  persisted rejects.
 - `cf-agent --simulate` remains an **optional human-facing confirmation**
   of actual-state delta, never a mechanism of the gate. File the upstream
   `--simulate-output=json` issue before Step 3 code.
@@ -473,11 +519,24 @@ property, not a testing nicety.
   sources and never appears on the wire (D23’s parse/re-serialize/diff
   check was the symptom of why).
 - **Canonical form is RFC 8785 (JCS)** plus the structural rules JCS does
-  not give: every set-semantics collection is an array sorted by a
-  schema-declared key (entries by `(domain, kind, id)`); strings are NFC
-  normalized; no floats anywhere in the goal file; signatures detached;
-  and no nonces, timestamps, or other run-varying fields inside the
-  diffed object.
+  not give: every set-semantics collection is a **map keyed by identity**
+  — entries addressed by the `(domain, kind, id)` key path, nested
+  `domains → <domain> → <kind> → <id>` — rather than an array sorted by a
+  schema-declared key (corrected from this section's earlier text:
+  RFC 8785 orders object members by UTF-16 code units, so a
+  `(domain, kind, id)`-sorted array needs its own comparator definition, a
+  second ordering rule alongside JCS's that the corpus's own review caught
+  disagreeing with it at a non-BMP boundary; a map has no second
+  definition to get wrong, and duplicate-key rejection gives uniqueness
+  from the parse itself instead of a separate lint rule — reconciliation
+  §2.2, C-2). Two positional arrays survive where order is meaning
+  (`command` argv, `pre_action.command`); one sorted string-set array
+  (`verbs`, ascending code-point order) survives for when the peer-grant
+  kind lands. Strings are NFC normalized; no floats anywhere in the goal
+  file; **booleans are legal** — JCS gives them one canonical spelling,
+  and forbidding them would only force a second spelling as `"true"` /
+  `"false"` strings (C-3); signatures detached; and no nonces, timestamps,
+  or other run-varying fields inside the diffed object.
 - **The goal file is fully resolved and the schema defines no defaults.**
   Every meaningful field is present with its explicit value; authoring
   defaults are resolved by the compiler before render; empty collections
@@ -488,10 +547,10 @@ property, not a testing nicety.
 - **Refuse, never normalize.** Validator and lint MUST reject any goal
   file that is not byte-identical to the canonicalization of itself.
 - **The diff is structural, not textual.** Hunks are at **entry**
-  granularity, addressed by the sort key, each carrying the full old
-  and/or new entry. Field-level diffs are derived for display. A text
-  diff of canonical bytes is a permitted rendering and never the
-  authoritative object.
+  granularity, addressed by the `(domain, kind, id)` key path, each
+  carrying the full old and/or new entry. Field-level diffs are derived
+  for display. A text diff of canonical bytes is a permitted rendering
+  and never the authoritative object.
 
 ### 9.3 Accept is all-or-nothing (E1 §5.3)
 
@@ -588,8 +647,13 @@ field.
   property to read.
 - A schema bump ships in **two phases**: first the validator/agent update
   as an ordinary diff under version N−1 — a privileged-region hunk, TC-25
-  class — then the migration release under §9.4’s empty-diff rule.
-  Release lint MUST enforce the phase order.
+  class — then the migration release under §9.4’s empty-diff rule. There
+  is no separate release-lint phase-order check (cut from this section’s
+  earlier text, C-6, reconciliation §5): "the compiler refuses to render
+  version N for a host whose reported ceiling is < N" *is* the two-phase
+  enforcement, in the one place the per-host knowledge already lives — a
+  release-lint restatement would need the same report data and duplicate
+  the same rule.
 
 Cost, accepted: the compiler carries multi-version render ability for a
 window and tracks per-host versions. The price is paid in one place
@@ -598,13 +662,34 @@ rather than as device-side leniency on every device.
 ### 9.7 Coverage travels in the goal file (E1 §5.7)
 
 The goal-file schema **MUST include the per-domain coverage
-declarations** (`comprehensive` / `opt_out_reason`, verbatim from
-`common.schema.json#/$defs/domain_coverage`; §4.1). The diff’s meaning
-depends on them: silence in a comprehensive domain means “no change,”
-silence in a `not-yet-migrated` domain means “not described,” and
-validator and briefing MUST NOT let the two read alike. A coverage
+declaration**, restated as a **single enum** —
+`comprehensive` / `not-yet-migrated` / `deliberately-unmanaged` — never a
+verbatim `$ref` of `common.schema.json#/$defs/domain_coverage` (§4.1):
+that def carries a `default`, an optional boolean where
+absent-vs-present-true is two spellings of one meaning, required free
+prose, and if/then contradiction guards a single field does not need.
+Same three meanings; the Site Model keeps its authoring shape; the
+compiler resolves to the enum (corrected from this section’s earlier
+text, which named the `$ref`; C-1, reconciliation §4.1). Entries nest
+**inside** the domain envelope
+(`domains → <domain> → {coverage, entries}`), so an entry without stated
+coverage is unrepresentable and `deliberately-unmanaged`-with-entries is
+a schema violation, not a lint finding.
+
+The diff’s meaning depends on coverage, and there are **three** silence
+classes, not two: silence in a `comprehensive` domain means “no change”;
+silence in a `not-yet-migrated` domain means “not described”; and a
+**domain absent from the map entirely is `undeclared`** — a third class
+E1 §5.7 does not name, because the unbounded unknown cannot be
+enumerated and declaring a domain is precisely the act of naming a
+backlog item so it becomes countable (C-10, reconciliation §4.1).
+Site-Model-declared domains all appear in every goal file, at minimum as
+`not-yet-migrated`; a domain’s first appearance is itself a reviewable
+`coverage_changes` item with `"old": "undeclared"`. Validator and
+briefing MUST NOT let any two of the three read alike. A coverage
 transition is itself a hunk, and reclassification to
-`deliberately-unmanaged` (DC-37) is a distinct review class.
+`deliberately-unmanaged` (DC-37) is a distinct review class; the full
+transition-to-ceremony derivation is §9.8.
 
 Goal-file completeness is a **contract, not a given**: a diff over a
 non-comprehensive domain proves nothing about what else changed on the
@@ -618,13 +703,51 @@ device.
   policy, advisor keys, peer allowlist, policy-tree digest,
   agent/validator binary and version, device resource policy, and
   `schema_version` itself. The approval record MUST carry a ceremony
-  class adequate to the derived privilege (§9.4).
-- **Removals compile to actuation.** Absence of a promise is absence of
-  enforcement, not reversal. Every remove-hunk MUST compile to explicit
-  negative promises (file delete, package absent,
-  `service_policy => "stop"`), a removal MUST NOT be smuggled as a
-  modify, and the briefing MUST render removals *as their actuation*, not
-  as absence.
+  class adequate to the derived privilege (§9.4). Coverage transitions
+  (§9.7) derive their ceremony class the same way — retreat is
+  privileged, not forbidden, because forcing a stall or a lie is worse
+  than a loud, reviewable step backward:
+
+  | Coverage transition | Ceremony class |
+  | --- | --- |
+  | `undeclared` → `not-yet-migrated` or → `comprehensive` | ordinary (declaring / tightening) |
+  | `not-yet-migrated` → `comprehensive` | ordinary (tightening) |
+  | any transition **into** `deliberately-unmanaged` | privileged (DC-37 class) |
+  | any transition **out of** `comprehensive` (incl. → `undeclared`) | privileged (retreat) |
+  | any transition **out of** `deliberately-unmanaged` | privileged (reversing a deliberate decision) |
+
+  One uniform rule the validator holds: a coverage transition is
+  privileged iff it touches `deliberately-unmanaged` or leaves
+  `comprehensive`. Retreats are counted next to Q11’s migration counter
+  (reconciliation §4.3).
+- **Removal is a state, not a diff-compiled actuation** (corrected from
+  this section’s earlier text, which had the negative promise compile
+  from the diff itself — read literally, that breaks convergence: the
+  applied configuration becomes a function of the diff as well as the
+  goal file, the diff has acquired apply semantics on the exact ground
+  §9.1 refused to ship diffs on, and a one-shot imperative is lost by a
+  crash, a re-run, or a stale device’s N−7 → N catch-up; C-4,
+  reconciliation §6). Actuated entries carry `state: "present" |
+  "absent"`. A removal is a **replace hunk** (`present → absent`) whose
+  tombstone persists in the goal file, and the negative promise (file
+  delete, package absent, `service_policy => "stop"`) renders from the
+  **file**, not the diff — idempotent, crash-safe, re-release-safe,
+  stale-catch-up-safe. A removal correctly *is* a modify of `state`; the
+  real smuggling hazard is the **bare entry deletion**, which means “stop
+  managing,” not “remove from device” — the briefing MUST render the two
+  distinctly (“stops being managed; the thing REMAINS” vs “will be
+  stopped and unloaded”). Tombstones are legal in `comprehensive`
+  domains: there is no sweeper, only extra-entry *reporting*, so
+  forbidding the tombstone there would leave a finished domain with no
+  actuated removal path at all. Tombstone kinds are present-state kinds
+  only (`service` in v1, plus `file`/`package` when they land);
+  `interlock` and `unit-writer` are present-only, with no device-state
+  footprint to tombstone — deleting one is an ordinary remove hunk the
+  briefing renders as “guard removed” / “writer declaration dropped.” A
+  dropped tombstone is itself a change (“stop enforcing absence”), silent
+  in non-comprehensive domains; per-file tombstone count is a residue
+  counter to watch beside diff-size (R19). Tombstone GC is a policy note,
+  not a v1 feature.
 - **Fetched content binds bytes, not names.** Digest fields on fetched
   artifacts (DC-11) are a schema obligation, covered by the accept and
   re-verified immediately before apply. The policy tree / generic bundle

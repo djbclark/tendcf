@@ -427,8 +427,8 @@ kinds Steps 1–6 actuate" — applied honestly, which Fable's own list fails
 Model today declares a file or a package; a `file` kind whose domain never
 migrates and a `package` kind nothing populates are speculative surface, and
 under the strict bump rule speculative surface is not even cheap insurance —
-it is an unreviewed claim about operations not yet transcribed (Grok §9.12,
-adopted). Named omissions, each a counted bump when it lands:
+it is an unreviewed claim about operations not yet transcribed (Grok §9,
+cut 12, adopted). Named omissions, each a counted bump when it lands:
 
 - **`file`** — and with it the entire inline/fetch content design (Fable §6:
   bounded inline xor digest+size fetch, with the deterministic
@@ -1156,7 +1156,7 @@ against the text or by running code.
   header field that diffs is `schema_version`" and would require the
   header-hunk machinery it rejects. Relocated to `device-trust` (§7).
 - **G-4 (Grok).** Its `peer` kind with an admitted-guessed verb enum
-  violates its own no-speculative-kinds rule (§9.12). Cut (§8).
+  violates its own no-speculative-kinds rule (§9, cut 12). Cut (§8).
 - **G-5 (Grok, the big one).** The compiler-shipped projection sibling
   binds the entire actuated surface by an unreviewable hash — the
   approved-equals-applied gap reopened — and its cost case miscounts the
