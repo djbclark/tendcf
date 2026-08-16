@@ -72,16 +72,16 @@ no other Site Model files to compose against.
 | 28 | `28-missing-launchd-knob` | `launchd` with `run_at_load` but no `keep_alive` | schema (`required`) |
 | 29 | `29-empty-argv` | `command: []` | schema (`minItems`) |
 | 30 | `30-empty-env-map` | `env: {}` | schema (`minProperties`) |
-| 31 | `31-unprefixed-host-key` | `host` with no `ed25519:` prefix | schema (pattern) |
-| 32 | `32-uppercase-digest-hex` | `sha256:` digest with uppercase hex | schema (pattern) |
+| 31 | `31-unprefixed-host-key` | `host` with no `ed25519:` prefix | schema (`pattern`) |
+| 32 | `32-uppercase-digest-hex` | `sha256:` digest with uppercase hex | schema (`pattern`) |
 | 33 | `33-defaulted-expect-exit` | `pre_action` with no `expect_exit` | schema (`required`) |
 | 34 | `34-silenced-interlock-report` | interlock `report: false` | schema (`const`) |
-| 35 | `35-malformed-writer-prefix` | unit-writer prefix with no trailing `.*` | schema (pattern) |
+| 35 | `35-malformed-writer-prefix` | unit-writer prefix with no trailing `.*` | schema (`pattern`) |
 | 36 | `36-unknown-writer` | `writer: custom-tool` | schema (`enum`) |
 | 37 | `37-uppercase-domain` | domain key `Supervision` | schema (`propertyNames`) |
 | 38 | `38-proposer-set-privileged-flag` | service entry with a `privileged: true` field | schema (`additionalProperties`) |
 | 39 | `39-description-prose` | service entry with a `description` field | schema (`additionalProperties`) |
-| 40 | `40-boolean-reason-coverage-spelling` | `coverage` as `{comprehensive, opt_out_reason}` | schema (`type`) |
+| 40 | `40-boolean-reason-coverage-spelling` | `coverage` as `{comprehensive, opt_out_reason}` | schema (`enum`) |
 | 41 | `41-embedded-release-stamp` | a stray top-level `release_stamp` field | schema (`additionalProperties`) |
 | 42 | `42-malformed-advisor-key-id` | advisor-key property name not `ed25519:`+hex | schema (`propertyNames`) |
 | 43 | `43-float-timeout` | `timeout_seconds: 30.5` | schema (`type`) |
@@ -148,6 +148,44 @@ while the accept stays honest.
 | 57 | `57-accept-with-annotations` | `verdict: accept` **with** a `refused` | schema (`if/else`) |
 | 59 | `59-refused-path-names-no-hunk` | `refused` naming a hunk the diff lacks | family (refused) |
 | 60 | `60-record-for-another-host` | a record signed for a different device | family (host) |
+
+## The `Caught by` parentheticals are executable too
+
+The head of each cell (`schema`, `goal cross-file`, `family (apply)`) has
+been read back and checked since dddd31b. The parenthetical beside a
+`schema` head was still prose until now, which meant ``schema (`const`)``
+could sit on a case the `const` rule no longer touches and nothing would
+notice — the more specific half of the claim was the unchecked one.
+
+Now every **backticked** token inside a `schema (...)` parenthetical is
+checked against what the validator actually objected with. Backticks are the
+notation: a backticked token is a machine-checked claim, and a bare word
+beside one is prose that makes the row read as English — the "pattern" in
+``schema (`abs_path` pattern)``, the "def" in ``schema (`absent` def)``.
+
+Keeping those readable names cost something to build, and it was worth it.
+jsonschema resolves `$ref` before reporting, so the `abs_path` violation
+arrives naming only `pattern` and the tombstone rule arrives naming only
+`additionalProperties` — both true, both the message class D16(a) rules out,
+because neither can be acted on without going and reading the schema. Rather
+than degrade the cells to those keywords to make them checkable, the lint
+walks the raw schema alongside the error and recovers the `$defs` names the
+failure passed through. `propertyNames` needed the same treatment from the
+other direction: a bad domain key reports `pattern` one level below the rule
+a reader would name.
+
+What this catches, and what it does not, measured by mutation: naming a rule
+the validator never reached goes red (`required`->`minLength`,
+`if/then`->`if/else`, `propertyNames`->`additionalProperties` all fail).
+Naming the wrong sibling branch of a `oneOf` it *did* reach stays green —
+swapping `abs_path` for `absent` on case 24 passes, because a service entry
+is a `oneOf` over present/absent and the absent branch genuinely failed too.
+Tightening that would mean ranking branch failures by relevance, which the
+error does not carry.
+
+Case 40 is the defect this found on its first run: it was declared
+`schema (`type`)`, but `$defs.coverage` is a bare `enum` with no `type`, so
+an object value fails `enum`. The cell had been wrong since it was written.
 
 Case 57 is why the `else` branch is spelled `{"refused": false}` rather
 than §11's more obvious `{"not": {"required": ["refused"]}}`. The two are

@@ -226,13 +226,18 @@ CLASSES_WITHOUT_FIXTURES = frozenset({RULE_PAIRING, RULE_SCHEMA_META, RULE_HARNE
 class Finding(NamedTuple):
     rule: str
     msg: str
+    # What the validator actually objected with — keywords, `if/then` style
+    # branch locators, and the $defs names the failure passed through. Carried
+    # on the finding because the jsonschema error is long gone by the time
+    # check_declared_class() compares it to the README's parenthetical.
+    evidence: frozenset[str] = frozenset()
 
 
 findings: list[Finding] = []
 PRINT_FINDINGS = True
 
 
-def fail(msg: str, *, rule: str) -> None:
+def fail(msg: str, *, rule: str, evidence: frozenset[str] = frozenset()) -> None:
     """Record a finding under the rule class that produced it.
 
     `rule` is keyword-only and required rather than defaulted, so a new
@@ -242,7 +247,7 @@ def fail(msg: str, *, rule: str) -> None:
     """
     if rule not in RULE_CLASSES:
         die(f"internal: fail() called with unknown rule class {rule!r}")
-    findings.append(Finding(rule, msg))
+    findings.append(Finding(rule, msg, evidence))
     if PRINT_FINDINGS:
         print(f"schema-lint: FAIL: {msg}")
 
@@ -394,6 +399,16 @@ BROKEN_README = BROKEN_DIR / "README.md"
 _README_ROW = re.compile(r"^\|\s*\d+\s*\|\s*`([^`]+)`\s*\|.*\|\s*(.+?)\s*\|\s*$")
 
 
+# A backticked token inside a `schema (...)` parenthetical. Backticks are the
+# notation for "this is a machine-checkable claim"; bare words beside one —
+# the "pattern" in ``schema (`abs_path` pattern)``, the "def" in
+# ``schema (`absent` def)`` — are prose that makes the row read as English.
+_CLAIM = re.compile(r"`([^`]+)`")
+
+# Populated by read_declared_classes(); consumed by check_declared_class().
+claims: dict[str, frozenset[str]] = {}
+
+
 def read_declared_classes() -> dict[str, str]:
     """Each fixture's declared rule class, read from examples/broken/README.md.
 
@@ -417,9 +432,12 @@ def read_declared_classes() -> dict[str, str]:
         row = _README_ROW.match(line)
         if row is None:
             continue
-        case, cell = row.group(1), row.group(2).replace("`", "")
+        case, raw_cell = row.group(1), row.group(2)
+        cell = raw_cell.replace("`", "")
         head = cell.split(" (", 1)[0]
         rule = cell if head in DETAILED_RULE_HEADS else head
+        if head == RULE_SCHEMA:
+            claims[case] = frozenset(_CLAIM.findall(raw_cell))
         if rule not in RULE_CLASSES:
             fail(
                 f"examples/broken/README.md: {case} is declared {cell!r}, which "
@@ -459,6 +477,49 @@ def check_declared_class(
         fail(
             f"{label}: declares {want!r}, but the finding(s) came from {fired} — "
             "the rule this case exists to test did not fire",
+            rule=RULE_HARNESS,
+        )
+        return False
+    return check_declared_claim(label, case, found)
+
+
+def check_declared_claim(label: str, case: str, found: list[Finding]) -> bool:
+    """Is the `schema (...)` parenthetical supported by what actually fired?
+
+    The "Caught by" head has been executable since dddd31b; the parenthetical
+    beside it was still prose, so `schema (`const`)` could sit on a case the
+    `const` rule no longer touches and nothing would notice. It is the more
+    specific half of the claim and was the unchecked one.
+
+    Checked as *supported*, not as exhaustive: a cell naming one of several
+    true causes passes, because on a failing `oneOf` every branch failed and
+    picking the readable branch is the point. A cell naming something the
+    validator never objected with does not pass.
+
+    The limit that buys, measured rather than guessed: on case 24, swapping
+    ``schema (`abs_path` pattern)`` for ``schema (`absent` pattern)`` stays
+    green, because the service entry is a `oneOf` over present/absent and the
+    absent branch really did fail too. Three other swaps do go red —
+    `required`->`minLength`, `if/then`->`if/else`,
+    `propertyNames`->`additionalProperties`. So this catches a cell that names
+    a rule the validator never reached; it does not catch a cell that names
+    the wrong sibling branch of a `oneOf` it did reach. Tightening that would
+    mean ranking branch failures by relevance, which is a judgement the error
+    does not carry.
+    """
+    want = claims.get(case)
+    if not want:
+        return True
+    evidence: set[str] = set()
+    for finding in found:
+        if finding.rule == RULE_SCHEMA:
+            evidence |= finding.evidence
+    unsupported = sorted(want - evidence)
+    if unsupported:
+        fail(
+            f"{label}: declares {', '.join(repr(u) for u in unsupported)}, which "
+            f"the validator never objected with — it reported "
+            f"{sorted(evidence) or 'nothing'}",
             rule=RULE_HARNESS,
         )
         return False
@@ -815,6 +876,94 @@ def check_pairing(schemas: dict[str, dict]) -> None:
         )
 
 
+BRANCH_LOCATORS = {"then": "if/then", "else": "if/else", "not": "if/not"}
+
+# Keywords that, appearing as a step in a schema_path, name the RULE being
+# applied rather than a way of navigating into a subschema. `propertyNames` is
+# the case that forces this: a bad domain key reports
+# `pattern` at `['properties','domains','propertyNames','pattern']`, so the
+# rule a reader would name is one step above the keyword jsonschema hands
+# back. `properties` and `additionalProperties` are deliberately absent —
+# they are navigation on nearly every path, and admitting them would let a
+# cell claim `additionalProperties` for almost any failure.
+APPLICATORS = frozenset(
+    {
+        "propertyNames",
+        "patternProperties",
+        "contains",
+        "prefixItems",
+        "items",
+        "dependentSchemas",
+        "dependentRequired",
+        "unevaluatedProperties",
+        "unevaluatedItems",
+    }
+)
+
+
+def _refs_along(root: Any, path: list[Any]) -> set[str]:
+    """The `$defs` names a failure passed through, read off the RAW schema.
+
+    jsonschema resolves `$ref` before reporting, so an error that is really
+    "this violates the `abs_path` definition" arrives naming only `pattern`,
+    and one that is really "a tombstone may carry nothing but `state`"
+    arrives naming only `additionalProperties`. Those keywords are true and
+    useless: they are what D16(a) rules out, a message that cannot be
+    resolved without a human going and reading the schema.
+
+    The names are still in the schema document, so walk that alongside the
+    error's schema_path and collect every `$ref` stepped through. This is
+    what lets examples/broken/README.md keep saying `abs_path` — a claim a
+    reader can act on — instead of degrading to `pattern` to stay checkable.
+    """
+    node, seen = root, set()
+    if not isinstance(root, dict):
+        return seen
+    for step in path:
+        if isinstance(node, dict) and "$ref" in node:
+            target = node["$ref"]
+            name = target.rsplit("/", 1)[-1]
+            # Only local `#/$defs/...` refs resolve here; a cross-document ref
+            # would need the registry, and no cell names one.
+            if target.startswith("#/$defs/"):
+                seen.add(name)
+                node = root.get("$defs", {}).get(name, node)
+        try:
+            node = node[step]
+        except (KeyError, IndexError, TypeError):
+            return seen
+    if isinstance(node, dict) and node.get("$ref", "").startswith("#/$defs/"):
+        seen.add(node["$ref"].rsplit("/", 1)[-1])
+    return seen
+
+
+def schema_evidence(error: Any, root: Any) -> frozenset[str]:
+    """Everything the README's parenthetical is allowed to claim about `error`.
+
+    Includes the sub-errors of a failing `oneOf`: when a oneOf fails, every
+    branch failed, so naming any branch's cause is honest. That is deliberate
+    looseness, and it is the reason a cell is checked for being *supported*
+    rather than for being the single best description.
+    """
+    found: set[str] = set()
+
+    def collect(err: Any, prefix: list[Any]) -> None:
+        full = prefix + list(err.schema_path)
+        if err.validator is not None:
+            found.add(str(err.validator))
+        for step in full:
+            if isinstance(step, str) and step in BRANCH_LOCATORS:
+                found.add(BRANCH_LOCATORS[step])
+            if isinstance(step, str) and step in APPLICATORS:
+                found.add(step)
+        found.update(_refs_along(root, full))
+        for sub in err.context or []:
+            collect(sub, full)
+
+    collect(error, [])
+    return frozenset(found)
+
+
 def error_location(error: Any) -> str:
     """Where a schema violation is, in whichever coordinate space still has it.
 
@@ -846,7 +995,11 @@ def validate(instance: Any, schema: dict, registry: Registry, label: str) -> Non
         schema, registry=registry, format_checker=FormatChecker()
     )
     for error in sorted(validator.iter_errors(instance), key=lambda e: list(e.path)):
-        fail(f"{label}: {error_location(error)}: {error.message}", rule=RULE_SCHEMA)
+        fail(
+            f"{label}: {error_location(error)}: {error.message}",
+            rule=RULE_SCHEMA,
+            evidence=schema_evidence(error, schema),
+        )
 
 
 # row_type -> the $defs branch of report-row.schema.json that describes it.
