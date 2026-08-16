@@ -40,7 +40,7 @@ The empirical findings that decide this document:
 | # | Behaviour on 3.27.1 | Evidence |
 |---|---|---|
 | E-1 | An unscoped `vars` key lands at **`data:variables.<key>`**, tagged `source=cmdb`. | `cmdb.c:96–118`, `cmdb.h:31`; live `--show-vars` |
-| E-2 | **`$(def.<key>)` does not expand** for `host_specific.json` keys. | Live: `DEF=[$(def.tendcf_service)]`, literal. `scope="def"` exists only on the `def.json` path (`generic_agent.c:453,573`) |
+| E-2 | **`$(def.<key>)` does not expand** for `host_specific.json` keys. | Live: `DEF=[$(def.tendcf_service)]`, literal. `scope="def"` exists only on the `def.json` path (`generic_agent.c:447,567` in 3.27.1; those assignments sit at 453/573 in the local 3.28.0-111 checkout, and citing the checkout's numbers for a 3.27.1 claim was an error — see C-2) |
 | E-3 | A **dotted** flat key is parsed as a scope path: `com.dotted.key` installs as `data:com.dotted.key`, scope `com`. | Live `--show-vars` |
 | E-4 | Top-level primitives **stringify**; booleans and integers survive typed only **inside a container**. | `AddCMDBVariable`, `cmdb.c:121,131,140,152`; live `KEEPALIVE=[true]`, `EXIT=[0]` |
 | E-5 | `$(`, `${`, `@{`, `@(` anywhere in `vars` fails the **entire** CMDB load, not just that key. | `var_expressions.h:90–97`, `cmdb.c:182`; live `error: Failed to load CMDB data` |
@@ -74,7 +74,8 @@ Model A's interpreter relocated rather than abolished. Three things defeat it.
    not merely more expensive than the alternative, it does not address.
 2. **The filter is structural, not value-inspecting.** It keys on *domain
    class* and *kind* — positions in the schema whose vocabularies are closed
-   and disjoint (`goal-file.schema.json:232`), fixed at schema-authoring time
+   and disjoint (`goal-file.schema.json:54`, `state_entries`: "Kinds are a
+   closed set per schema_version"), fixed at schema-authoring time
    and never read from an entry body. R21's tripwire names inspection of
    entry **values**. A kind table is re-keying; that is exactly what R21
    licenses.
@@ -353,6 +354,8 @@ is the point of goldens.
 | id | Correction |
 |---|---|
 | C-1 | R21's second arrow, `tombstones → the negative-promise lists`, is **withdrawn** as a specification of projector output. The arrow chain is an illustrative sketch (Fable `:393–396`) promoted into decided prose without §16.A's ILLUSTRATIVE stamp, losing the qualifier "the generic bundle iterates" that made the lists projector *input*. Arrows one and three stand; the tripwire in the same sentence stands and is mechanical as N-1; R21's filed register entry (`reconciliation:1233`) carries no arrows and is unaffected. P-3 rests on C-4, R4-reborn and briefing honesty, not on this. |
+
+| C-2 | Numbers and citations from this session that a later audit found wrong. The decisions are unaffected; the measurements were not all re-derived before being asserted, which is the defect. **In this document:** E-2 cited `generic_agent.c:453,573`, the local 3.28.0-111 checkout's lines, for a claim about 3.27.1 — corrected to 447/567. §1 cited `goal-file.schema.json:232` for kinds being "closed and disjoint"; :232 is `trust_domain` (correct for the "read their own configuration ONLY from here" quote elsewhere), and the closed-kinds text is `state_entries` at :54 — corrected. **In commit messages, which are pushed and cannot be amended:** `0d175ef` says 134 findings / 129 byte-identical, measured as 133 / 128; `b12ee79` says "43 §19.x findings" (41 by the audit's count, 33 by a plain `grep -rn '§19\.' docs --include=*.md` — the number is method-dependent and should not have been stated as one figure), says "four of the seven" handoff findings are the dangling Grok 9.12 citation (8 findings, 6 of them that citation, across 4 files — the reference is not spelled with its section glyph here because this is a live document and the target genuinely resolves nowhere, which is the whole reason those handoffs are frozen), says the tool had exited 1 "for weeks" when `bin/xref_lint.py` was first committed 2026-08-15, one day earlier, and says the rejected list-item parser invents 279 section ids (253 on that tree, 264 at HEAD). `b12ee79`'s claim that `--all` output is byte-identical to before holds for the finding lines but not the summary line, which gained wording. The five `<root>` cases, the zero rule-class changes, and the two genuinely-dangling E1 ids the parser would have masked all verified true. Evidence: `docs/paper/reviews/2026-08-16_cursor-grok-4.6_claims-audit.md`. |
 
 ### Residues
 

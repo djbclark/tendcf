@@ -1,0 +1,56 @@
+CLAIMS AUDIT, read-only. Work in /Users/djbclark/src/tendcf. Modify nothing;
+run no state-changing git command. Your output is your report.
+
+Seven commits landed in one session:
+
+    git log 9325d0b..HEAD
+
+Their messages are unusually assertive. They cite exact measurements — byte
+counts, finding counts, mutation results, live CFEngine probes, file:line
+citations. This repo's convention is that a claim is only as good as the
+measurement behind it, and a confident-but-false measurement is worse than
+none because it stops the next person checking.
+
+**Your job: verify every checkable factual claim in those seven commit
+messages, and in `docs/architecture/projector-reconciliation-2026-08-16.md`.
+Do not review style or judgement. Only: is the stated fact true?**
+
+Mark each: `TRUE` (with how you checked), `FALSE` (with what is actually the
+case), or `UNVERIFIABLE` (and why).
+
+## Claims that matter most
+
+- **Counts.** "645 bytes", "52 findings -> 0", "28 live documents, 53
+  frozen", "8 schemas, 59 negative fixtures, 6 byte-class, 10 projection
+  fixtures", "35 cells now carry a checked claim", "129 findings
+  byte-identical", "134 findings", "49 frozen / 27 linted" (b12ee79 — note a
+  later commit changes this, so check which number belongs to which commit).
+- **The eight mutations in d699fd6.** Each claims a specific failure mode and
+  message. Re-run them: apply the mutation, run `bin/schema_lint.py`, confirm
+  it goes red for the stated reason, restore. `bin/projector.py` is tracked
+  now, so `git checkout bin/projector.py` restores it. Report any mutation
+  whose claimed result you cannot reproduce.
+- **The three mutations in 505393e** (`required`->`minLength`,
+  `if/then`->`if/else`, `propertyNames`->`additionalProperties` go red;
+  `abs_path`->`absent` stays green). Re-run all four.
+- **The CFEngine 3.27.1 findings E-1..E-9** in the reconciliation. `cf-agent`
+  and `cf-promises` are at /opt/homebrew/bin. Re-probe them in a throwaway
+  `--workdir` under `mktemp -d`. E-2 ("$(def.<key>) does not expand") is the
+  single most load-bearing claim in the whole session — the entire rejection
+  of one opinion rests on it. Check it hardest.
+- **The provenance claim in 630a4ed**, that Fable's opinion reads "the
+  negative-promise lists THE GENERIC BUNDLE ITERATES" and the 2026-08-15 copy
+  dropped that qualifier. Quote both, exactly, with line numbers.
+- **"Case 40's cell had been wrong since it was written"** (505393e). Check
+  `$defs.coverage` and check the fixture. Also check git history: was it
+  wrong from its first commit, or did it become wrong?
+- **Any file:line citation** in the reconciliation's E-table and §0. Spot
+  checks are fine if there are many; say which you checked.
+
+## Also
+
+If any commit message claims something the code does NOT do, that is the most
+valuable finding you can return — the messages are the durable record here,
+and a message that overstates is a trap for the next reader.
+
+Be terse. A table is ideal. Ground everything.
