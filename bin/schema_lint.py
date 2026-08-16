@@ -33,7 +33,7 @@ Six layers, cheapest first:
      applying its hunks to the baseline reproduces the proposed file byte
      for byte, and the approval record's asserted ceremony class equals
      the one the validator derives (§11);
-  6. each of the fifty deliberately broken fixtures in examples/broken/
+  6. each of the fifty-two deliberately broken fixtures in examples/broken/
      and the five byte-class fixtures in examples/broken-bytes/ is caught.
      A lint that only accepts good input is not a check.
 
@@ -74,7 +74,7 @@ SCHEMA_DIR = REPO / "schema"
 EXAMPLE_DIR = REPO / "examples"
 BROKEN_DIR = EXAMPLE_DIR / "broken"
 BYTE_CLASS_DIR = EXAMPLE_DIR / "broken-bytes"
-EXPECTED_BROKEN = 50
+EXPECTED_BROKEN = 52
 EXPECTED_BYTE_CLASS = 5
 
 # example file -> schema file. report-rows.yml is a sequence of rows, each
@@ -90,7 +90,17 @@ EXAMPLES: dict[str, tuple[str, bool]] = {
     "goal-file-baseline.json": ("goal-file.schema.json", False),
     "goal-diff.json": ("goal-diff.schema.json", False),
     "approval-record.json": ("approval-record.schema.json", False),
+    "approval-record-reject.json": ("approval-record.schema.json", False),
 }
+
+# Both answers to one ceremony, held to the same rules. §11 requires a
+# reject-with-annotations fixture, and one accept fixture cannot supply it:
+# `refused` is present iff the verdict is reject, so the schema's
+# refused-iff-reject `if/then` has no instance to exercise either branch
+# against while every record in the corpus says accept. The pair differs in
+# `verdict`, `refused`, and `signature` and in nothing else — deliberately,
+# so that what a reviewer's choice changes is exactly what differs here.
+APPROVAL_RECORDS = ("approval-record.json", "approval-record-reject.json")
 
 # Both goal files, held to the same schema and the same cross-entry rails.
 # The baseline is not a lesser artifact: it is the device's currently
@@ -831,7 +841,7 @@ def apply_diff(baseline: Any, diff: dict[str, Any], label: str) -> Any | None:
 
 
 def check_goal_file_family(loaded: dict[str, Any]) -> None:
-    """The four family fixtures must describe one another exactly.
+    """The family fixtures must describe one another exactly.
 
     Each of these is a rule the running system holds and the fixture set
     would otherwise only gesture at: the two hashes are what §9.1's
@@ -842,8 +852,12 @@ def check_goal_file_family(loaded: dict[str, Any]) -> None:
     goal = loaded.get("goal-file.json")
     baseline = loaded.get("goal-file-baseline.json")
     diff = loaded.get("goal-diff.json")
-    record = loaded.get("approval-record.json")
-    if not all(isinstance(doc, dict) for doc in (goal, baseline, diff, record)):
+    records = {
+        name: loaded[name]
+        for name in APPROVAL_RECORDS
+        if isinstance(loaded.get(name), dict)
+    }
+    if not all(isinstance(doc, dict) for doc in (goal, baseline, diff)) or not records:
         return
 
     goal_hash = canonical_sha256(goal)
@@ -862,7 +876,11 @@ def check_goal_file_family(loaded: dict[str, Any]) -> None:
 
     # One host across the family. A record signed for one device against a
     # diff computed for another is DC-2's per-target validity, defeated.
-    hosts = {name: loaded[name].get("host") for name in EXAMPLES if name.endswith(".json")}
+    hosts = {
+        name: doc.get("host")
+        for name, doc in loaded.items()
+        if name.endswith(".json") and isinstance(doc, dict)
+    }
     if len(set(hosts.values())) > 1:
         fail(f"goal-file family: fixtures disagree on host: {hosts}")
 
@@ -874,22 +892,28 @@ def check_goal_file_family(loaded: dict[str, Any]) -> None:
             "complete report of the change between the pair"
         )
 
-    if record.get("proposed_sha256") != diff.get("proposed_sha256"):
-        fail("approval-record: proposed_sha256 does not match the diff's")
-    if "baseline_sha256" not in record:
-        fail(
-            "approval-record: no baseline_sha256, but a goal-diff exists — only "
-            "first adoption has no baseline, and first adoption has no diff (§11)"
-        )
-    elif record.get("baseline_sha256") != diff.get("baseline_sha256"):
-        fail("approval-record: baseline_sha256 does not match the diff's")
-
+    # Every record in the family answers this same diff, so every record is
+    # held to these rules — the reject is not a lesser fixture that may drift
+    # while the accept stays honest. A record whose hashes no longer name the
+    # pair is the §9.1 cross-check failing, whichever way its verdict went.
     derived = derive_ceremony_class(diff)
-    if record.get("ceremony_class") != derived:
-        fail(
-            f"approval-record: ceremony_class {record.get('ceremony_class')!r} is "
-            f"asserted, but the validator derives {derived!r} from the diff"
-        )
+    for name, record in records.items():
+        label = name.removesuffix(".json")
+        if record.get("proposed_sha256") != diff.get("proposed_sha256"):
+            fail(f"{label}: proposed_sha256 does not match the diff's")
+        if "baseline_sha256" not in record:
+            fail(
+                f"{label}: no baseline_sha256, but a goal-diff exists — only "
+                "first adoption has no baseline, and first adoption has no diff (§11)"
+            )
+        elif record.get("baseline_sha256") != diff.get("baseline_sha256"):
+            fail(f"{label}: baseline_sha256 does not match the diff's")
+
+        if record.get("ceremony_class") != derived:
+            fail(
+                f"{label}: ceremony_class {record.get('ceremony_class')!r} is "
+                f"asserted, but the validator derives {derived!r} from the diff"
+            )
 
 
 def check_goal_file_forbidden_refs(schemas: dict[str, dict]) -> None:

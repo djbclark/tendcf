@@ -1,12 +1,12 @@
 # Negative fixtures
 
-Fifty deliberately broken overlays, plus five byte-class fixtures in the
-sibling `examples/broken-bytes/`. `bin/schema_lint.py` must catch every
-one; a case that validates is a lint failure.
+Fifty-two deliberately broken overlays, plus five byte-class fixtures in
+the sibling `examples/broken-bytes/`. `bin/schema_lint.py` must catch
+every one; a case that validates is a lint failure.
 
 Each directory here replaces the happy-path file of the same name under
 `examples/`. The rest of the Site Model (cases 1-12) or the goal-file
-family (cases 13-55) stays as in the happy path.
+family (cases 13-57) stays as in the happy path.
 
 | # | Case | Broken input | Caught by |
 | --- | --- | --- | --- |
@@ -90,6 +90,42 @@ Case 54 sits under `device-trust` because that is the only domain the
 baseline carries, so its record is overlaid to assert `privileged` — the
 class the validator correctly derives — leaving the no-op as the finding
 rather than a ceremony mismatch on top of it.
+
+Cases 56 and 57 close `approval-record.schema.json`'s refused-iff-reject
+`if/then/else`, which until now had no fixture in **either** direction:
+every approval record in the corpus said `accept`, so the `then` branch
+had no instance to fail against and the `else` branch none to pass. §11
+requires "a reject-with-annotations" fixture, and one accept record
+cannot supply it — `refused` is present iff the verdict is reject, so the
+happy path can only ever exercise one side of the rule it states.
+
+The positive half of that pair is `examples/approval-record-reject.json`,
+a second **valid** record answering the same ceremony as
+`examples/approval-record.json`: same host, same nonce, same
+`approval_seq`, same two hashes, differing in `verdict`, `refused`, and
+`signature` and in nothing else. The shared nonce and counter are not a
+DC-2 violation smuggled into the corpus — they are what makes the pair a
+controlled comparison. These are the two possible answers to one device
+challenge, not two records a validator would ever persist in sequence;
+what a reviewer's decision changes is exactly what differs between the
+files. Both are held to the family layer's record rules (§9.1's two
+hashes, the derived ceremony class), so the reject cannot drift stale
+while the accept stays honest.
+
+| # | Case | Broken input | Caught by |
+| --- | --- | --- | --- |
+| 56 | `56-reject-without-annotations` | `verdict: reject` with no `refused` | schema (`if/then`) |
+| 57 | `57-accept-with-annotations` | `verdict: accept` **with** a `refused` | schema (`if/else`) |
+
+Case 57 is why the `else` branch is spelled `{"refused": false}` rather
+than §11's more obvious `{"not": {"required": ["refused"]}}`. The two are
+the same rule; the `not` form reports it by printing the entire record
+back and saying it "should not be valid", which is the message class
+D16(a) rules out — resolution needs a human, so the message has to name
+what is wrong. The `false`-schema form names the offending annotation
+array and nothing else. Neither form yields an instance path better than
+`<root>` (jsonschema drops it for boolean subschemas), which is the
+harness's problem rather than the schema's.
 
 ## Byte-class fixtures (`../broken-bytes/`)
 

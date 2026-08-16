@@ -93,10 +93,8 @@
     ]
   },
   "else": {
-    "not": {
-      "required": [
-        "refused"
-      ]
+    "properties": {
+      "refused": false
     }
   }
 }
