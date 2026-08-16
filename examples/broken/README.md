@@ -318,6 +318,9 @@ below are that document's negatives.
 | 76 | `76-env-not-an-object.json` | `env` as an array carrying a real secret (N-4) | projection |
 | 77 | `77-nan-not-representable.json` | `NaN` — accepted by `json`, unrepresentable in JCS (N-6) | projection |
 | 78 | `78-decomposed-string-in-projection.json` | a decomposed (NFD) string, which JCS passes through (N-6) | projection |
+| 79 | `79-newline-in-interlock-id.json` | an interlock id ending in `\n` (N-9) | projection |
+| 80 | `80-newline-in-service-id.json` | a service id ending in `\n` (N-9) | projection |
+| 81 | `81-newline-in-env-value.json` | an `env` value ending in `\n` (N-4) | projection |
 
 Three of the twelve negatives have no row, and deliberately. N-1 (structure
 must not change when only `state` flips) and N-11 (two runs agree) are

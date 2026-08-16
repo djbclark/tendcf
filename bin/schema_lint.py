@@ -86,7 +86,7 @@ GOLDEN = EXAMPLE_DIR / "host_specific.json"
 PROJECTOR = Path(__file__).resolve().with_name("projector.py")
 EXPECTED_BROKEN = 59
 EXPECTED_BYTE_CLASS = 6
-EXPECTED_PROJECTION = 13
+EXPECTED_PROJECTION = 16
 
 # example file -> schema file. report-rows.yml is a sequence of rows, each
 # validated individually against the row schema. The goal-file family is

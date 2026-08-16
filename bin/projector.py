@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["rfc8785"]
 # ///
-"""Project a goal file into `host_specific.json` — the reference projector.
+r"""Project a goal file into `host_specific.json` — the reference projector.
 
 The mapping this implements was decided in
 `docs/architecture/projector-reconciliation-2026-08-16.md`, whose P-1..P-7
@@ -84,7 +84,11 @@ spelling and is accepted as one: a projection carries no schema and no goal
 file, and an on-device checker will not have either. The restatement is
 narrow (two patterns and two lengths) and drift in it can only make the
 checker weaker than the schema, never stricter than the goal file it came
-from.
+from. That weakness was real and not hypothetical: the patterns were first
+written with `$`, which in Python also matches before a trailing newline
+while JSON Schema's ECMA-262 `$` does not, so an id ending in `\n` passed
+(F5). Fixed to `\Z` and fixtured three times over, once per pattern, since
+a revert of any one of them alone is otherwise invisible.
 
 Run it:  bin/projector.py examples/goal-file.json
          bin/projector.py --check examples/host_specific.json
@@ -136,15 +140,23 @@ RULE_PROJECTION_BYTES = "projection bytes"
 
 # Restated from goal-file.schema.json — see the module docstring's last
 # paragraph for why that is deliberate here and nowhere else.
+#
+# `\Z`, NOT `$`. JSON Schema `pattern` is ECMA-262, where `$` without the `m`
+# flag matches end-of-input and nothing else; Python's `$` also matches just
+# before a final `\n`. F5: that difference made N-9 evadable — an interlock id
+# "caddy-config-valid\n", a promiser and launchd label no goal file can spell,
+# was accepted. `\Z` is the faithful restatement of the schema's `$`.
 ENTRY_ID_PATTERNS = {
-    "service": re.compile(r"^[A-Za-z0-9][A-Za-z0-9@._-]*$"),
-    "interlock": re.compile(r"^[a-z0-9][a-z0-9-]*$"),
+    "service": re.compile(r"^[A-Za-z0-9][A-Za-z0-9@._-]*\Z"),
+    "interlock": re.compile(r"^[a-z0-9][a-z0-9-]*\Z"),
 }
 ENTRY_ID_MAX_LENGTH = {"service": 128, "interlock": 64}
 
 # common.schema.json's env_map: key and value are both secretspec key NAMES.
 # A value outside this class is a resolved secret, which is the whole of N-4.
-SECRETSPEC_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
+# `\Z` for the same reason as above, and it matters more here: `$` admitted a
+# value ending in a newline, which is a value and not a name.
+SECRETSPEC_NAME = re.compile(r"^[A-Z][A-Z0-9_]*\Z")
 
 # device-trust's ids and digests are key-position in the goal file: an
 # `ed25519:` advisor-key id, a `sha256:` digest. A key spelled this way in a
