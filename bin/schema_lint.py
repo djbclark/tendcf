@@ -379,8 +379,20 @@ def check_canonical_bytes(raw: bytes, label: str) -> Any | None:
 
 
 def check_family_canonical_bytes() -> None:
-    """Every `.json` fixture on disk is canonical bytes, checked as bytes."""
-    for name in EXAMPLES:
+    """Every `.json` fixture on disk is canonical bytes, checked as bytes.
+
+    F9: that sentence had gone false. It iterated EXAMPLES alone, and
+    OUTPUT_ONLY_EXAMPLES had since removed `host_specific.json` from that set
+    for a pairing reason — it is a produced artifact with no authored schema
+    instance — which is nothing to do with its bytes. The induction the
+    sentence rests on was gone with it.
+
+    Repaired by restoring the claim rather than narrowing it: the union is
+    iterated, so "every `.json` fixture on disk" is again literally what runs.
+    Being output-only is a statement about where a file comes from, never a
+    licence for it to be non-canonical.
+    """
+    for name in sorted(set(EXAMPLES) | OUTPUT_ONLY_EXAMPLES):
         if not name.endswith(".json"):
             continue
         path = EXAMPLE_DIR / name
