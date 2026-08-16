@@ -13,6 +13,10 @@ It must agree with the guide.
 Technical paper:
 [`../paper/tendcf-architecture-paper.md`](../paper/tendcf-architecture-paper.md)
 
+Contested vocabulary — words with two senses, or whose referent moved under
+a decision: [`GLOSSARY.md`](GLOSSARY.md). It defines nothing; it points at
+whichever document is authoritative for each term.
+
 Site Model contract (JSON Schema, fixtures, lint):
 [`../../schema/`](../../schema/), [`../../examples/`](../../examples/),
 [`../../bin/schema_lint.py`](../../bin/schema_lint.py).
