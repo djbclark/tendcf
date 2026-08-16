@@ -357,19 +357,161 @@ is the point of goldens.
 
 | C-2 | Numbers and citations from this session that a later audit found wrong. The decisions are unaffected; the measurements were not all re-derived before being asserted, which is the defect. **In this document:** E-2 cited `generic_agent.c:453,573`, the local 3.28.0-111 checkout's lines, for a claim about 3.27.1 — corrected to 447/567. §1 cited `goal-file.schema.json:232` for kinds being "closed and disjoint"; :232 is `trust_domain` (correct for the "read their own configuration ONLY from here" quote elsewhere), and the closed-kinds text is `state_entries` at :54 — corrected. **In commit messages, which are pushed and cannot be amended:** `0d175ef` says 134 findings / 129 byte-identical, measured as 133 / 128; `b12ee79` says "43 §19.x findings" (41 by the audit's count, 33 by a plain `grep -rn '§19\.' docs --include=*.md` — the number is method-dependent and should not have been stated as one figure), says "four of the seven" handoff findings are the dangling Grok 9.12 citation (8 findings, 6 of them that citation, across 4 files — the reference is not spelled with its section glyph here because this is a live document and the target genuinely resolves nowhere, which is the whole reason those handoffs are frozen), says the tool had exited 1 "for weeks" when `bin/xref_lint.py` was first committed 2026-08-15, one day earlier, and says the rejected list-item parser invents 279 section ids (253 on that tree, 264 at HEAD). `b12ee79`'s claim that `--all` output is byte-identical to before holds for the finding lines but not the summary line, which gained wording. The five `<root>` cases, the zero rule-class changes, and the two genuinely-dangling E1 ids the parser would have masked all verified true. Evidence: `docs/paper/reviews/2026-08-16_cursor-grok-4.6_claims-audit.md`. |
 
+| C-3 | §11 of this document listed "`device-trust`'s actual destination" as "**now the next open question**", on the reading that R21's third arrow names a file whose format was unspecified. It was not open. Fable defines "own config" as `device-trust` itself (`goal-file-schema-opinion-fable.md:293`), so the arrow names the region and the file reading makes that sentence circular; the only agent config *file* in the corpus is `:302`'s privileged-promiser-list address, and §7 already ruled that list **empty in v1** because §8 cut the `package` and `file` kinds it needed. The defect is the same one C-1 recorded for arrow two — an illustrative sketch read as decided prose — and arrow three degraded in transcription too ("the **validator's** own config" at `:395` became "the **agent's** own config" at `reconciliation:529`), so C-1's finding now rests on two instances rather than one. Answered by P-8; the §11 bullet is struck rather than deleted, because the error in it is the correction. |
+
 ### Residues
 
 | id | Residue |
 |---|---|
 | R22 | The reference projector in `bin/` is a second implementation site to tendcf-agent's. The golden bytes are the anti-drift oracle. |
 | R23 | The kind-token `-`→`_` rule is convention with no mechanical force; hyphens are legal in `vars` keys on 3.27.1 (measured). Do not re-derive a mechanical justification for it. |
+| R24 | Device-authored operational state — device nonce, monotonic `approval_seq` high-water, TUF root and high-water mark — has no specified home. It cannot live in the goal file (signed upstream; these are device-authored), it is **not** `device-trust` content, and it must carry no copy of any, or P-8's second-source-of-truth objection applies to it. `architecture-DEFINITIVE-v3.md` open questions 13 and 15, and its §14.4. |
 
 ## 11. What this does not decide
 
 - The generic bundle itself. This document fixes the data contract the bundle
   reads; the `.cf` that consumes `tendcf_service` and renders promises from
   `state` is not written here.
-- `device-trust`'s actual destination. P-1 removes it from the projection;
+- ~~`device-trust`'s actual destination. P-1 removes it from the projection;
   R21's "the agent's own config" names where it goes, and that file's format
-  is not specified anywhere yet. **This is now the next open question.**
+  is not specified anywhere yet. **This is now the next open question.**~~
+  **Struck: answered in §12 of this document, and it was never open.** The
+  bullet is kept
+  rather than deleted because the error in it is the correction — see C-3.
 - Whether a future kind projects. Decided per kind, at schema-authoring time.
+
+## 12. P-8 — `device-trust` has no destination; it is read where it already is
+
+**Decision: `device-trust` is consumed in place, from the integrity-protected
+approved goal file the agent already stores (`architecture-DEFINITIVE-v3.md`
+§9.1 — hereafter `architecture §N`, since the citation convention above
+reserves a bare `§N` for the 2026-08-15 document). There is no agent
+trust-config file, no second format, and nothing for the projector — or
+anything else — to write. §11 of this document called this "the next open
+question"; §7 had already closed it, under a different heading.**
+
+### 12.1 What R21's third arrow actually names
+
+§11 of this document read `trust entries → the agent's own config` as naming
+a *file* whose format nobody had specified. Two things defeat that reading,
+and both are recoverable from provenance already in the corpus.
+
+**"Own config" is the region, not a file.** Fable's opinion — the source of
+the arrow chain — defines the term a hundred lines above the arrow: "the
+validator and agent read their own configuration *only* from `device-trust`"
+(`goal-file-schema-opinion-fable.md:293`), which `trust_domain` restates
+almost verbatim. On Fable's own definition arrow three is not a route to a
+destination; it is the statement that trust entries **are** that
+configuration. The file reading makes the sentence circular — the agent would
+read its configuration only from `device-trust`, having first copied
+`device-trust` somewhere else in order to read it.
+
+**The arrow degraded in transcription twice, not once.** C-1 recorded arrow
+two losing "the generic bundle iterates". Arrow three changed reader: Fable
+writes "the **validator's** own config" (`:395`), the 2026-08-15 copy writes
+"the **agent's** own config" (`reconciliation:529`). Nothing turns on it —
+`trust_domain` names both readers — but it is the same parenthetical, re-typed
+rather than quoted, losing something each time. C-1's finding that the arrow
+chain is an illustrative sketch promoted into decided prose now rests on two
+independent instances instead of one.
+
+**The one agent config *file* in the corpus was already ruled empty.** Fable
+does name a file, once, and not in the arrow: "a short compiled-in list of
+addresses (`package:tendcf-agent`, `package:cfengine`, the agent's own config
+path)" (`:302`). That is the **privileged promiser list** — addresses an
+ordinary entry must not be permitted to write — and it exists in Fable's draft
+because Fable's v1 had gate machinery arriving as `package` and `file`
+entries. §7 answered it directly:
+
+> **In v1 the compiled-in promiser list is empty.** Fable's list
+> (`package:tendcf-agent`, `package:cfengine`, config paths) existed because
+> its v1 had gate machinery arriving as ordinary package/file entries. With
+> those kinds cut, the derivation collapses to "any hunk under `device-trust`,
+> plus the header" — the shortest this list will ever be. It regrows when
+> `package`/`file` land; that regrowth is R1, watched.
+
+§8 cut `package` and `file`, and `state_entries` carries exactly `service`,
+`interlock` and `unit-writer` (`goal-file.schema.json:54`). So in v1 **no
+goal-file entry can write any path at all**, and the agent's config path has
+nothing to be protected from. No v1 file, therefore no v1 format. When `file`
+lands the path returns to the promiser list — that is R1, already watched, and
+it is a *protection* obligation, not a format one.
+
+### 12.2 Why the file the §11 bullet imagined should not be built
+
+Set the provenance aside; the artifact is wrong on its own terms.
+
+**It is P-1's minority position with a different filename.** §1 of this
+document rejected
+projecting `device-trust` because it creates "a second read path for precisely
+the region `goal-file.schema.json:232` reserves … a second source of truth,
+which the corpus treats as a defect independent of whether anyone can write to
+it." Nothing in that argument depends on the second read path being
+`host_specific.json`. It applies unchanged to `agent-config.json`.
+
+**And it would sever trust content from the only thing that makes it
+privileged.** This is the argument §11 of this document flagged as needing F7,
+and F7 supplies it. Privilege is **positional** — "any hunk under
+`device-trust`", derived by the validator against the baseline's structure,
+never from anything in the entry (§7, architecture §9.8). F7 measured how
+little the entry carries: of the corpus's four trust bodies, three are recognisable from bytes alone by a digest
+(`advisor-key` in the key, `agent` and `policy-tree` in the value), and the
+fourth — `trust-policy`'s `{"local_yes_required": true, "state": "present",
+"tier": "consented"}` — carries no marker whatever. Nothing distinguishes it
+from a legal service body without the schema, which a bare file does not
+carry.
+
+Position is therefore not one signal among several. It is the whole signal.
+Trust content moved into a standalone file loses, in one step:
+
+- the domain that names it privileged,
+- the closed kind set that makes that naming unforgeable,
+- the diff, ceremony class and approval record that gate changes to it.
+
+All four would have to be rebuilt for the new file. That is not specifying a
+format; it is standing up a second gate for content already inside the first
+one.
+
+**The other half of the enforcement is now measured rather than asserted.** §7
+holds that "trust content misfiled elsewhere is inert, not covert", resting on
+`trust_domain`'s claim that the trust kinds are "structurally inexpressible
+outside this domain". That claim was prose and was tested nowhere. `1064def`
+adds a `schema_lint` property that smuggles every trust kind and every trust
+body into an ordinary domain and requires each to be refused — 9 of 9 today,
+and it extends itself to a fifth trust kind that does not exist yet, which
+fixtures would not.
+
+It is verified by **M22**, chosen because M21 proved nothing: relaxing
+`state_entries`' `additionalProperties` to `true` is already caught by case
+`14-unknown-kind`. M22 is the realistic regression instead — a future editor
+adds `trust-policy` to the closed kind set, leaving the set closed and case 14
+firing exactly as before. At `1064def~1` that leaves schema-lint **fully
+green**, with a trust kind spellable in an ordinary domain and the gate
+reporting OK; at `1064def` it produces exactly one finding.
+
+### 12.3 What is genuinely unspecified, and is not this
+
+Two things sit beside the question the §11 bullet asked and are not
+answered by it.
+Naming them is why the §11 bullet is struck rather than deleted.
+
+1. **Device-authored operational state** — the device nonce, the monotonic
+   `approval_seq` high-water, the TUF root and high-water mark (architecture
+   §9.1, §9.11).
+   This cannot live in the goal file: the goal file is signed upstream and
+   these are authored by the device. It is not trust *policy*, and it must
+   carry no copy of anything under `device-trust`, or it becomes the second
+   source of truth this section rejects. Carried as R24.
+2. **The bootstrap seam.** `baseline_sha256` is "absent only at first
+   adoption" (architecture §9.1), so the first approval record has no baseline
+   — and hence
+   no `device-trust` — to be verified against. Which advisor key admits the
+   first record is a first-run-ceremony question (D41), which explicitly
+   refuses TOFU for `consented` devices. P-8 closes steady state; first run is
+   architecture open question 15's ("whether a device-local trust root the
+   release path cannot write is buildable across macOS, Linux, and Android by
+   one person"), and stays there.
+
+Neither is a trust-config format. Both are device-local state whose absence is
+already carried elsewhere, and conflating them with P-8 is what made the §11
+bullet look open.

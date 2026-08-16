@@ -229,7 +229,7 @@
     },
 
     "trust_domain": {
-      "description": "The privileged region as one reserved, always-present, always-comprehensive domain. The validator's privilege derivation is 'any hunk under device-trust', plus the header — and in v1 nothing else, because no state kind carries gate machinery (reconciliation §7). Privilege is derived against the BASELINE's structure, never the proposal's. The validator and agent read their own configuration ONLY from here, so trust content misfiled elsewhere is inert, not covert; the trust kinds are structurally inexpressible outside this domain.",
+      "description": "The privileged region as one reserved, always-present, always-comprehensive domain. The validator's privilege derivation is 'any hunk under device-trust', plus the header — and in v1 nothing else, because no state kind carries gate machinery (reconciliation §7). Privilege is derived against the BASELINE's structure, never the proposal's. The validator and agent read their own configuration ONLY from here, so trust content misfiled elsewhere is inert, not covert; the trust kinds are structurally inexpressible outside this domain — measured by schema_lint's check_trust_inexpressible(), because that inexpressibility is a corollary of state_entries' closed kind set and a kind added there would revoke it without editing a word here (projector reconciliation P-8).",
       "type": "object",
       "properties": {
         "coverage": {
