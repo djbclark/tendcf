@@ -188,8 +188,10 @@ a data-injection layer. The version history is on that page: 3.7.0 put
 augments into the Masterfiles Policy Framework and 3.7.3 back-ported
 `def.json` parsing into the core agent, but `$(sys.workdir)/data/host_specific.json`
 has only been parsed **since 3.18.0**. Using both files therefore sets the
-floor at CFEngine 3.18, not 3.7. The name is historical; YAML is a valid
-input. The compiler is a tool, not the home of schemas.
+floor at CFEngine 3.18, not 3.7. The name is historical, and despite it
+**YAML is not a valid Augments input** — CFEngine 3.27.1 reads JSON only.
+YAML remains an authoring format for the Site Model (§7) and never reaches
+the agent. The compiler is a tool, not the home of schemas.
 
 CFEngine’s [Masterfiles Policy Framework](https://github.com/cfengine/masterfiles)
 is already largely data-driven on top of that layer. For the common case
@@ -357,12 +359,17 @@ and a file that is not already in that form is refused rather than
 normalized. YAML stays an authoring format for the Site Model and never
 reaches a device.
 
-**Removals are actuated, not omitted.** Under a convergent engine the
-absence of a promise is the absence of enforcement, not reversal: drop an
-entry and the thing keeps running. Every removal in a diff compiles to an
-explicit negative promise — the file deleted, the package absent,
-`service_policy => "stop"` — and a briefing renders a removal as what it
-will do, never as a blank space.
+**Removals are actuated, not omitted — and a removal is a state, not an
+event.** Under a convergent engine the absence of a promise is the absence
+of enforcement, not reversal: drop an entry and the thing keeps running. So
+a removed entry does not leave the goal file; it stays, marked absent, as a
+**tombstone**, and the explicit negative promise — the file deleted, the
+package absent, `service_policy => "stop"` — renders from the **file**, not
+from the diff. That is what makes it idempotent: a crash mid-apply, a
+re-run, or a device catching up across several releases at once all converge
+to the same place, where a one-shot instruction carried only in a transient
+diff would simply be lost. A briefing renders a removal as what it will do,
+never as a blank space.
 
 **Silence means two different things, and the file says which.** In a domain
 the goal file declares comprehensive (§11), an entry that does not appear in
@@ -816,8 +823,17 @@ runit service on another host.
 `service:caddy` from the name alone). The compiler derives an ordering
 edge from that match:
 
+This illustration is **preview-channel material and does not load as
+Augments.** Both of its top-level keys — `data` and `nix2cf_edges` — are
+skipped by CFEngine 3.27.1, so as written this file injects nothing. The
+shape the agent actually consumes is `{"vars": {…}}` and nothing else; the
+projection onto it runs device-side, after approval. The nesting below is
+kept because it shows the *derivation* legibly, which is what this
+walkthrough is for — do not copy it onto a device and expect an effect.
+
 ```jsonc
-// host_specific.json — ILLUSTRATIVE, not compiler output
+// host_specific.json — ILLUSTRATIVE ONLY. Preview channel; does NOT load
+// as Augments (top-level `data` and `nix2cf_edges` are both skipped).
 {
   "data": {
     "nix2cf_services": {
