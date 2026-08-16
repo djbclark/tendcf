@@ -8,6 +8,30 @@ Each directory here replaces the happy-path file of the same name under
 `examples/`. The rest of the Site Model (cases 1-12) or the goal-file
 family (cases 13-57) stays as in the happy path.
 
+**The "Caught by" column is executable.** `bin/schema_lint.py` reads these
+tables back and requires each case to be caught by the class its row
+declares — a case that fires only findings from some other layer is a lint
+failure, as is a fixture with no row here or a row naming no fixture on
+disk. "Something objected" was the weaker claim this harness used to make,
+and it was weak where it mattered: a fixture that rewrites a file another
+layer reads makes that layer object by construction, so a case could go on
+passing after the rule it exists to test was deleted. Cases 13-43 are the
+whole set that was in that position — each rewrites `goal-file.json`, which
+the family layer reads — and the lint carried a special case standing that
+layer down for them. That gate is gone; the declaration replaces it, and
+without the gate's asymmetry (an overlaid *baseline* was never stood down,
+so a schema negative written against `goal-file-baseline.json` would have
+been masked exactly the way 13-43 would have been — it now is not).
+
+The class is the cell text with any parenthetical dropped, except under
+`family`, where the parenthetical is the class: `family (hash)`,
+`family (apply)`, and `family (ceremony)` are three different rules and a
+case must name the right one. Under `schema` the parenthetical is the
+keyword or def under test — prose for a reader, since the lint cannot
+produce it — so it is documentation and is not checked. The full
+vocabulary is `RULE_CLASSES` in `bin/schema_lint.py`; a cell naming
+anything else is a lint failure too.
+
 | # | Case | Broken input | Caught by |
 | --- | --- | --- | --- |
 | 1 | `01-opt-out-no-reason` | `comprehensive: false` with no `opt_out_reason` | schema |
@@ -69,12 +93,18 @@ hunk or transition that changes nothing is that same nothing smuggled
 through as volume, spending the reviewer attention §16 iv is about.
 
 Each overlays `goal-diff.json`, and — where isolating the rule under test
-requires it — `goal-file-baseline.json` and `approval-record.json` too, so
+requires it — `goal-file-baseline.json` and both approval records too, so
 that exactly one finding fires and it is the one the case name claims
-(verified for all seven; the harness itself only requires a finding, not
-this one). None of them overlays `goal-file.json`: the family layer reads
-the proposed file rather than judging it, and stands down whenever that
-file is the one under test.
+(verified for all seven, and for 56 and 57).
+
+The reject-record overlay is not decoration. The family layer holds every
+record to the diff, so a case that corrects only the accept record leaves
+the reject one disagreeing with that case's own diff — a second finding
+about nothing the case claims. Each mirror asserts the **derived** ceremony
+class and the case diff's own hashes, never the deliberate error the accept
+overlay exists to make: cases 52 and 53 are about one record asserting
+`ordinary` over a privileged change, so their mirrors correctly say
+`privileged` and stay silent.
 
 | # | Case | Broken input | Caught by |
 | --- | --- | --- | --- |

@@ -34,8 +34,13 @@ Six layers, cheapest first:
      for byte, and the approval record's asserted ceremony class equals
      the one the validator derives (§11);
   6. each of the fifty-two deliberately broken fixtures in examples/broken/
-     and the five byte-class fixtures in examples/broken-bytes/ is caught.
-     A lint that only accepts good input is not a check.
+     and the five byte-class fixtures in examples/broken-bytes/ is caught
+     BY THE LAYER IT NAMES. A lint that only accepts good input is not a
+     check; a negative harness that accepts any objection at all is barely
+     one, because a fixture that rewrites a file another layer reads makes
+     that layer object by construction. Each case declares its rule class
+     in examples/broken/README.md's "Caught by" column, read back at run
+     time, and passes only if that class fired (reconciliation §13).
 
 Layers 3 and 5 are the point. Layers 1-2 and 4 catch a broken or unpaired
 schema; 3 and 5 are what keep a parses-fine-but-wrong document out of a
@@ -58,11 +63,12 @@ import argparse
 import copy
 import hashlib
 import json
+import re
 import sys
 import unicodedata
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import rfc8785
 import yaml
@@ -126,12 +132,77 @@ GOAL_FILE_FORBIDDEN_REFS = {
 # paired with an example" claim machine-checkable rather than a convention.
 DEFINITION_ONLY_SCHEMAS = {"common.schema.json"}
 
-findings: list[str] = []
+# The rule class every finding carries. A negative fixture declares which
+# class must catch it (examples/broken/README.md's "Caught by" column, read
+# back at run time), so a case can no longer pass on a finding from some
+# other layer that happens to fire at the same time. Without this, deleting
+# a rule stays green as long as *something* still objects to the fixture —
+# and every fixture that rewrites a file the family layer reads makes
+# something else object by construction.
+#
+# These strings are the README's vocabulary, not a parallel one: whatever
+# is written here is what the table must say. Heads listed in
+# DETAILED_RULE_HEADS carry their parenthetical into the class, because
+# `family` alone would let a hash case pass on a ceremony finding; for
+# `schema` the parenthetical is the keyword or def under test, prose the
+# lint cannot produce, so it is documentation and is not checked.
+RULE_SCHEMA = "schema"
+RULE_SCHEMA_META = "schema meta"
+RULE_PAIRING = "pairing"
+RULE_DISCRIMINATOR = "lint discriminator"
+RULE_CROSS_FILE = "cross-file"
+RULE_FAMILY_HASH = "family (hash)"
+RULE_FAMILY_APPLY = "family (apply)"
+RULE_FAMILY_CEREMONY = "family (ceremony)"
+RULE_FAMILY_HOST = "family (host)"
+RULE_JCS = "JCS idempotence"
+RULE_DUPLICATE_KEY = "duplicate-key parse"
+RULE_NFC = "NFC check"
+RULE_PARSE = "parse"
+RULE_HARNESS = "harness"
+
+RULE_CLASSES = frozenset(
+    {
+        RULE_SCHEMA,
+        RULE_SCHEMA_META,
+        RULE_PAIRING,
+        RULE_DISCRIMINATOR,
+        RULE_CROSS_FILE,
+        RULE_FAMILY_HASH,
+        RULE_FAMILY_APPLY,
+        RULE_FAMILY_CEREMONY,
+        RULE_FAMILY_HOST,
+        RULE_JCS,
+        RULE_DUPLICATE_KEY,
+        RULE_NFC,
+        RULE_PARSE,
+        RULE_HARNESS,
+    }
+)
+
+DETAILED_RULE_HEADS = frozenset({"family"})
+
+
+class Finding(NamedTuple):
+    rule: str
+    msg: str
+
+
+findings: list[Finding] = []
 PRINT_FINDINGS = True
 
 
-def fail(msg: str) -> None:
-    findings.append(msg)
+def fail(msg: str, *, rule: str) -> None:
+    """Record a finding under the rule class that produced it.
+
+    `rule` is keyword-only and required rather than defaulted, so a new
+    check cannot be added without deciding which class it belongs to —
+    a default would make the declaration a convention someone has to
+    remember, which is the failure mode check_pairing() already names.
+    """
+    if rule not in RULE_CLASSES:
+        die(f"internal: fail() called with unknown rule class {rule!r}")
+    findings.append(Finding(rule, msg))
     if PRINT_FINDINGS:
         print(f"schema-lint: FAIL: {msg}")
 
@@ -229,12 +300,19 @@ def check_canonical_bytes(raw: bytes, label: str) -> Any | None:
     """
     try:
         doc = json.loads(raw, object_pairs_hook=_reject_duplicate_keys)
-    except ValueError as exc:
-        fail(f"{label}: not canonical JSON: {exc}")
+    except json.JSONDecodeError as exc:
+        # Ordered before the ValueError below because JSONDecodeError is one:
+        # bytes that are not JSON at all and bytes that are two documents in
+        # a trench coat arrive through the same `except`, and they are not
+        # the same finding.
+        fail(f"{label}: not JSON: {exc}", rule=RULE_PARSE)
+        return None
+    except ValueError as exc:  # _reject_duplicate_keys
+        fail(f"{label}: not canonical JSON: {exc}", rule=RULE_DUPLICATE_KEY)
         return None
 
     for pointer in _non_nfc_strings(doc):
-        fail(f"{label}: {pointer} is not NFC-normalized")
+        fail(f"{label}: {pointer} is not NFC-normalized", rule=RULE_NFC)
 
     canonical = rfc8785.dumps(doc)
     if canonical != raw:
@@ -248,7 +326,10 @@ def check_canonical_bytes(raw: bytes, label: str) -> Any | None:
             else "member order, insignificant whitespace, or a number "
             "spelling JCS collapses"
         )
-        fail(f"{label}: bytes are not their own JCS canonical form — {why}")
+        fail(
+            f"{label}: bytes are not their own JCS canonical form — {why}",
+            rule=RULE_JCS,
+        )
     return doc
 
 
@@ -267,7 +348,93 @@ def check_family_canonical_bytes() -> None:
         check_canonical_bytes(raw, f"examples/{name}")
 
 
-def check_byte_class_fixtures() -> int:
+BROKEN_README = BROKEN_DIR / "README.md"
+
+# | 13 | `13-schema-version-bump` | `schema_version: 2` | schema (`const`) |
+_README_ROW = re.compile(r"^\|\s*\d+\s*\|\s*`([^`]+)`\s*\|.*\|\s*(.+?)\s*\|\s*$")
+
+
+def read_declared_classes() -> dict[str, str]:
+    """Each fixture's declared rule class, read from examples/broken/README.md.
+
+    That table is already where a reader looks to find out what catches a
+    given case, and a table only a reader consults drifts from the code the
+    day someone changes a rule. Reading it back makes the "Caught by" column
+    load-bearing: a wrong cell is a lint failure, and so is a fixture with no
+    row or a row with no fixture. It also means the declarations live next to
+    the fixtures they describe rather than in a second list inside this file,
+    which would be the same drift with an extra step.
+    """
+    if not BROKEN_README.is_file():
+        fail(
+            "examples/broken/README.md is missing — the negative fixtures "
+            "declare nothing, so nothing can be checked against them",
+            rule=RULE_HARNESS,
+        )
+        return {}
+    declared: dict[str, str] = {}
+    for line in BROKEN_README.read_text().splitlines():
+        row = _README_ROW.match(line)
+        if row is None:
+            continue
+        case, cell = row.group(1), row.group(2).replace("`", "")
+        head = cell.split(" (", 1)[0]
+        rule = cell if head in DETAILED_RULE_HEADS else head
+        if rule not in RULE_CLASSES:
+            fail(
+                f"examples/broken/README.md: {case} is declared {cell!r}, which "
+                f"names no rule class this lint can emit ({sorted(RULE_CLASSES)})",
+                rule=RULE_HARNESS,
+            )
+            continue
+        if case in declared:
+            fail(
+                f"examples/broken/README.md: {case} has more than one row",
+                rule=RULE_HARNESS,
+            )
+        declared[case] = rule
+    return declared
+
+
+def check_declared_class(
+    label: str, case: str, declared: dict[str, str], found: list[Finding]
+) -> bool:
+    """Did the class this case declares actually fire?
+
+    "Something objected" is the weaker claim the harness used to make, and
+    it is weak in a way that matters: a fixture that rewrites a file another
+    layer reads makes that layer object by construction, so a case could go
+    on passing after the rule it exists to test was deleted.
+    """
+    want = declared.get(case)
+    if want is None:
+        fail(
+            f"{label}: has no row in examples/broken/README.md — every fixture "
+            "declares the class that must catch it",
+            rule=RULE_HARNESS,
+        )
+        return False
+    fired = sorted({finding.rule for finding in found})
+    if want not in fired:
+        fail(
+            f"{label}: declares {want!r}, but the finding(s) came from {fired} — "
+            "the rule this case exists to test did not fire",
+            rule=RULE_HARNESS,
+        )
+        return False
+    return True
+
+
+def check_declaration_coverage(declared: dict[str, str], on_disk: set[str]) -> None:
+    """A README row naming no fixture is a case someone deleted quietly."""
+    for case in sorted(set(declared) - on_disk):
+        fail(
+            f"examples/broken/README.md: row {case!r} names no fixture on disk",
+            rule=RULE_HARNESS,
+        )
+
+
+def check_byte_class_fixtures(declared: dict[str, str]) -> int:
     """Each examples/broken-bytes/*.json must be refused at the byte layer.
 
     Deliberately narrower than check_negative_fixtures(): only the byte
@@ -283,23 +450,29 @@ def check_byte_class_fixtures() -> int:
     lint rather than leaving it to canonicalization.
     """
     if not BYTE_CLASS_DIR.is_dir():
-        fail("examples/broken-bytes/ is missing — the byte-class fixtures are gone")
+        fail(
+            "examples/broken-bytes/ is missing — the byte-class fixtures are gone",
+            rule=RULE_HARNESS,
+        )
         return 0
     cases = sorted(BYTE_CLASS_DIR.glob("*.json"))
     if len(cases) != EXPECTED_BYTE_CLASS:
         fail(
             f"examples/broken-bytes/: expected {EXPECTED_BYTE_CLASS} cases, "
-            f"found {len(cases)}"
+            f"found {len(cases)}", rule=RULE_HARNESS
         )
     caught = 0
     for case in cases:
         label = f"examples/broken-bytes/{case.name}"
         with capture_findings(silent=True) as case_findings:
             check_canonical_bytes(case.read_bytes(), label)
-        if case_findings:
+        if not case_findings:
+            fail(
+                f"{label}: was not caught (the byte layer accepted it)",
+                rule=RULE_HARNESS,
+            )
+        elif check_declared_class(label, case.name, declared, case_findings):
             caught += 1
-        else:
-            fail(f"{label}: was not caught (the byte layer accepted it)")
     return caught
 
 
@@ -326,7 +499,10 @@ def check_schemas_valid(schemas: dict[str, dict]) -> None:
         try:
             Draft202012Validator.check_schema(schema)
         except Exception as exc:  # noqa: BLE001 - surface whatever it says
-            fail(f"schema/{name} is not a valid JSON Schema 2020-12: {exc}")
+            fail(
+                f"schema/{name} is not a valid JSON Schema 2020-12: {exc}",
+                rule=RULE_SCHEMA_META,
+            )
 
 
 def check_pairing(schemas: dict[str, dict]) -> None:
@@ -346,16 +522,28 @@ def check_pairing(schemas: dict[str, dict]) -> None:
         fail(
             f"schema/{name} has no example: add one to examples/ and register the "
             "pair in EXAMPLES, or list it in DEFINITION_ONLY_SCHEMAS if it holds "
-            "only shared $defs"
+            "only shared $defs", rule=RULE_PAIRING
         )
     for name in sorted(paired_schemas - on_disk_schemas):
-        fail(f"EXAMPLES pairs against schema/{name}, which does not exist")
+        fail(
+            f"EXAMPLES pairs against schema/{name}, which does not exist",
+            rule=RULE_PAIRING,
+        )
     for name in sorted(on_disk_examples - set(EXAMPLES)):
-        fail(f"examples/{name} is paired with no schema — register it in EXAMPLES")
+        fail(
+            f"examples/{name} is paired with no schema — register it in EXAMPLES",
+            rule=RULE_PAIRING,
+        )
     for name in sorted(DEFINITION_ONLY_SCHEMAS - on_disk_schemas):
-        fail(f"DEFINITION_ONLY_SCHEMAS names schema/{name}, which does not exist")
+        fail(
+            f"DEFINITION_ONLY_SCHEMAS names schema/{name}, which does not exist",
+            rule=RULE_PAIRING,
+        )
     for name in sorted(DEFINITION_ONLY_SCHEMAS & paired_schemas):
-        fail(f"schema/{name} is both definition-only and paired with an example")
+        fail(
+            f"schema/{name} is both definition-only and paired with an example",
+            rule=RULE_PAIRING,
+        )
 
 
 def validate(instance: Any, schema: dict, registry: Registry, label: str) -> None:
@@ -364,7 +552,7 @@ def validate(instance: Any, schema: dict, registry: Registry, label: str) -> Non
     )
     for error in sorted(validator.iter_errors(instance), key=lambda e: list(e.path)):
         where = "/".join(str(p) for p in error.path) or "<root>"
-        fail(f"{label}: {where}: {error.message}")
+        fail(f"{label}: {where}: {error.message}", rule=RULE_SCHEMA)
 
 
 # row_type -> the $defs branch of report-row.schema.json that describes it.
@@ -387,7 +575,8 @@ def validate_row(row: Any, schema: dict, registry: Registry, label: str) -> None
     branch = ROW_TYPES.get(row_type)
     if branch is None:
         fail(
-            f"{label}: row_type {row_type!r} is not one of {sorted(ROW_TYPES)}"
+            f"{label}: row_type {row_type!r} is not one of {sorted(ROW_TYPES)}",
+            rule=RULE_DISCRIMINATOR,
         )
         return
     validate(
@@ -403,7 +592,10 @@ def load_happy_examples() -> dict[str, Any]:
     for example_name in EXAMPLES:
         path = EXAMPLE_DIR / example_name
         if not path.exists():
-            fail(f"examples/{example_name} is missing — the schema has no fixture")
+            fail(
+                f"examples/{example_name} is missing — the schema has no fixture",
+                rule=RULE_PAIRING,
+            )
             continue
         loaded[example_name] = load_any(path)
     return loaded
@@ -415,7 +607,6 @@ def validate_loaded(
     registry: Registry,
     *,
     label_prefix: str = "examples",
-    overlaid: frozenset[str] = frozenset(),
 ) -> None:
     for example_name, (schema_name, is_sequence) in EXAMPLES.items():
         if example_name not in loaded:
@@ -424,11 +615,14 @@ def validate_loaded(
         schema = schemas.get(schema_name)
         label = f"{label_prefix}/{example_name}"
         if schema is None:
-            fail(f"schema/{schema_name} is missing (needed by {label})")
+            fail(
+                f"schema/{schema_name} is missing (needed by {label})",
+                rule=RULE_PAIRING,
+            )
             continue
         if is_sequence:
             if not isinstance(data, list):
-                fail(f"{label}: expected a sequence of rows")
+                fail(f"{label}: expected a sequence of rows", rule=RULE_SCHEMA)
                 continue
             for i, row in enumerate(data):
                 validate_row(row, schema, registry, f"{label}[{i}]")
@@ -437,72 +631,79 @@ def validate_loaded(
     check_cross_file(loaded)
     for goal_file in GOAL_FILES:
         check_goal_file_cross_file(loaded, goal_file)
-    # The family layer takes the goal-file pair as given and asks whether the
-    # diff and the record describe IT. A negative case that rewrites the
-    # proposed goal file is making a claim about goal-file.schema.json, and
-    # the diff's now-inevitable disagreement would let that case pass on the
-    # wrong rule — so the layer stands down exactly when the file it reads
-    # from is the file under test. Measured, not assumed: run the family
-    # layer over cases 13-43 without this and it fires on 31 of 31, which
-    # would leave every §10 schema rule deletable without a red lint.
-    # Deliberately asymmetric — an overlaid BASELINE does not stand it down,
-    # because cases 52 and 53 need it live. A future schema negative written
-    # as a broken baseline would be masked the same way 13-43 would have
-    # been; write it against goal-file.json instead.
-    if "goal-file.json" not in overlaid:
-        check_goal_file_family(loaded)
+    # Every layer runs over every case, including the family layer over a
+    # case that rewrites the goal file it reads. That used to be gated: the
+    # family layer stood down whenever `goal-file.json` was the overlaid
+    # file, because otherwise its hash disagreement — inevitable, and about
+    # nothing the case claims — would let cases 13-43 pass on the wrong
+    # rule, leaving every §10 schema rule deletable without a red lint. The
+    # gate bought that at the price of an asymmetry: an overlaid BASELINE
+    # did not stand the layer down (52 and 53 need it live), so a schema
+    # negative written as a broken baseline would have been masked exactly
+    # the way 13-43 would have been.
+    #
+    # Declared classes make the gate unnecessary in both directions. A case
+    # now has to be caught by the class it names, so the family layer's
+    # noise on a schema case is noise the assertion ignores, and there is no
+    # longer a file whose position in the family makes it the wrong place to
+    # write a negative.
+    check_goal_file_family(loaded)
 
 
 def check_negative_fixtures(
     happy: dict[str, Any],
     schemas: dict[str, dict],
     registry: Registry,
+    declared: dict[str, str],
 ) -> int:
-    """Each examples/broken/<case>/ overlay must be rejected.
+    """Each examples/broken/<case>/ overlay must be rejected, by its own rule.
 
     Overlay files replace the happy-path document of the same name; the rest
     of the Site Model stays as in examples/. Silence on the expected failures
-    — a negative fixture that the lint accepts is the finding.
+    — a negative fixture that the lint accepts is the finding, and so is one
+    caught by a class other than the one its README row declares.
     """
     if not BROKEN_DIR.is_dir():
-        fail(f"examples/broken/ is missing — all {EXPECTED_BROKEN} negatives are gone")
+        fail(
+            f"examples/broken/ is missing — all {EXPECTED_BROKEN} negatives are gone",
+            rule=RULE_HARNESS,
+        )
         return 0
     cases = sorted(p for p in BROKEN_DIR.iterdir() if p.is_dir())
     if len(cases) != EXPECTED_BROKEN:
         fail(
-            f"examples/broken/: expected {EXPECTED_BROKEN} cases, found {len(cases)}"
+            f"examples/broken/: expected {EXPECTED_BROKEN} cases, found {len(cases)}",
+            rule=RULE_HARNESS,
         )
     caught = 0
     for case in cases:
         overlays = sorted(case.glob("*.yml")) + sorted(case.glob("*.json"))
         if not overlays:
-            fail(f"examples/broken/{case.name}: no overlay .yml/.json")
+            fail(
+                f"examples/broken/{case.name}: no overlay .yml/.json",
+                rule=RULE_HARNESS,
+            )
             continue
         loaded = {name: copy.deepcopy(doc) for name, doc in happy.items()}
-        overlaid: set[str] = set()
         for overlay in overlays:
             if overlay.name not in EXAMPLES:
                 fail(
-                    f"examples/broken/{case.name}: {overlay.name} is not a Site Model file"
+                    f"examples/broken/{case.name}: {overlay.name} is not a Site Model file",
+                    rule=RULE_HARNESS,
                 )
                 continue
             loaded[overlay.name] = load_any(overlay)
-            overlaid.add(overlay.name)
+        label = f"examples/broken/{case.name}"
         with capture_findings(silent=True) as case_findings:
-            validate_loaded(
-                loaded,
-                schemas,
-                registry,
-                label_prefix=f"examples/broken/{case.name}",
-                overlaid=frozenset(overlaid),
-            )
-        if case_findings:
-            caught += 1
-        else:
+            validate_loaded(loaded, schemas, registry, label_prefix=label)
+        if not case_findings:
             fail(
-                f"examples/broken/{case.name}: was not caught "
-                "(lint accepted a deliberately broken fixture)"
+                f"{label}: was not caught "
+                "(lint accepted a deliberately broken fixture)",
+                rule=RULE_HARNESS,
             )
+        elif check_declared_class(label, case.name, declared, case_findings):
+            caught += 1
     return caught
 
 
@@ -522,7 +723,10 @@ def check_cross_file(loaded: dict[str, Any]) -> None:
     for writer in writers_doc.get("writers") or []:
         prefix = writer.get("prefix", "")
         if prefix in seen_prefixes:
-            fail(f"launchd-writers: prefix {prefix} declared twice — one writer per prefix")
+            fail(
+                f"launchd-writers: prefix {prefix} declared twice — one writer per prefix",
+                rule=RULE_CROSS_FILE,
+            )
         seen_prefixes.add(prefix)
         prefixes.append(prefix)
 
@@ -535,7 +739,7 @@ def check_cross_file(loaded: dict[str, Any]) -> None:
             if inner.removesuffix("*").startswith(outer.removesuffix("*")):
                 fail(
                     f"launchd-writers: prefix {inner} nests inside {outer} — "
-                    "two writers over one label namespace"
+                    "two writers over one label namespace", rule=RULE_CROSS_FILE
                 )
 
     # --- bundles -----------------------------------------------------------
@@ -543,11 +747,17 @@ def check_cross_file(loaded: dict[str, Any]) -> None:
     for bundle_name, bundle in bundles.items():
         domain = bundle.get("domain")
         if domain not in domains:
-            fail(f"services: bundle {bundle_name} names unknown domain {domain!r}")
+            fail(
+                f"services: bundle {bundle_name} names unknown domain {domain!r}",
+                rule=RULE_CROSS_FILE,
+            )
         for interlock in bundle.get("interlocks") or []:
             iid = interlock.get("id")
             if iid in interlock_ids:
-                fail(f"services: interlock id {iid!r} declared twice")
+                fail(
+                    f"services: interlock id {iid!r} declared twice",
+                    rule=RULE_CROSS_FILE,
+                )
             interlock_ids.add(iid)
 
     # --- services ----------------------------------------------------------
@@ -555,17 +765,29 @@ def check_cross_file(loaded: dict[str, Any]) -> None:
     for service in services:
         name = service.get("name", "<unnamed>")
         if name in names:
-            fail(f"services: service name {name!r} declared twice")
+            fail(
+                f"services: service name {name!r} declared twice",
+                rule=RULE_CROSS_FILE,
+            )
         names.add(name)
 
         if service.get("domain") not in domains:
-            fail(f"services: {name} names unknown domain {service.get('domain')!r}")
+            fail(
+                f"services: {name} names unknown domain {service.get('domain')!r}",
+                rule=RULE_CROSS_FILE,
+            )
         if service.get("bundle") not in bundles:
-            fail(f"services: {name} names unknown bundle {service.get('bundle')!r}")
+            fail(
+                f"services: {name} names unknown bundle {service.get('bundle')!r}",
+                rule=RULE_CROSS_FILE,
+            )
 
         role = service.get("role")
         if role is not None and role not in roles:
-            fail(f"services: {name} names unknown role {role!r} (roles.yml)")
+            fail(
+                f"services: {name} names unknown role {role!r} (roles.yml)",
+                rule=RULE_CROSS_FILE,
+            )
 
         label = (service.get("launchd") or {}).get("label")
         if label is not None:
@@ -573,14 +795,16 @@ def check_cross_file(loaded: dict[str, Any]) -> None:
             if not matched:
                 fail(
                     f"services: {name} launchd label {label!r} falls under no declared "
-                    "writer prefix (launchd-writers.yml) — this is the two-writers rail"
+                    "writer prefix (launchd-writers.yml) — this is the two-writers rail",
+                    rule=RULE_CROSS_FILE,
                 )
 
     for service in services:
         for target in service.get("depends_on") or []:
             if target not in names:
                 fail(
-                    f"services: {service.get('name')} depends_on unknown service {target!r}"
+                    f"services: {service.get('name')} depends_on unknown service {target!r}",
+                    rule=RULE_CROSS_FILE,
                 )
 
     # --- roles -------------------------------------------------------------
@@ -589,12 +813,15 @@ def check_cross_file(loaded: dict[str, Any]) -> None:
         backups = role.get("backups") or []
         peers = role.get("peers") or []
         if main in backups:
-            fail(f"roles: {role_name} lists its main host {main!r} as its own backup")
+            fail(
+                f"roles: {role_name} lists its main host {main!r} as its own backup",
+                rule=RULE_CROSS_FILE,
+            )
         overlap = set(backups) & set(peers)
         if overlap:
             fail(
                 f"roles: {role_name} lists {sorted(overlap)} as both backup and peer — "
-                "a peer is explicitly not a candidate for main"
+                "a peer is explicitly not a candidate for main", rule=RULE_CROSS_FILE
             )
 
 
@@ -631,7 +858,10 @@ def check_goal_file_cross_file(loaded: dict[str, Any], name: str) -> None:
                     bundles_in_use.add(bundle)
         for prefix, writer_entry in (entries.get("unit-writer") or {}).items():
             if prefix in seen_prefixes:
-                fail(f"{label}: unit-writer prefix {prefix!r} declared twice")
+                fail(
+                    f"{label}: unit-writer prefix {prefix!r} declared twice",
+                    rule=RULE_CROSS_FILE,
+                )
             seen_prefixes.add(prefix)
             writer = writer_entry.get("writer") if isinstance(writer_entry, dict) else None
             prefixes.append((domain_name, prefix, writer))
@@ -646,7 +876,8 @@ def check_goal_file_cross_file(loaded: dict[str, Any], name: str) -> None:
             if bundle not in bundles_in_use:
                 fail(
                     f"{label}: domains/{domain_name}/entries/interlock/{interlock_id} "
-                    f"bundle {bundle!r} is used by no present service"
+                    f"bundle {bundle!r} is used by no present service",
+                    rule=RULE_CROSS_FILE,
                 )
 
     # --- no unit-writer prefix nests inside another (one label namespace) --
@@ -658,7 +889,7 @@ def check_goal_file_cross_file(loaded: dict[str, Any], name: str) -> None:
             if inner.removesuffix("*").startswith(outer.removesuffix("*")):
                 fail(
                     f"{label}: unit-writer prefix {inner!r} nests inside {outer!r} — "
-                    "two writers over one namespace"
+                    "two writers over one namespace", rule=RULE_CROSS_FILE
                 )
 
     # --- comprehensive-domain services fall under a cfengine writer --------
@@ -676,12 +907,13 @@ def check_goal_file_cross_file(loaded: dict[str, Any], name: str) -> None:
                 fail(
                     f"{label}: domains/{domain_name}/entries/service/{service_id} "
                     "falls under no declared unit-writer prefix — the two-writers rail, "
-                    "applied to the goal file"
+                    "applied to the goal file", rule=RULE_CROSS_FILE
                 )
             elif not any(w == "cfengine" for _, w in matched):
                 fail(
                     f"{label}: domains/{domain_name}/entries/service/{service_id} "
-                    "falls under a unit-writer prefix whose writer is not cfengine"
+                    "falls under a unit-writer prefix whose writer is not cfengine",
+                    rule=RULE_CROSS_FILE,
                 )
 
 
@@ -764,17 +996,20 @@ def apply_diff(baseline: Any, diff: dict[str, Any], label: str) -> Any | None:
                     fail(
                         f"{label}: {where} states the same entry as `old` and "
                         "`new` — a hunk that changes nothing is padding for the "
-                        "hunks that do"
+                        "hunks that do", rule=RULE_FAMILY_APPLY
                     )
                     ok = False
                 if "old" in hunk:
                     if bucket.get(entry_id) != hunk["old"]:
-                        fail(f"{label}: {where} `old` is not the baseline's entry")
+                        fail(
+                            f"{label}: {where} `old` is not the baseline's entry",
+                            rule=RULE_FAMILY_APPLY,
+                        )
                         ok = False
                 elif entry_id in bucket:
                     fail(
                         f"{label}: {where} has no `old`, so it is an add, but the "
-                        "baseline already carries that entry"
+                        "baseline already carries that entry", rule=RULE_FAMILY_APPLY
                     )
                     ok = False
                 if "new" in hunk:
@@ -794,7 +1029,7 @@ def apply_diff(baseline: Any, diff: dict[str, Any], label: str) -> Any | None:
             # already was is entry noise wearing that section's clothes.
             fail(
                 f"{label}: coverage_changes/{domain_name} states {stated_old!r} "
-                "on both sides — that is not a transition"
+                "on both sides — that is not a transition", rule=RULE_FAMILY_APPLY
             )
             ok = False
         # A domain absent from the map is undeclared — the third silence
@@ -806,7 +1041,8 @@ def apply_diff(baseline: Any, diff: dict[str, Any], label: str) -> Any | None:
         if actual_old != stated_old:
             fail(
                 f"{label}: coverage_changes/{domain_name} claims old "
-                f"{stated_old!r}, but the baseline has {actual_old!r}"
+                f"{stated_old!r}, but the baseline has {actual_old!r}",
+                rule=RULE_FAMILY_APPLY,
             )
             ok = False
         if change.get("new") == "undeclared":
@@ -815,7 +1051,8 @@ def apply_diff(baseline: Any, diff: dict[str, Any], label: str) -> Any | None:
                 fail(
                     f"{label}: coverage_changes/{domain_name} retreats to "
                     "undeclared while its entries survive — a domain leaves the "
-                    "map only once the hunks have deleted everything under it"
+                    "map only once the hunks have deleted everything under it",
+                    rule=RULE_FAMILY_APPLY,
                 )
                 ok = False
             domains.pop(domain_name, None)
@@ -825,7 +1062,7 @@ def apply_diff(baseline: Any, diff: dict[str, Any], label: str) -> Any | None:
             fail(
                 f"{label}: coverage_changes/{domain_name} declares a domain no "
                 "hunk populates — a declared domain with no entries is not a "
-                "document the schema admits"
+                "document the schema admits", rule=RULE_FAMILY_APPLY
             )
             ok = False
 
@@ -833,7 +1070,8 @@ def apply_diff(baseline: Any, diff: dict[str, Any], label: str) -> Any | None:
         if "coverage" not in domain:
             fail(
                 f"{label}: hunks create domain {domain_name} with no matching "
-                "coverage_changes entry — its first appearance is unreviewed"
+                "coverage_changes entry — its first appearance is unreviewed",
+                rule=RULE_FAMILY_APPLY,
             )
             ok = False
 
@@ -866,12 +1104,12 @@ def check_goal_file_family(loaded: dict[str, Any]) -> None:
     if diff.get("baseline_sha256") != baseline_hash:
         fail(
             "goal-diff: baseline_sha256 is not H(examples/goal-file-baseline.json) "
-            f"— expected {baseline_hash}"
+            f"— expected {baseline_hash}", rule=RULE_FAMILY_HASH
         )
     if diff.get("proposed_sha256") != goal_hash:
         fail(
             "goal-diff: proposed_sha256 is not H(examples/goal-file.json) "
-            f"— expected {goal_hash}"
+            f"— expected {goal_hash}", rule=RULE_FAMILY_HASH
         )
 
     # One host across the family. A record signed for one device against a
@@ -882,14 +1120,17 @@ def check_goal_file_family(loaded: dict[str, Any]) -> None:
         if name.endswith(".json") and isinstance(doc, dict)
     }
     if len(set(hosts.values())) > 1:
-        fail(f"goal-file family: fixtures disagree on host: {hosts}")
+        fail(
+            f"goal-file family: fixtures disagree on host: {hosts}",
+            rule=RULE_FAMILY_HOST,
+        )
 
     applied = apply_diff(baseline, diff, "goal-diff")
     if applied is not None and rfc8785.dumps(applied) != rfc8785.dumps(goal):
         fail(
             "goal-diff: applying the hunks to examples/goal-file-baseline.json "
             "does not reproduce examples/goal-file.json — the diff is not a "
-            "complete report of the change between the pair"
+            "complete report of the change between the pair", rule=RULE_FAMILY_APPLY
         )
 
     # Every record in the family answers this same diff, so every record is
@@ -900,19 +1141,27 @@ def check_goal_file_family(loaded: dict[str, Any]) -> None:
     for name, record in records.items():
         label = name.removesuffix(".json")
         if record.get("proposed_sha256") != diff.get("proposed_sha256"):
-            fail(f"{label}: proposed_sha256 does not match the diff's")
+            fail(
+                f"{label}: proposed_sha256 does not match the diff's",
+                rule=RULE_FAMILY_HASH,
+            )
         if "baseline_sha256" not in record:
             fail(
                 f"{label}: no baseline_sha256, but a goal-diff exists — only "
-                "first adoption has no baseline, and first adoption has no diff (§11)"
+                "first adoption has no baseline, and first adoption has no diff (§11)",
+                rule=RULE_FAMILY_HASH,
             )
         elif record.get("baseline_sha256") != diff.get("baseline_sha256"):
-            fail(f"{label}: baseline_sha256 does not match the diff's")
+            fail(
+                f"{label}: baseline_sha256 does not match the diff's",
+                rule=RULE_FAMILY_HASH,
+            )
 
         if record.get("ceremony_class") != derived:
             fail(
                 f"{label}: ceremony_class {record.get('ceremony_class')!r} is "
-                f"asserted, but the validator derives {derived!r} from the diff"
+                f"asserted, but the validator derives {derived!r} from the diff",
+                rule=RULE_FAMILY_CEREMONY,
             )
 
 
@@ -936,7 +1185,8 @@ def check_goal_file_forbidden_refs(schemas: dict[str, dict]) -> None:
                 if normalized in GOAL_FILE_FORBIDDEN_REFS:
                     fail(
                         f"schema/goal-file.schema.json: $ref {ref!r} reuses a def "
-                        "the goal file must restate instead of referencing"
+                        "the goal file must restate instead of referencing",
+                        rule=RULE_SCHEMA_META,
                     )
             for value in node.values():
                 walk(value)
@@ -969,8 +1219,15 @@ def main() -> int:
         loaded = load_happy_examples()
         validate_loaded(loaded, schemas, registry)
         if not findings:
-            caught = check_negative_fixtures(loaded, schemas, registry)
-            byte_caught = check_byte_class_fixtures()
+            declared = read_declared_classes()
+            caught = check_negative_fixtures(loaded, schemas, registry, declared)
+            byte_caught = check_byte_class_fixtures(declared)
+            on_disk: set[str] = set()
+            if BROKEN_DIR.is_dir():
+                on_disk |= {p.name for p in BROKEN_DIR.iterdir() if p.is_dir()}
+            if BYTE_CLASS_DIR.is_dir():
+                on_disk |= {p.name for p in BYTE_CLASS_DIR.glob("*.json")}
+            check_declaration_coverage(declared, on_disk)
 
     if findings:
         print(f"schema-lint: {len(findings)} finding(s)")
