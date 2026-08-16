@@ -86,7 +86,7 @@ GOLDEN = EXAMPLE_DIR / "host_specific.json"
 PROJECTOR = Path(__file__).resolve().with_name("projector.py")
 EXPECTED_BROKEN = 59
 EXPECTED_BYTE_CLASS = 6
-EXPECTED_PROJECTION = 18
+EXPECTED_PROJECTION = 27
 
 # example file -> schema file. report-rows.yml is a sequence of rows, each
 # validated individually against the row schema. The goal-file family is
@@ -793,6 +793,20 @@ def check_projector_properties(projector: Any, loaded: dict[str, Any]) -> None:
     except Exception as exc:  # noqa: BLE001
         fail(f"project() raised on the N-1 state flip: {exc}", rule=RULE_PROJECTION)
         return
+
+    # N-8, the one N-series rule a fixture cannot express: expressing it as a
+    # file means checking in a 5 MiB file. It is a property of the checker
+    # over synthesised bytes instead, which is the same reason N-1 and N-11
+    # are here. F8 listed this flag() site as unguarded; it is guarded now.
+    oversized = b'{"vars":{"tendcf_service":{"x":{"pad":"'
+    oversized += b"p" * projector.MAX_PROJECTION_BYTES + b'"}}}}'
+    if not any("N-8" in f for f in projector.validate_projection(oversized)):
+        fail(
+            f"{len(oversized)} bytes of projection did not trip N-8 — past "
+            f"{projector.MAX_PROJECTION_BYTES} CFEngine truncates the read and "
+            "the whole CMDB load fails, so the ceiling is a refusal (E-9)",
+            rule=RULE_PROJECTION,
+        )
 
     container = projector.container_name("service")
     permitted = f"vars/{container}/{target}/state"

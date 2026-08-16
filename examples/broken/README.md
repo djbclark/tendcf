@@ -323,13 +323,31 @@ below are that document's negatives.
 | 81 | `81-newline-in-env-value.json` | an `env` value ending in `\n` (N-4) | projection |
 | 82 | `82-agent-pin-in-value.json` | the agent binary pin, digest in value position (N-5) | projection |
 | 83 | `83-advisor-key-in-value.json` | the advisor key, digest in value position (N-5) | projection |
+| 84 | `84-unknown-container-only.json` | an unknown `vars` container and nothing else wrong (N-5, N-12) | projection |
+| 85 | `85-no-vars-key.json` | `{}` — no top-level `vars` at all (P-6.3) | projection |
+| 86 | `86-empty-service-container.json` | a kind container present but empty (P-6.4) | projection |
+| 87 | `87-not-json-at-all.json` | truncated bytes that do not parse | projection |
+| 88 | `88-duplicate-top-level-key.json` | `vars` twice, which I-JSON resolves last-wins | projection |
+| 89 | `89-top-level-is-an-array.json` | `[]` where an object belongs | projection |
+| 90 | `90-vars-is-an-array.json` | `vars` is an array | projection |
+| 91 | `91-container-is-an-array.json` | a kind container is an array | projection |
+| 92 | `92-entry-body-is-an-array.json` | an entry body is an array | projection |
 
-Three of the twelve negatives have no row, and deliberately. N-1 (structure
-must not change when only `state` flips) and N-11 (two runs agree) are
-properties over *two* projections, not shapes one document can have; they
-are checked by `check_projector_properties()` instead of being faked as
-fixtures. N-8 is the 5 MiB ceiling, which a fixture could only express by
-checking in a 5 MiB file.
+Three of the twelve negatives have no row, and deliberately — all three are
+checked by `check_projector_properties()` instead, over bytes it synthesises.
+N-1 (structure must not change when only `state` flips) and N-11 (two runs
+agree) are properties over *two* projections, not shapes one document can
+have. N-8 is the 5 MiB ceiling, which a fixture could only express by
+checking in a 5 MiB file; the property builds one in memory instead.
+
+Cases 84–92 are not attacks. Each exists because neutering one `flag()` call
+site in `check_projection()` left the whole gate green — the rule had no
+fixture that tripped it *alone*, so it could be deleted unnoticed. That is
+F8 of the adversarial review, and the tool that measures it is
+`bin/flag_coverage.py`. Case 84 is the important one: the closed-container
+rule is what M7 credited with catching a tombstone split, and until 84 every
+fixture that reached it also tripped the trust-key rule beside it, so the two
+masked each other.
 
 Case 75 earns its place even though it is the shape a losing opinion
 proposed: it is what a future editor reaches for when the include table
