@@ -1,11 +1,12 @@
 # Negative fixtures
 
-Forty-three deliberately broken overlays. `bin/schema_lint.py` must catch
-every one; a case that validates is a lint failure.
+Fifty deliberately broken overlays, plus five byte-class fixtures in the
+sibling `examples/broken-bytes/`. `bin/schema_lint.py` must catch every
+one; a case that validates is a lint failure.
 
-Each directory replaces the happy-path file of the same name under
+Each directory here replaces the happy-path file of the same name under
 `examples/`. The rest of the Site Model (cases 1-12) or the goal-file
-family (cases 13-43) stays as in the happy path.
+family (cases 13-55) stays as in the happy path.
 
 | # | Case | Broken input | Caught by |
 | --- | --- | --- | --- |
@@ -61,8 +62,67 @@ no other Site Model files to compose against.
 | 42 | `42-malformed-advisor-key-id` | advisor-key property name not `ed25519:`+hex | schema (`propertyNames`) |
 | 43 | `43-float-timeout` | `timeout_seconds: 30.5` | schema (`type`) |
 
-The byte-class negatives reconciliation §13 also names (pretty-printed
-twin, duplicate keys, non-NFC strings, `15.0` spelling of `15`) need the
-new byte-class fixture mechanism §13 describes — raw bytes compared before
-parsing — which is not built yet (§18 item 5, not this pass). They are not
-in this table.
+Cases 49-55 are the diff-class negatives. 49-53 are the five §13 names as
+the floor; 54 and 55 go one step past it, refusing the no-op hunk and the
+no-op coverage change — §11 says an empty diff is not a document, and a
+hunk or transition that changes nothing is that same nothing smuggled
+through as volume, spending the reviewer attention §16 iv is about.
+
+Each overlays `goal-diff.json`, and — where isolating the rule under test
+requires it — `goal-file-baseline.json` and `approval-record.json` too, so
+that exactly one finding fires and it is the one the case name claims
+(verified for all seven; the harness itself only requires a finding, not
+this one). None of them overlays `goal-file.json`: the family layer reads
+the proposed file rather than judging it, and stands down whenever that
+file is the one under test.
+
+| # | Case | Broken input | Caught by |
+| --- | --- | --- | --- |
+| 49 | `49-baseline-hash-mismatch` | `baseline_sha256` naming no fixture on disk | family (hash) |
+| 50 | `50-hunk-inconsistency` | a hunk's `new.working_dir` the proposed file does not carry | family (apply) |
+| 51 | `51-non-empty-migration` | `version_bump` alongside `hunks` | schema (`if/then`) |
+| 52 | `52-ordinary-over-privileged-hunk` | a `device-trust` hunk approved `ordinary` | family (ceremony) |
+| 53 | `53-coverage-retreat-ordinary-class` | a domain leaving `comprehensive`, approved `ordinary` | family (ceremony) |
+| 54 | `54-no-op-hunk` | a hunk stating the same entry as `old` and `new` | family (apply) |
+| 55 | `55-no-op-coverage-change` | `comprehensive → comprehensive` | family (apply) |
+
+Case 54 sits under `device-trust` because that is the only domain the
+baseline carries, so its record is overlaid to assert `privileged` — the
+class the validator correctly derives — leaving the no-op as the finding
+rather than a ceremony mismatch on top of it.
+
+## Byte-class fixtures (`../broken-bytes/`)
+
+The five §13 byte-class negatives. These are not overlays: each is a whole
+alternate `goal-file.json` checked as **raw bytes, before the parse**, and
+`bin/schema_lint.py` runs only its byte layer over them.
+
+That narrowness is the point, and it is measured rather than assumed. Run
+44, 45, 46 and 48 through every *other* layer in the lint — schema,
+cross-file, family — and they produce **zero findings between them**,
+because each parses to exactly the document the happy path parses to: a
+trailing newline survives `json.loads`, a duplicate key is silently
+resolved last-wins, and `30.0` is a JSON Schema `integer`. Nothing
+downstream of the parse can see any of the four.
+
+47 is the exception, and worth stating precisely rather than rounding off.
+JCS does not normalize, so an NFD path *is* idempotent under
+re-serialization — but it is a different document, so downstream layers do
+see it: as a `proposed_sha256` disagreement between the goal file and the
+diff that names it, and nothing more. The byte layer is what turns "some
+hash does not match" into "`…/working_dir` is not NFC-normalized", which is
+why §2.1 puts NFC in the lint rather than leaving it to the canonicalizer.
+
+| # | Case | Broken input | Caught by |
+| --- | --- | --- | --- |
+| 44 | `44-pretty-printed-twin.json` | the happy goal file, indented | JCS idempotence |
+| 45 | `45-trailing-newline.json` | canonical bytes plus `\n` | JCS idempotence |
+| 46 | `46-duplicate-keys.json` | `schema_version` stated twice | duplicate-key parse |
+| 47 | `47-non-nfc-path.json` | `working_dir` `/Users/josé/srv` in NFD | NFC check |
+| 48 | `48-float-spelling-of-integer.json` | `"timeout_seconds":30.0` | JCS idempotence |
+
+Case 48 is §13's "`15.0` spelling of `15`" instantiated on the integer this
+fixture actually carries. Cases 44 and 48 are the pair §2.1 describes as
+the joint float rule's two halves: the schema catches a true fraction
+(case 43, `30.5`), byte identity catches the float *spelling* of an
+integer — neither alone is enough.
