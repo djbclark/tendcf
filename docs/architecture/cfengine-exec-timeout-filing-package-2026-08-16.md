@@ -1,8 +1,9 @@
 # Filing package: `exec_timeout` does not bound a `commands:` promise on macOS
 
-**Status: reference record, kept in tendcf.** Nothing here is committed to a
-CFEngine branch yet. The repro and the ticket text below are ready to paste;
-the fix is **not written**, deliberately — see "What is not yet established".
+**Status: reference record, kept in tendcf.** The defect below is now fixed on
+our fork and the mechanism is no longer open — see "The mechanism, pinned".
+This document is kept as the evidence trail; the live filing state is the B-1
+row of [`upstream-register.md`](upstream-register.md).
 
 Found 2026-08-16 while measuring whether the projection contract fixed by
 [`projector-reconciliation-2026-08-16.md`](projector-reconciliation-2026-08-16.md)
@@ -16,8 +17,8 @@ and it is filed as such rather than designed around.
 | Repro | **22 lines of policy, no data file** — reproduces 3/3 on 3.27.1, 1/1 on 3.29.0a |
 | Affected | CFEngine 3.27.1 (Homebrew, arm64 macOS) **and** 3.29.0a.17eb78e6d (local build) |
 | Platform | macOS/Darwin. **Not tested on Linux** — and Linux takes a different code path (below), so it may not reproduce there |
-| Root cause | **Narrowed, not pinned.** Two candidate early-return paths named below |
-| Fix | **Not written.** Direction proposed; needs an instrumented build first |
+| Root cause | **Pinned** by instrumented build, 2026-08-16: the poll loops count iterations instead of measuring elapsed time |
+| Fix | **Written, tested, pushed** — `26634ac1f` on `fix/exec-timeout-commands`; tracked as B-1 in [`upstream-register.md`](upstream-register.md) |
 | Jira ticket | not filed — same Atlassian API token blocker as [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md) |
 | Prior art | **Unverified.** CFEngine's tracker is Jira, not GitHub issues, so a `gh search` finding nothing means nothing |
 
@@ -66,8 +67,9 @@ having no timeout at all. Nine seconds is far more than the ladder in
 
 The command is also not reliably stopped. With a payload that ignores `SIGINT`
 and `SIGTERM` (`trap '' INT TERM; sleep 30`, `exec_timeout => "2"`) the run
-takes **30.25 s** — `SIGKILL` is never delivered, because `SIGKILL` cannot be
-trapped and would have ended it at ~2 s.
+takes **30.25 s**. An earlier draft read that as "`SIGKILL` is never delivered";
+instrumentation later showed `SIGKILL` *is* sent, at ~8.9 s, and the remaining
+21 s is the orphaned `sleep` holding the pipe open — a separate defect, B-2.
 
 And when the direct child *is* killed, its descendants are not: a `sleep 30`
 grandchild was observed orphaned and still running 28 s after its parent shell
@@ -138,56 +140,85 @@ emitted inside the `ALARM_PID != -1` branch immediately before
 `GracefulTerminate()` (`libpromises/timeout.c:38–51`). So the alarm, the
 handler, and `ALARM_PID` (set in `libpromises/pipes_unix.c:241`) are all fine.
 
-What does not happen is `SIGKILL`. `GracefulTerminate()`
-(`libpromises/process_unix.c:241`) is a ladder — `SIGINT`, wait, `SIGTERM`,
-wait, `SIGKILL` — where each wait is `ProcessWaitUntilExited(pid, STOP_WAIT_TIMEOUT)`
-and `STOP_WAIT_TIMEOUT` is `999999999L` **nanoseconds**, i.e. just under one
-second (`process_unix.c:135`). With a child that traps `INT` and `TERM`, the
-ladder must reach `SIGKILL` at roughly 2 s after the alarm. It measurably does
-not.
+`SIGKILL` **is** eventually delivered — an earlier draft of this document said
+it never was, which was wrong — but it arrives at ~8.9 s instead of ~2 s, by
+which time a command shorter than that has already finished and been reaped
+normally. That is the whole of defect A.
 
-The ladder can only exit early where `ProcessWaitUntilExited()` returns true,
-which it does for `PROCESS_STATE_DOES_NOT_EXIST` **and for
-`PROCESS_STATE_ZOMBIE`** (`process_unix.c:86–107`). On macOS that state comes
-from `libpromises/process_unix_stub.c:38`, which distinguishes only "exists" from
-"does not exist" via `kill(pid, 0)` and returns `PROCESS_STATE_RUNNING` for
-everything alive.
+`GracefulTerminate()` (`libpromises/process_unix.c:241`) is a ladder — `SIGINT`,
+wait, `SIGTERM`, wait, `SIGKILL` — where each wait is
+`ProcessWaitUntilExited(pid, STOP_WAIT_TIMEOUT)` and `STOP_WAIT_TIMEOUT` is
+`999999999L` **nanoseconds**, i.e. just under one second (`process_unix.c:135`).
+Two waits should therefore cost ~2 s. They cost ~8.9 s.
 
-**macOS uses the stub.** There is no `process_darwin.c`; `libpromises/Makefile.am:210–216`
-selects `process_unix_stub.c` for any platform that is not Linux, AIX, HP-UX,
-Solaris or FreeBSD. This is also why the Linux behaviour may differ and why
-this report does not claim a Linux repro.
+**macOS uses the process stub.** There is no `process_darwin.c`;
+`libpromises/Makefile.am:210–216` selects `process_unix_stub.c` for any platform
+that is not Linux, AIX, HP-UX, Solaris or FreeBSD, so `GetProcessState()`
+distinguishes only "exists" from "does not exist" via `kill(pid, 0)`
+(`process_unix_stub.c:38`) and can never report `ZOMBIE` or `STOPPED`. This is
+why the Linux behaviour may differ and why this report claims no Linux repro. It
+is a contributing factor, not the cause, and is filed separately as B-3.
 
-## What is not yet established
+## The mechanism, pinned
 
-The mechanism is narrowed to "`GracefulTerminate()` returns before `SIGKILL`",
-with exactly two candidate early-return paths — the `ProcessWaitUntilExited()`
-true-return after `SIGINT`, or the one after `SIGTERM`. **Which one, and why,
-is not proven**, and this document does not guess. Confirming it needs an
-instrumented debug build logging each rung of the ladder and each
-`GetProcessState()` result.
+Instrumenting each rung of the ladder and rebuilding (2026-08-16) settled it:
 
-The ~9.2 s figure is the sharpest clue and does not currently have an
-explanation. It is stable across `exec_timeout` values, so it is a fixed cost
-of the alarm path rather than anything proportional; and it is roughly 9×, not
-2×, the ~1 s `STOP_WAIT_TIMEOUT` that bounds each rung of the ladder. Whatever
-accounts for those nine seconds is likely the same thing that swallows the
-`SIGKILL`, so the number is worth explaining before anything is patched.
+```
+GT(pid=44939): ENTER
+GT: SIGINT sent at 0.000s
+wait(pid=44939): TIMED OUT after 4.459s, 100 iters -> false
+GT: SIGTERM sent at 4.460s
+wait(pid=44939): TIMED OUT after 4.457s, 100 iters -> false
+GT: SIGKILL sent at 8.917s -> true
+```
 
-That is the next step, and it should happen **before** a patch is proposed,
-because the obvious fix and the correct fix may differ:
+Each "one second" wait runs its full **100 iterations** and takes **4.46 s**.
+Two of them are the ~8.9 s, which is the ~9.2 s stall measured from outside.
 
-- If the ladder is exiting early on a misread process state, the fix is in
-  `GetProcessState()` on Darwin — a real `process_darwin.c` using `sysctl`/
-  `proc_pidinfo`, which is a missing-platform-support gap rather than a logic bug.
-- If the ladder is completing but signalling the wrong target, the fix is to
-  make `cf_popen()` put the child in its own process group and signal the
-  **group** — which would also fix the orphaned-grandchild half of defect B,
-  but is an invasive change to a function used everywhere in the codebase.
+The cause is in the loops themselves. `ProcessWaitUntilExited()` and
+`ProcessWaitUntilStopped()` take a timeout in nanoseconds but budget it by
+subtracting `SLEEP_POLL_TIMEOUT_NS` once per iteration — assuming every
+`nanosleep()` costs exactly what was requested. `nanosleep()` guarantees only
+that it sleeps *at least* that long, so the loops **count iterations rather than
+measure a duration**.
 
-The grandchild observation argues the process-group change is needed
-*regardless* of which path causes defect A, since killing only the direct child
-cannot bound a command that spawns anything.
+Confirmed independently of CFEngine: a standalone C program doing
+100 × `nanosleep(10 ms)` on this machine takes **4.41–4.66 s**, i.e. ~45 ms per
+10 ms request. So `STOP_WAIT_TIMEOUT`'s documented "one second" is ~4.5 s on
+Darwin/arm64, and would be wrong by a different factor on any platform with
+different timer granularity.
+
+## The fix, and what it did not fix
+
+`26634ac1f` on `fix/exec-timeout-commands`: both loops now compute a deadline
+from a monotonic clock and re-check elapsed time each iteration, using the same
+`CLOCK_MONOTONIC` fallback pattern as `EvalContextEventStart()`.
+
+Measured after the fix:
+
+| case | before | after |
+|---|---|---|
+| `sleep 5`, `exec_timeout 2` | promise **kept**, 11.2 s | promise **not kept**, 5.2 s |
+| `/bin/sleep 30`, `exec_timeout 2` | — | 4.4 s |
+| `/bin/sleep 1`, `exec_timeout 2` | — | 1.2 s, no penalty |
+
+Defect A is gone and the stall is gone. **Two things are not fixed** and are
+tracked separately, because each deserves its own change:
+
+- **B-2** — only the direct child is signalled. `sh -c 'sleep 30'` with
+  `exec_timeout 2` still takes 30.3 s, because the orphaned `sleep` holds the
+  pipe open and `cf-agent` blocks reading it. The fix is a process group in
+  `cf_popen()`, which is invasive enough to stand alone.
+- **B-3** — the Darwin stub cannot see a zombie, so an exited-but-unreaped child
+  polls as `RUNNING` for the whole budget. This is why `/bin/sleep 30` costs
+  4.4 s rather than ~2 s: the child dies on `SIGINT` immediately, and the ladder
+  then burns both waits on a corpse before sending `SIGKILL` to it.
+
+One caveat carried upstream with the fix: `process_terminate_unix_test.c` mocks
+`nanosleep()` and advances a fake clock by the requested sleep — exactly the
+accounting removed here — so it had to be taught to drive `clock_gettime()` from
+the same fake clock. That is a real change to a test's time model, and it is
+flagged in the fork issue as something a reviewer may want done differently.
 
 ## What this blocks in tendcf
 
