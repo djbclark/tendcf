@@ -114,9 +114,18 @@
         "complete": {
           "description": "False when convergence stopped early — an interlock blocked a bundle, or the run was interrupted. A device that is partially converged must not read as converged.",
           "type": "boolean"
+        },
+        "schema_ceiling": {
+          "description": "Highest goal-file schema_version this device's validator fully interprets. What the D44 render rule reads to decide which version to render this host's goal file at — an integer, not a string, so comparison is never lexicographic (goal-file-schema-reconciliation-2026-08-15.md §12, correcting E1 §5.6's claim that this column already existed; map §9.6). For a host that has never reported, the compiler renders at the version enrolled at that host's first-adoption ceremony, not this column. Required now rather than optional-then-required: nothing writes rows yet, so there is no legacy row to be lenient about.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "validator_version": {
+          "description": "The tendcf-agent binary that produced this row. schema_ceiling is the claim the render rule depends on; this is the courtesy — diagnostics only, never read by the render rule itself.",
+          "$ref": "common.schema.json#/$defs/release_stamp"
         }
       },
-      "required": ["row_type", "converged_release", "converged_at", "complete"],
+      "required": ["row_type", "converged_release", "converged_at", "complete", "schema_ceiling"],
       "additionalProperties": false
     }
   }
