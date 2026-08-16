@@ -317,6 +317,7 @@ below are that document's negatives.
 | 75 | `75-goal-file-under-vars.json` | the whole goal file under `vars` (N-12) | projection |
 | 76 | `76-env-not-an-object.json` | `env` as an array carrying a real secret (N-4) | projection |
 | 77 | `77-nan-not-representable.json` | `NaN` — accepted by `json`, unrepresentable in JCS (N-6) | projection |
+| 78 | `78-decomposed-string-in-projection.json` | a decomposed (NFD) string, which JCS passes through (N-6) | projection |
 
 Three of the twelve negatives have no row, and deliberately. N-1 (structure
 must not change when only `state` flips) and N-11 (two runs agree) are
@@ -329,3 +330,16 @@ Case 75 earns its place even though it is the shape a losing opinion
 proposed: it is what a future editor reaches for when the include table
 feels arbitrary, and it satisfies every check §13 had before the projector
 layer existed.
+
+Case 78 is the one case in this table that a *canonicalizer* cannot see.
+Cases 70, 71 and 72 are caught by the JCS byte compare, because
+re-canonicalizing them produces different bytes. Case 78 already **is** its
+own JCS canonical form: JCS takes NFC as an input precondition and passes
+anything else through untouched, so the byte compare agrees and only the
+explicit NFC check dissents. Before it existed, deleting that check left
+the whole gate green while `project()` emitted `cafe\xcc\x81` for a
+`working_dir` of `/srv/café` — the ninth mutation the adversarial review at
+`docs/paper/reviews/2026-08-16_opus-5-high_projector-gate-review.md` was
+asked to find (its F3). It is deliberately the golden with one value
+changed, so the NFC finding is the only one it produces and no second
+defect can mask it.
