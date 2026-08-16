@@ -315,6 +315,8 @@ below are that document's negatives.
 | 73 | `73-canonified-interlock-id.json` | an entry id rewritten (N-9) | projection |
 | 74 | `74-duplicate-id-across-containers.json` | one id under both kinds (N-10) | projection |
 | 75 | `75-goal-file-under-vars.json` | the whole goal file under `vars` (N-12) | projection |
+| 76 | `76-env-not-an-object.json` | `env` as an array carrying a real secret (N-4) | projection |
+| 77 | `77-nan-not-representable.json` | `NaN` — accepted by `json`, unrepresentable in JCS (N-6) | projection |
 
 Three of the twelve negatives have no row, and deliberately. N-1 (structure
 must not change when only `state` flips) and N-11 (two runs agree) are

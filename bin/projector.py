@@ -273,7 +273,17 @@ def project(goal_file: dict) -> bytes:
         containers[name] = container
 
     # P-6.3: `vars` is always present, even with no container under it.
-    raw = rfc8785.dumps({"vars": containers})
+    # Same F1 hazard as in check_projection(): the goal file is copied
+    # verbatim, so a value JCS cannot represent reaches here intact, and an
+    # uncaught FloatDomainError device-side is not the refusal this
+    # docstring promises.
+    try:
+        raw = rfc8785.dumps({"vars": containers})
+    except Exception as exc:  # noqa: BLE001 - rfc8785 raises several types
+        raise ProjectionRefused(
+            f"the goal file carries a value JCS cannot represent: "
+            f"{type(exc).__name__}: {exc} (N-6, P-6.1)"
+        ) from exc
 
     refusals = check_projection(raw)
     if refusals:
@@ -315,7 +325,24 @@ def check_projection(raw: bytes) -> list[ProjectionFinding]:
         flag(RULE_PROJECTION_BYTES, f"not canonical JSON: {exc}")
         return found
 
-    canonical = rfc8785.dumps(doc)
+    # F1: `json` accepts several things JCS cannot represent — NaN, Infinity,
+    # 1e999, integers outside the IEEE-754 double domain, lone surrogates —
+    # and rfc8785 raises on every one. Raising here would break two contracts
+    # at once: this function is documented to RETURN findings, and
+    # bin/schema_lint.py calls it in a loop, so one such fixture aborted the
+    # whole lint before the coverage checks ran. Un-canonicalizable bytes are
+    # a refusal like any other, not a crash.
+    try:
+        canonical = rfc8785.dumps(doc)
+    except Exception as exc:  # noqa: BLE001 - rfc8785 raises several types
+        flag(
+            RULE_PROJECTION_BYTES,
+            f"not representable in JCS: {type(exc).__name__}: {exc}. "
+            "`json` accepts NaN, Infinity, oversized integers and lone "
+            "surrogates; JCS represents none of them, so bytes carrying one "
+            "can never be a projection (N-6, P-6.1)",
+        )
+        return found
     if canonical != raw:
         why = (
             "leading or trailing whitespace, which JCS emits neither of"
@@ -417,6 +444,21 @@ def check_projection(raw: bytes) -> list[ProjectionFinding]:
                 flag(RULE_PROJECTION, f"{where}: entry body is not an object")
                 continue
             env = body.get("env")
+            # F2: this guard used to be the whole check, so an `env` that was
+            # not a dict skipped N-4 entirely — and `project()` copies bodies
+            # verbatim without schema-validating them, so
+            # `env: ["TOKEN=<real secret>"]` reached the output bytes with
+            # ZERO findings. The schema forbids that shape, but N-4 exists
+            # precisely for the case where something upstream did not hold,
+            # and a check that only runs on well-formed input is not a check.
+            if env is not None and not isinstance(env, dict):
+                flag(
+                    RULE_PROJECTION,
+                    f"{where}/env: {type(env).__name__}, not an object of "
+                    "NAME -> secretspec-key-NAME. Any other shape is refused "
+                    "rather than skipped: skipping it is how a resolved "
+                    "secret reaches $(sys.workdir)/data/ unnoticed (N-4, P-4)",
+                )
             if isinstance(env, dict):
                 for env_key, env_value in env.items():
                     if SECRETSPEC_NAME.match(env_key) and isinstance(
