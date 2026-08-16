@@ -35,8 +35,8 @@ Legend: **done** · *pending* · — not applicable.
 
 | id | Item | Repo | Fix | Fork branch | Fork artifact | Email | Upstream |
 |---|---|---|---|---|---|---|---|
-| B-1 | Poll loops count iterations instead of measuring elapsed time; `exec_timeout` reports a timed-out command as *promise kept* | core | **done** `26634ac1f` | **done** [`fix/exec-timeout-commands`](https://github.com/djbclark/core/tree/fix/exec-timeout-commands) | **done** [#4](https://github.com/djbclark/core/issues/4) | *pending* — see "Blocked on" | *pending* |
-| B-2 | Descendants not signalled on timeout; grandchild holds the pipe, so `exec_timeout` does not bound wall clock | core | *not started* | — | — | — | — |
+| B-1 | Poll loops count iterations instead of measuring elapsed time; `exec_timeout` reports a timed-out command as *promise kept* | core | **done** `26634ac1f` | **done** [`fix/exec-timeout-commands`](https://github.com/djbclark/core/tree/fix/exec-timeout-commands) | **done** [#4](https://github.com/djbclark/core/issues/4) | *pending* — **security@**, see "Blocked on" | *pending* |
+| B-2 | Descendants not signalled on timeout; grandchild holds the pipe, so `exec_timeout` does not bound wall clock | core | **done** `cb2561584` | **done** [`fix/timeout-process-group`](https://github.com/djbclark/core/tree/fix/timeout-process-group) | **done** [#5](https://github.com/djbclark/core/issues/5) | *pending* — **contact@** | *pending* |
 | B-3 | No `process_darwin.c`; macOS uses the stub, so `GetProcessState()` never reports ZOMBIE/STOPPED and `SafeKill()`'s PID-recycling guard is disabled | core | *not started* | — | — | — | — |
 | B-4 | JSON reals truncated to 2 decimals (`0.00049` → `0.00`), including through mustache templating; `%.2f` and `%.4f` disagree | libntech | *not started* | — | — | — | — |
 | B-5 | Rejected CMDB file names no key/value/path, and one bad key drops every variable on the host | core | *not started* | — | — | — | — |
@@ -56,14 +56,24 @@ B-1's full evidence is in
 
 ## Blocked on
 
-- **Email.** `hermes send` has no mail transport — `hermes send --list` offers
-  only Discord, Signal and Telegram. The canonical fix is `composio link gmail`,
-  which runs Composio's managed OAuth and then sends as the real
-  `djbclark@gmail.com` so replies thread into the normal inbox. Operator is
-  setting this up (2026-08-16).
-- **Which address for B-1.** It is a fail-open: a guard whose verification timed
-  out is reported as satisfied. That is a correctness bug with a security shape,
-  and the contact@/security@ split is the operator's call, not ours to assume.
+- **Email — the first action of the next session.** Emailing is **not optional**:
+  operator, 2026-08-16, *"It is 100% needed to email the addresses I gave you for
+  each bug, or set of bugs, we post issues and tickets for in our local repo."*
+  Our fork issues are public only in a personal repository nobody is likely to
+  find, so posting there is **not** disclosure and does not discharge the duty to
+  tell upstream.
+
+  Blocked in this session only: `hermes send` has no mail transport (Discord,
+  Signal, Telegram only), and the Claude Gmail connector the operator set up
+  mid-session is not visible to a session that was already running — MCP servers
+  are fixed at startup. Deferred deliberately to the next session, where it is
+  the **first thing to do** after the handoff/quit/baton cycle.
+- **Which address.** B-1 is a fail-open — a guard whose verification timed out is
+  reported as satisfied — so it goes to **security@northern.tech** unless the
+  operator says otherwise; under-reporting is the worse error, and upstream can
+  downgrade it. B-2 is a hang/resource-leak and goes to **contact@**. An earlier
+  draft of this register argued B-1 could go to contact@ because the fork issue
+  was already public; that reasoning was **wrong** and the operator corrected it.
 - **Jira.** Every *pending* in the Upstream column is waiting on the same
   Atlassian API token recorded against
   [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md).
@@ -96,6 +106,14 @@ is meant to leave it. That is also why the diff discipline from PR 1 still
 governs every fix: additive over modifying, few tight hunks, no reflowing of
 neighbouring code, so that carrying an item across upstream releases stays cheap
 while it waits.
+
+**Branch layout.** One branch per upstream contribution, each cut from `master`
+and independently landable — `fix/exec-timeout-commands` (B-1) and
+`fix/timeout-process-group` (B-2) touch disjoint files, and either can be taken
+without the other. **`tendcf-integration`** merges all of them and is the branch
+our builds are made from. Never develop on the integration branch; cherry-pick
+onto a clean per-fix branch so what we offer upstream is never entangled with
+something upstream has not agreed to.
 
 **Our builds test against the fork**, so a fix landing here changes what tendcf
 is measured against. Anything in the corpus that was measured on stock 3.27.1
