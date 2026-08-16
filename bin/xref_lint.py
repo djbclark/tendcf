@@ -115,6 +115,16 @@ FROZEN: tuple[tuple[str, str], ...] = (
         "guarantee.",
     ),
     (
+        "docs/architecture/projector-opinion-*.md",
+        "frozen inputs to projector-reconciliation-2026-08-16.md, on the "
+        "same footing as the goal-file-schema opinions above: each is one "
+        "model's unedited stdout from a single cold pass, superseded by the "
+        "reconciliation that adjudicates them. Two of their citations are "
+        "recorded as refuted in that document's §0 and are left standing "
+        "here — correcting an opinion in place would destroy the evidence "
+        "that the audit caught it.",
+    ),
+    (
         "docs/architecture/e1-adjudication-*.md",
         "frozen adjudications, corrected in the reconciliation's §15 "
         "corrections register rather than in place, and verified "
