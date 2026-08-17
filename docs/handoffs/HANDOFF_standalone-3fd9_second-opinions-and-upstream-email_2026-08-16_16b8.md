@@ -63,8 +63,13 @@ only on `fork/silent-digest-failure` and is not upstream. `cfengine/core`
 records `5b5d04e1`. Committing the bump would put an unresolvable submodule
 reference into every core branch we offer upstream.
 
-**Email sent** — Gmail message id `1a00d22ac0d46c9b`, to
-security@northern.tech, one message covering B-1, B-2 and B-8.
+**Email sent** — Gmail id `1a00d22ac0d46c9b`, to security@northern.tech, one
+message covering B-1, B-2 and B-8. **Plus a correcting follow-up**, Gmail id
+`1a00d44a2758b9ea`, threaded to it: sharper severity account (`depends_on`
+releases the dependent; `if_ok` has no `repair_timeout`), the retraction of the
+ALARM_PID refutation, the corrected "was terminated" wording, and the
+`background => "true"` scope limit. The follow-up was necessary only because
+the first was sent at a review quorum — see Operator Feedback.
 
 ## What We Tried
 
@@ -249,6 +254,14 @@ All reviewers who reported on B-8 rated it **security@** unprompted.
   that?" Correct challenge: it was inherited phrasing from 5420 stated as an
   external mandate. Say whose requirement a constraint is, or give the actual
   reason. Reason now recorded in the register.
+- **"Let's change the timing on how you send emails, to avoid having to send
+  follow-ups in the future."** The first email went out at a 2-of-3 quorum and
+  the third review landed minutes later with material that changed the message,
+  forcing a correcting follow-up to an external security team (sent, Gmail id
+  `1a00d44a2758b9ea`). **New standing rule: no upstream send until EVERY
+  commissioned review has reported.** A quorum is not the gate. Recorded in the
+  register's Channels section and in agent memory
+  (`upstream-email-wait-for-full-panel`).
 - Carried from 5420 and still live: fix every bug we find; maintain the fork as
   a staging area, not a product; regression-test after each fix; three channels
   per bug (fork branch, fork artifact, email); `CONTRIBUTING.md` process is not

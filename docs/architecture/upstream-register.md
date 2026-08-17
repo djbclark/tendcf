@@ -33,12 +33,23 @@ Per the operator, each item gets the same treatment PR 3 got:
    doubt, security@** (operator, 2026-08-16).
 
 **A second opinion is required before upstream is contacted** (operator,
-2026-08-16). This is the same adversarial-review discipline the corpus already
+2026-08-16), and **every commissioned review must have reported before anything
+is sent** (operator, 2026-08-16, after the fact — see below). A quorum is not
+the gate; the whole panel is. This is the same adversarial-review discipline the corpus already
 applies to its own decisions — see the `*-opinion-{fable,gemini,grok}.md` panels
 and the refutations they produced. A fork issue filed without one is not a
 problem in itself, because the fork is not upstream; the rule is that **no email
 goes out until the item has been second-opinioned and the issue updated with
 whatever that review found.**
+
+**Timing rule, learned the expensive way.** The first email to security@ went
+out with 2 of 3 B-8 reviews in, on the reasoning that both agreed and the third
+would concur. The third landed minutes later carrying a false statement in our
+own error string, a much sharper severity argument, and the evidence that
+overturned a mechanism we had told upstream was ruled out — forcing a
+correcting follow-up to an external security team. Wait for every reviewer. If
+one must be abandoned, cancel it explicitly and say in the email how many
+reviews informed the report; never send while one is still running.
 
 Nothing is filed on an upstream tracker yet, by necessity rather than choice.
 
