@@ -102,8 +102,15 @@ Both worktrees are **already configured and built** against **stock libntech
 ```sh
 cd /Users/djbclark/src/core-p1     # or core-p2
 make -j2                           # the machine is busy; do not exceed -j2
-cd tests/unit && make check        # expect "All 68 tests behaved as expected (4 expected failures)"
+cd tests/unit && make check
 ```
+
+Measured baselines, `rc=0` on both:
+
+| tree | result |
+|---|---|
+| `core-p1` | `All 68 tests behaved as expected (4 expected failures)` |
+| `core-p2` | `All 69 tests behaved as expected (4 expected failures)` — 69 because P-2 adds `simulate_mode_test` |
 
 **Three reviewers are working concurrently.** `core-p1` and `core-p2` are
 shared. Do **not** run `make` in a shared tree while experimenting — for any
