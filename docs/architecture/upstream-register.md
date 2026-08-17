@@ -97,6 +97,26 @@ B-1's full evidence is in
   earlier draft of this register said B-2 goes to contact@, and separately
   argued B-1 could go to contact@ because the fork issue was already public;
   both were **wrong** and are superseded by the operator's instruction.
+- **OPEN, mechanism not established — `exec_timeout` may not bound wall clock
+  at all for a command that closes its output before it exits.** Measured:
+  `"/bin/sh" arglist => { "-c", "exec 1>&- 2>&-; sleep 10; exit 0" }` under
+  `exec_timeout => "2"` takes **~10.2s on stock 3.27.1** and ~12.1s on the
+  integration build. The read loop ends at EOF, so the wait happens inside
+  `cf_pclose()`/`cf_pwait()`. Gemini proposed `cf_pclose()`'s
+  `ALARM_PID = -1` (`pipes_unix.c:874`), which precedes `cf_pwait()`, as the
+  cause. That clear is real, **but the fix was implemented and measured and the
+  behaviour did not change** (10.3s), so the diagnosis is refuted and the
+  branch was discarded unfiled. Do not re-derive the ALARM_PID theory. Recorded
+  in [#6](https://github.com/djbclark/core/issues/6) and disclosed in the
+  security@ email as an observation only. Next step is to pin the actual
+  mechanism before filing anything.
+- **libntech submodule pointer stays uncommitted in `~/src/cfengine-core`** —
+  not an external rule, and earlier notes overstated it as "required". The
+  reason: the checkout sits at `dc85a6f` ("Handle digest initialization failure
+  when hashing"), our own P-3 fix, which exists only on `fork/silent-digest-failure`
+  and is **not upstream**. `cfengine/core` records `5b5d04e1`. Committing the
+  bump would put an unresolvable submodule reference into every core branch we
+  offer upstream and entangle two contributions meant to land separately.
 - **Jira.** Every *pending* in the Upstream column is waiting on the same
   Atlassian API token recorded against
   [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md).
