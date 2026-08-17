@@ -88,7 +88,7 @@ Legend: **done** · *pending* · — not applicable.
 | B-8 | `commands:` promise that exceeded `exec_timeout` is reported **kept** — `RepairExec()` never returns `ACTION_RESULT_TIMEOUT`, so the promise is judged only on the child's exit status. **This is the actual fail-open**; B-1 only narrows its window | core | **done** `326bcdb8d` | **done** [`fix/exec-timeout-promise-result`](https://github.com/djbclark/core/tree/fix/exec-timeout-promise-result) | **done** [#6](https://github.com/djbclark/core/issues/6) | *pending* — found **by** the B-1/B-2 panel | *pending* — **security@** | *pending* |
 | P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** `ea439e0ad` | `simulate-keep-chroot` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | *unknown* | **DONE** [cfengine/core#6293](https://github.com/cfengine/core/pull/6293) — open, mergeable, CLA signed |
 | P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** `f5ce3a35d` | `simulate-json` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | *unknown* | **DONE** [cfengine/core#6294](https://github.com/cfengine/core/pull/6294) — open, mergeable, CLA signed |
-| P-3 | Silent digest-initialization failure when hashing | libntech | **done** `dc85a6f` | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) (PR) + [libntech#3](https://github.com/djbclark/libntech/issues/3) (issue) | *pending* — panel running 2026-08-16 | **done** (operator, manually) | **DONE** [NorthernTechHQ/libntech#290](https://github.com/NorthernTechHQ/libntech/issues/290) (issue) + [#291](https://github.com/NorthernTechHQ/libntech/pull/291) (PR) — open, mergeable, CLA signed |
+| P-3 | Silent digest-initialization failure when hashing | libntech | **done** `dc85a6f` | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) (PR) + [libntech#3](https://github.com/djbclark/libntech/issues/3) (issue) |  **done** — panel + fable adjudication, correction pushed `e76700b` | **done** (operator, manually) | **DONE** [NorthernTechHQ/libntech#290](https://github.com/NorthernTechHQ/libntech/issues/290) (issue) + [#291](https://github.com/NorthernTechHQ/libntech/pull/291) (PR) — open, mergeable, CLA signed |
 
 `djbclark/core` [#7](https://github.com/djbclark/core/issues/7) tracks the
 unmerged-libntech submodule dependency, and
@@ -334,8 +334,35 @@ claim it does.
   peer TOFU uses `HashNewFromKey()`, which already fails closed; **(c)** gemini
   alone adds that the patch ignores `EVP_DigestUpdate`/`EVP_DigestFinal`
   failures in the very same functions. Severity is split 2–1 for ordinary bug
-  over `security@`. A fable-deep adjudication is running; **nothing goes to
-  maintainers until it reports**, per the whole-panel rule above.
+  over `security@`.
+- **DONE 2026-08-17 — P-3's correction is pushed.** The fable adjudication that
+  gated this did report: it is
+  [`upstream-p3-reconciliation-2026-08-16.md`](upstream-p3-reconciliation-2026-08-16.md),
+  which sustained "push a correction, do not withdraw" and settled severity at
+  **ordinary bug, not `security@`** — the zero digest is a colliding *lookup
+  handle*, not a bypassed *cryptographic gate*. Executed its §5 in full:
+  `dc85a6f` → **`e76700b`** on `fork/silent-digest-failure`, force-pushed with
+  a lease; [#291](https://github.com/NorthernTechHQ/libntech/pull/291) is still
+  **open and mergeable** on the new head, now a single commit. The C change is
+  **byte-identical** to what the panel reviewed — only the message and the test
+  moved. PR body rewritten to match the commit; force-push explained in a PR
+  comment; #290's "worst-case impact" paragraph corrected by comment rather
+  than a silent body edit. No email, per §5F.
+
+  The test the PR falsely said was impossible now exists:
+  `tests/unit/hash_init_fail_test.c`, a **dedicated program** because the
+  provider drain stops working once any EVP digest has run. Verified in both
+  directions — 40/40 on the branch, and **exit 3, all three cases failing**,
+  against the unfixed file.
+
+  **One thing the adjudication did not catch, found by measuring:** the WIP
+  draft's `HashFile`/`HashPubKey` cases asserted only the zeroed digest, which
+  is *pre-existing* behaviour — they passed against unpatched code, so 2 of 3
+  cases were decorative. The patch's only contribution for those two is the log
+  message. The adjudication suggested `StartLoggingIntoBuffer()`, but its
+  buffer is `static` with no public reader; `Log()` writes to **stdout** here,
+  so the test captures that with `dup2` and asserts the message. That is what
+  took it from 1-of-3 to 3-of-3 discriminating.
 - **RESOLVED 2026-08-16 — P-1 and P-2 cited ticket numbers that did not exist.**
   `00c98bc8b` carried `Ticket: #6295` and `8ee015c42` carried `Ticket: #6296`;
   both **404** against `cfengine/core`, which has issues disabled and could not
