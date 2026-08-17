@@ -86,8 +86,8 @@ Legend: **done** · *pending* · — not applicable.
 | B-6 | `eval()` returns `%lf` for integral results, so arithmetic cannot feed any function taking a count | core | *not started* | — | **done** [#10](https://github.com/djbclark/core/issues/10) | *pending* | *pending* | *pending* |
 | B-7 | Dotted CMDB keys silently become scope paths, with no warning (**warn only** — do not change behaviour) | core | *not started* | — | **done** [#11](https://github.com/djbclark/core/issues/11) | *pending* | *pending* | *pending* |
 | B-8 | `commands:` promise that exceeded `exec_timeout` is reported **kept** — `RepairExec()` never returns `ACTION_RESULT_TIMEOUT`, so the promise is judged only on the child's exit status. **This is the actual fail-open**; B-1 only narrows its window | core | **done** `326bcdb8d` | **done** [`fix/exec-timeout-promise-result`](https://github.com/djbclark/core/tree/fix/exec-timeout-promise-result) | **done** [#6](https://github.com/djbclark/core/issues/6) | **done** — its own 3-model panel (cursor/gemini/grok, 2026-08-16); grok found a real defect in the fix (the flag was sampled before `cf_pclose`), fixed in `7a32e3969`, and caught the unconditional "and was terminated" wording, fixed in `57ac8da22` | **done** — `security@` 2026-08-17, Gmail id `1a00d22ac0d46c9b`, + correcting follow-up `1a00d44a2758b9ea` carrying the retracted ALARM_PID refutation | *pending* — not offered as an upstream PR yet |
-| P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** `ea439e0ad` | `simulate-keep-chroot` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | *unknown* | **DONE** [cfengine/core#6293](https://github.com/cfengine/core/pull/6293) — open, mergeable, CLA signed |
-| P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** `f5ce3a35d` | `simulate-json` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | *unknown* | **DONE** [cfengine/core#6294](https://github.com/cfengine/core/pull/6294) — open, mergeable, CLA signed |
+| P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** `ea439e0ad` | `simulate-keep-chroot` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | **done** — `contact@` + `security@` 2026-08-16 (thread `1a007e4362402bd9`); P-3 correcting follow-up `1a00fb936fc1741f` 2026-08-17 | **DONE** [cfengine/core#6293](https://github.com/cfengine/core/pull/6293) — open, mergeable, CLA signed |
+| P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** `f5ce3a35d` | `simulate-json` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | **done** — `contact@` + `security@` 2026-08-16 (thread `1a007e4362402bd9`); P-3 correcting follow-up `1a00fb936fc1741f` 2026-08-17 | **DONE** [cfengine/core#6294](https://github.com/cfengine/core/pull/6294) — open, mergeable, CLA signed |
 | P-3 | Silent digest-initialization failure when hashing | libntech | **done** `e76700b` (was `dc85a6f`; corrected 2026-08-17) | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) (PR) + [libntech#3](https://github.com/djbclark/libntech/issues/3) (issue) |  **done** — panel + fable adjudication, correction pushed `e76700b` | **done** (operator, manually) | **DONE** [NorthernTechHQ/libntech#290](https://github.com/NorthernTechHQ/libntech/issues/290) (issue) + [#291](https://github.com/NorthernTechHQ/libntech/pull/291) (PR) — open, mergeable, CLA signed |
 
 `djbclark/core` [#7](https://github.com/djbclark/core/issues/7) tracks the
@@ -111,9 +111,9 @@ passes, and only `git branch --contains` reveals it.
 
 | item | register said | corrected to | current head |
 |---|---|---|---|
-| P-1 | `5dbd295f6` | `00c98bc8b` | **`ea439e0ad`** (ticket-trailer repair, same day) |
-| P-2 | `071f85987` | `8ee015c42` | **`f5ce3a35d`** (ticket-trailer repair, same day) |
-| P-3 | `da7d3d9` | `dc85a6f` | `dc85a6f` |
+| P-1 | `5dbd295f6` | `00c98bc8b` | **`64e2ac1cb`** — `ea439e0ad` stripped `Ticket: #6295`, then 2026-08-17 **restored** it (the trailer was correct all along) |
+| P-2 | `071f85987` | `8ee015c42` | **`05e18f038`** — `f5ce3a35d` stripped `Ticket: #6296`, then 2026-08-17 **restored** it (the trailer was correct all along) |
+| P-3 | `da7d3d9` | `dc85a6f` | **`e76700b`** (2026-08-17 correction: added the test, fixed the false no-test claim and the TLS overstatement) |
 
 P-1 and P-2 moved *again* within hours of the correction, which is the point:
 these SHAs are not stable and citing them is a maintenance liability.
@@ -363,6 +363,29 @@ claim it does.
   buffer is `static` with no public reader; `Log()` writes to **stdout** here,
   so the test captures that with `dup2` and asserts the message. That is what
   took it from 1-of-3 to 3-of-3 discriminating.
+
+  **The adjudication's §5F was also wrong, and it cost a follow-up.** It said
+  "No `security@` mail, no maintainer email. Verified: the 2026-08-16 security@
+  email covered B-1/B-2/B-8 only; P-3 was never emailed, so there is no prior
+  private characterization to correct." **P-3 was emailed** — Gmail thread
+  `1a007e4362402bd9`, sent to `contact@northern.tech` 2026-08-16T00:06Z and
+  re-sent to `contact@` + `security@` at 00:10Z. That mail reproduces #290 in
+  full, including **both** claims the panel retracted: the "no unit test is
+  possible" paragraph and an impact list stating the digest "is included by
+  `libcfnet/tls_generic.c` and `libcfnet/client_protocol.c`".
+
+  Correcting follow-up sent on that thread 2026-08-17, Gmail id
+  `1a00fb936fc1741f`: both retractions, the severity downgrade stated
+  explicitly *because* it reached `security@`, and the note that `da7d3d9` has
+  been superseded twice. It also credits the half of that sentence which was
+  **right** — that a libntech test "could only assert the all-zero digest that
+  is returned either way" — since that is exactly the defect found in the WIP
+  test above.
+
+  **Method note:** §5F's error is the same shape as the `#6295` one below —
+  a confident negative from a check that could not have seen the thing it ruled
+  out. Verify claims about what was sent against the mail store, not against
+  notes.
 - **RESOLVED 2026-08-16 — P-1 and P-2 cited ticket numbers that did not exist.**
   `00c98bc8b` carried `Ticket: #6295` and `8ee015c42` carried `Ticket: #6296`;
   both **404** against `cfengine/core`, which has issues disabled and could not
@@ -418,11 +441,20 @@ claim it does.
   evidence was already in our own tooling while this document called them
   phantoms.
 
-  **Not yet repaired:** `ea439e0ad` and `f5ce3a35d` are still the heads of
-  [#6293](https://github.com/cfengine/core/pull/6293) and
-  [#6294](https://github.com/cfengine/core/pull/6294), both open, and neither
-  carries `Ticket:` or `Changelog:`. Restoring them means a third force-push to
-  live upstream PRs; that is the operator's call, not a silent fix.
+  **REPAIRED 2026-08-17** (operator approved). `Ticket: #6295` / `#6296`
+  restored, and the `Changelog: Title` line they should have carried alongside
+  added — the titles are already past-tense, user-facing feature descriptions,
+  which is what `CONTRIBUTING.md` asks for. Rewritten with `git commit-tree`, so
+  no working tree moved and `cfengine-core` stayed on `tendcf-integration` with
+  its submodule untouched; **both trees verified byte-identical** before the
+  push, and both refs updated with an explicit old-value guard.
+
+  `ea439e0ad` → **`64e2ac1cb`** ([#6293](https://github.com/cfengine/core/pull/6293)),
+  `f5ce3a35d` → **`05e18f038`** ([#6294](https://github.com/cfengine/core/pull/6294)).
+  Both **open, mergeable, one commit**. Each PR body gained the
+  "Requested in #6295/#6296" line it never had, and each carries a comment
+  explaining the churn and stating plainly that the 404 was my error and no code
+  changed in either direction.
 - **Jira — no longer on the critical path.** P-1, P-2 and P-3 all reached
   upstream through GitHub without it. The Atlassian API token recorded against
   [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md) is still
