@@ -83,19 +83,33 @@ callers — `JsonPrimitiveToString()` and the mustache renderer — which are
 precisely the two sites B-4 rewrites. It has **zero** callers in `cfengine/core`.
 Once B-4 lands, nothing in either tree can produce `inf` from parsed JSON.
 
-### (c) Mustache coverage — there is nothing to extend
+### (c) Mustache coverage — it already exists, one repo downstream
 
-Confirmed by search, not assumed: **no file under `tests/unit/` references
-`MustacheRender` at all**, and `Makefile.am` has no `mustache_test` target. So
-`libutils/mustache.c` has **zero** unit coverage in libntech today, and the
-renderer half of both B-4 and B-10 is untestable in-tree.
+Two facts, both checked rather than assumed:
 
-The right move in the filing is therefore a *proposal* plus an offer, not an
-invention inside this PR: our `json_test.c` additions cover
-`JsonPrimitiveToString()`, which is the same defect on the same values reached
-by the other site, and we can supply a `mustache_test` as a separate PR if
-maintainers want one. Writing a new test binary into a defect-fix PR would
-enlarge its review surface for no severity benefit.
+1. In **libntech**, no file under `tests/unit/` references `MustacheRender` at
+   all and `Makefile.am` has no `mustache_test` target. `libutils/mustache.c`
+   has **zero** coverage in its own repository. That is what the panel saw.
+2. In **cfengine/core**, `tests/unit/mustache_test.c` **does** test
+   `MustacheRender()` — and it tests libntech's, since core links libntech.
+
+So the coverage is not missing, it is *downstream*. And core's test is
+**spec-driven**: it reads `tests/unit/data/mustache_<name>.json`, each holding
+`{"name", "template", "data", "expected"}` objects, and already runs six spec
+files (`comments`, `interpolation`, `sections`, `delimiters`, `inverted`,
+`extra`).
+
+That makes the proposal concrete and cheap rather than speculative: **adding
+number cases is data-only.** Appending entries to `mustache_extra.json` (8
+tests today) needs no new binary, no new C, and no `Makefile.am` change — it is
+already wired in. It is also the *correct* home, because the mustache render of
+a JSON number is exactly what these entries assert end-to-end.
+
+The filing should therefore say: the renderer fix is untestable in libntech
+today; the natural place for its regression test is
+`cfengine/core`'s existing `mustache_test` spec data; we are happy to supply
+those entries, and a libntech-local `mustache_test` too if maintainers would
+rather have coverage in the repository that owns the code.
 
 ### (b) The residual lossiness — real, but B-10 does not cause it
 
