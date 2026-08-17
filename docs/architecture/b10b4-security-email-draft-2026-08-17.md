@@ -1,9 +1,14 @@
 # Draft email to security@northern.tech — B-10 + B-4
 
-**Status: NOT SENT.** Drafted 2026-08-17 after the four-member panel closed.
-Awaiting operator go. Send via the built-in Claude Gmail connector, not
-Composio. New message, not a reply to the exec_timeout thread — different
-defect.
+**Status: SENT** 2026-08-17, Gmail message id `1a00f99c7e714823`, via the
+built-in Claude Gmail connector (not Composio), as a new message rather than a
+reply to the exec_timeout thread — different defect. Operator approved sending
+as drafted, after the four-member panel closed 4/4 "ship with changes" and 4/4
+`security@`.
+
+Sent body is plain text; the tables below were flattened to aligned columns and
+the markdown headings to `==` rules. Content is otherwise unchanged from this
+draft.
 
 **To:** security@northern.tech
 **Subject:** A valid JSON number takes CFEngine hosts to failsafe at policy load, and silently corrupts others
