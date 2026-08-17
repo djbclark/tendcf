@@ -77,8 +77,8 @@ Legend: **done** · *pending* · — not applicable.
 | B-1 | Poll loops count iterations instead of measuring elapsed time, so the termination ladder overshoots ~4.5x on Darwin | core | **done** `26634ac1f` + `943d5371f` | **done** [`fix/exec-timeout-commands`](https://github.com/djbclark/core/tree/fix/exec-timeout-commands) | **done** [#4](https://github.com/djbclark/core/issues/4) | **done** 3-model panel; found 2 defects, both fixed; **withdrew the fail-open claim** | *pending* — **security@** | *pending* |
 | B-2 | Descendants not signalled on timeout; grandchild holds the pipe, so `exec_timeout` does not bound wall clock | core | **done** `cb2561584` + `847373cf6` | **done** [`fix/timeout-process-group`](https://github.com/djbclark/core/tree/fix/timeout-process-group) | **done** [#5](https://github.com/djbclark/core/issues/5) | **done** 3-model panel; all three refused the unconditional `setpgid`; regression found and fixed | *pending* — **security@** (in doubt → security) | *pending* |
 | B-3 | No `process_darwin.c`; macOS uses the stub, so `GetProcessState()` never reports ZOMBIE/STOPPED and `SafeKill()`'s PID-recycling guard is disabled | core | *not started* | — | **done** [#12](https://github.com/djbclark/core/issues/12) | *pending* | *pending* | *pending* |
-| B-4 | JSON reals truncated to 2 decimals (`0.00049` → `0.00`), including through mustache templating; `%.2f` and `%.4f` disagree | libntech | **done** `fe1ace9` — **libntech half only**, core's `rlist.c`/`iteration.c` still truncate | **done** [`fix/json-real-precision`](https://github.com/djbclark/libntech/tree/fix/json-real-precision) | **done** [libntech#2](https://github.com/djbclark/libntech/issues/2) | *pending* | *pending* | *pending* |
-| B-10 | A **valid JSON number terminates the process**: exponent form without a dot (`1e-8`, `2e0`) is misclassified INTEGER, and integers past `long` overflow; both reach `StringToLongExitOnError()` → `DoCleanupAndExit()`. Measured on stock 3.27.1: `cf-promises` dies and **cf-agent falls back to failsafe** | libntech | **done** `f92cd1c` | **done** [`fix/json-number-fatal-exit`](https://github.com/djbclark/libntech/tree/fix/json-number-fatal-exit) | **done** [libntech#4](https://github.com/djbclark/libntech/issues/4) | *running* — fable-deep audit | *pending* — **security@** (availability; in doubt → security) | *pending* |
+| B-4 | JSON reals truncated to 2 decimals (`0.00049` → `0.00`), including through mustache templating; `%.2f` and `%.4f` disagree | libntech **+ core** | **done** both halves: libntech `fe1ace9`, core `6a4216dad` (core half **not yet behaviourally verified**) | **done** [`fix/json-real-precision`](https://github.com/djbclark/libntech/tree/fix/json-real-precision) + [`fix/json-number-rendering`](https://github.com/djbclark/core/tree/fix/json-number-rendering) | **done** [libntech#2](https://github.com/djbclark/libntech/issues/2) + [core#13](https://github.com/djbclark/core/issues/13) | *pending* | *pending* | *pending* |
+| B-10 | A **valid JSON number terminates the process**: exponent form without a dot (`1e-8`, `2e0`) is misclassified INTEGER, and integers past `long` overflow; both reach `StringToLongExitOnError()` → `DoCleanupAndExit()`. Measured on stock 3.27.1: `cf-promises` dies and **cf-agent falls back to failsafe** | libntech **+ core** | **done** both halves: libntech `f92cd1c`, core `6a4216dad` (core half **not yet behaviourally verified**) | **done** [`fix/json-number-fatal-exit`](https://github.com/djbclark/libntech/tree/fix/json-number-fatal-exit) + [`fix/json-number-rendering`](https://github.com/djbclark/core/tree/fix/json-number-rendering) | **done** [libntech#4](https://github.com/djbclark/libntech/issues/4) + [core#13](https://github.com/djbclark/core/issues/13) | *running* — fable-deep audit | *pending* — **security@** (availability; in doubt → security), **operator-approved** for upstream issue + PR + email once the audit clears | *pending* |
 | B-11 | `JsonRealCreate()` stores reals with `%.4f`, so **`JsonCopy()` changes a document's values**: `0.00049` → `0.0005`, `3.14159265` → `3.1416`. Measured; distinct from B-4, which is the render path | libntech | *not started* | — | *pending* | *pending* | *pending* | *pending* |
 | B-5a | Rejected CMDB file names no key, value or path — the `void *data` carrier already exists and is `ARG_UNUSED` | core | *not started* | — | **done** [#8](https://github.com/djbclark/core/issues/8) | *pending* | *pending* | *pending* |
 | B-5b | One bad key silently drops **every** variable on the host; agent then reports no failures | core | *not started* | — | **done** [#9](https://github.com/djbclark/core/issues/9) | *pending* | *pending* | *pending* |
@@ -196,6 +196,23 @@ claim it does.
   it must be confirmed to build and pass against **stock** libntech — not yet
   done for B-1, B-2 or B-8. The tracking issue lives on `djbclark/core`
   because that is where the submodule pointer bites.
+- **Two defects, four call sites, two repositories — and neither half is
+  sufficient alone.** B-4 and B-10 are the same underlying mistake: *rendering a
+  JSON number by converting it to a C numeric type and formatting it back,
+  instead of using the text the parser already kept.* It appears at four sites
+  reached by different routes, so fixing one repository leaves the other live:
+
+  | site | repo | reals | integers |
+  |---|---|---|---|
+  | `JsonPrimitiveToString()` | libntech | truncated | fatal |
+  | mustache renderer | libntech | truncated | fatal |
+  | `RlistAppendJson()` | core | truncated | fatal |
+  | iteration equivalent | core | truncated | fatal |
+
+  mustache reaches JSON data by a different path than variables and iteration
+  do, which is why the core half was invisible while measuring the libntech
+  half. **The core half is committed but NOT behaviourally verified** — the
+  build machine was saturated — and must not be offered upstream until it is.
 - **P-3's panel has reported, unanimously: push a correction.** cursor, gemini
   and grok all say the 21-line C patch itself holds — none could break the
   control flow, the free handling or `hash_test`. What is wrong is the *package*
