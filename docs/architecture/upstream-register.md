@@ -46,13 +46,14 @@ Legend: **done** · *pending* · — not applicable.
 
 | id | Item | Repo | Fix | Fork branch | Fork artifact | 2nd | Email | Upstream |
 |---|---|---|---|---|---|---|---|---|
-| B-1 | Poll loops count iterations instead of measuring elapsed time; `exec_timeout` reports a timed-out command as *promise kept* | core | **done** `26634ac1f` | **done** [`fix/exec-timeout-commands`](https://github.com/djbclark/core/tree/fix/exec-timeout-commands) | **done** [#4](https://github.com/djbclark/core/issues/4) | *pending* | *pending* — **security@**, see "Blocked on" | *pending* |
-| B-2 | Descendants not signalled on timeout; grandchild holds the pipe, so `exec_timeout` does not bound wall clock | core | **done** `cb2561584` | **done** [`fix/timeout-process-group`](https://github.com/djbclark/core/tree/fix/timeout-process-group) | **done** [#5](https://github.com/djbclark/core/issues/5) | *pending* | *pending* — **security@** (in doubt → security) | *pending* |
+| B-1 | Poll loops count iterations instead of measuring elapsed time, so the termination ladder overshoots ~4.5x on Darwin | core | **done** `26634ac1f` + `943d5371f` | **done** [`fix/exec-timeout-commands`](https://github.com/djbclark/core/tree/fix/exec-timeout-commands) | **done** [#4](https://github.com/djbclark/core/issues/4) | **done** 3-model panel; found 2 defects, both fixed; **withdrew the fail-open claim** | *pending* — **security@** | *pending* |
+| B-2 | Descendants not signalled on timeout; grandchild holds the pipe, so `exec_timeout` does not bound wall clock | core | **done** `cb2561584` + `847373cf6` | **done** [`fix/timeout-process-group`](https://github.com/djbclark/core/tree/fix/timeout-process-group) | **done** [#5](https://github.com/djbclark/core/issues/5) | **done** 3-model panel; all three refused the unconditional `setpgid`; regression found and fixed | *pending* — **security@** (in doubt → security) | *pending* |
 | B-3 | No `process_darwin.c`; macOS uses the stub, so `GetProcessState()` never reports ZOMBIE/STOPPED and `SafeKill()`'s PID-recycling guard is disabled | core | *not started* | — | — | *pending* | — | — |
 | B-4 | JSON reals truncated to 2 decimals (`0.00049` → `0.00`), including through mustache templating; `%.2f` and `%.4f` disagree | libntech | *not started* | — | — | *pending* | — | — |
 | B-5 | Rejected CMDB file names no key/value/path, and one bad key drops every variable on the host | core | *not started* | — | — | *pending* | — | — |
 | B-6 | `eval()` returns `%lf` for integral results, so arithmetic cannot feed any function taking a count | core | *not started* | — | — | *pending* | — | — |
 | B-7 | Dotted CMDB keys silently become scope paths, with no warning | core | *not started* | — | — | *pending* | — | — |
+| B-8 | `commands:` promise that exceeded `exec_timeout` is reported **kept** — `RepairExec()` never returns `ACTION_RESULT_TIMEOUT`, so the promise is judged only on the child's exit status. **This is the actual fail-open**; B-1 only narrows its window | core | **done** `326bcdb8d` | **done** [`fix/exec-timeout-promise-result`](https://github.com/djbclark/core/tree/fix/exec-timeout-promise-result) | **done** [#6](https://github.com/djbclark/core/issues/6) | *pending* — found **by** the B-1/B-2 panel | *pending* — **security@** | *pending* |
 | P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** | `simulate-keep-chroot` `5dbd295f6` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | *unknown* | *pending* |
 | P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** | `simulate-json` `071f85987` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | *unknown* | *pending* |
 | P-3 | Silent digest-initialization failure when hashing | libntech | **done** `da7d3d9` | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) | *not done* | **done** (operator, manually) | *pending* |
@@ -67,30 +68,35 @@ B-1's full evidence is in
 
 ## Blocked on
 
-- **Email — the first action of the next session.** Emailing is **not optional**:
-  operator, 2026-08-16, *"It is 100% needed to email the addresses I gave you for
-  each bug, or set of bugs, we post issues and tickets for in our local repo."*
-  Our fork issues are public only in a personal repository nobody is likely to
-  find, so posting there is **not** disclosure and does not discharge the duty to
-  tell upstream.
+- **Email — the remaining gate for B-1, B-2 and B-8.** Emailing is **not
+  optional**: operator, 2026-08-16, *"It is 100% needed to email the addresses I
+  gave you for each bug, or set of bugs, we post issues and tickets for in our
+  local repo."* Our fork issues are public only in a personal repository nobody
+  is likely to find, so posting there is **not** disclosure and does not
+  discharge the duty to tell upstream.
 
-  Blocked in this session only: `hermes send` has no mail transport (Discord,
-  Signal, Telegram only), and the Claude Gmail connector the operator set up
-  mid-session is not visible to a session that was already running — MCP servers
-  are fixed at startup. Deferred deliberately to the next session, where it is
-  the **first thing to do** after the handoff/quit/baton cycle.
-- **Second opinions on B-1 and B-2.** Both were filed before this rule was
-  stated. They must be reviewed — ideally by a non-Claude model, as the corpus
-  does elsewhere — and `#4`/`#5` updated with anything the review finds, *before*
-  either email is sent. The uncertainties already flagged in those issues
-  (`setpgid` versus Ctrl-C, the unconditional group SIGKILL, the test's clock
-  mock) are the obvious things to put in front of a reviewer.
-- **Which address.** B-1 is a fail-open — a guard whose verification timed out is
-  reported as satisfied — so it goes to **security@northern.tech** unless the
-  operator says otherwise; under-reporting is the worse error, and upstream can
-  downgrade it. B-2 is a hang/resource-leak and goes to **contact@**. An earlier
-  draft of this register argued B-1 could go to contact@ because the fork issue
-  was already public; that reasoning was **wrong** and the operator corrected it.
+  The transport blocker is **cleared**: the Claude Gmail connector
+  (`mcp__claude_ai_Gmail__*`) is visible to a session started after the operator
+  set it up. `hermes send` still has no mail transport (Discord, Signal,
+  Telegram only) and Composio is not the canonical path.
+- **Second opinions — DONE for B-1 and B-2** (2026-08-16). Panel of three
+  non-Claude CLIs, brief frozen at
+  [`UPSTREAM-B1-B2-REVIEW-BRIEF.md`](UPSTREAM-B1-B2-REVIEW-BRIEF.md), opinions
+  at `upstream-opinion-{cursor,gemini,grok}-2026-08-16.md`, reconciled in
+  [`upstream-b1-b2-reconciliation-2026-08-16.md`](upstream-b1-b2-reconciliation-2026-08-16.md).
+  It paid for itself: it refuted B-1's headline claim, caught a hang B-2
+  introduced, and turned up B-8. `#4` and `#5` are updated. **B-8 still needs
+  its own second opinion before its email**, per the standing rule — it was
+  found *by* this panel, not reviewed by it.
+- **Which address.** All three go to **security@northern.tech**. B-8 is the
+  fail-open — a check whose verification timed out is reported as satisfied.
+  B-1 is the timing defect that narrows B-8's window and was originally filed
+  as the fail-open itself; it travels with B-8 because the correction only
+  makes sense alongside it. B-2 is availability-shaped (unbounded wait plus a
+  leaked process), and the operator's rule is *if in doubt, security@*. An
+  earlier draft of this register said B-2 goes to contact@, and separately
+  argued B-1 could go to contact@ because the fork issue was already public;
+  both were **wrong** and are superseded by the operator's instruction.
 - **Jira.** Every *pending* in the Upstream column is waiting on the same
   Atlassian API token recorded against
   [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md).
