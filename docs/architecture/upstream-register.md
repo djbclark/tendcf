@@ -10,7 +10,7 @@ against the GitHub API rather than restated from these notes:
 
 | channel | reality | verified by |
 |---|---|---|
-| `cfengine/core` Issues | genuinely **disabled** | `gh api repos/cfengine/core` → `has_issues: false` |
+| `cfengine/core` Issues | genuinely **disabled** — but **Discussions are open and are what that repo uses instead**; we have two there ([6295](https://github.com/cfengine/core/discussions/6295), [6296](https://github.com/cfengine/core/discussions/6296)). Querying `/issues/<n>` 404s on a discussion, which misled this document once — see the 2026-08-17 correction below | `gh api repos/cfengine/core` → `has_issues: false`; discussions via GraphQL |
 | `cfengine/core` Pull requests | **open, and we have two live there** | [#6293](https://github.com/cfengine/core/pull/6293), [#6294](https://github.com/cfengine/core/pull/6294) |
 | `NorthernTechHQ/libntech` Issues | **ENABLED** — the old claim that they were disabled was simply wrong | `gh api repos/NorthernTechHQ/libntech` → `has_issues: true`; our [#290](https://github.com/NorthernTechHQ/libntech/issues/290) is filed there |
 | `NorthernTechHQ/libntech` Pull requests | **open, and we have one live there** | [#291](https://github.com/NorthernTechHQ/libntech/pull/291) |
@@ -384,6 +384,45 @@ claim it does.
   Contrast P-3, which got this right: `Ticket: #290` resolves to a real upstream
   issue. **The rule this leaves behind: never write a ticket trailer for a
   ticket you have not seen exist.**
+
+  **OVERTURNED 2026-08-17 — the trailers were correct and we should not have
+  removed them.** `#6295` and `#6296` are **real**, and they are ours:
+
+  | | title | author | created |
+  |---|---|---|---|
+  | [6295](https://github.com/cfengine/core/discussions/6295) | Retain the `--simulate` changes chroot after a run (`--simulate-keep-chroot`) | `djbclark` | 2026-08-16T00:47Z |
+  | [6296](https://github.com/cfengine/core/discussions/6296) | Write the `--simulate` change set as JSON (`--simulate-json`) | `djbclark` | 2026-08-16T00:48Z |
+
+  They are **Discussions**, not Issues — which is precisely what a repository
+  with issues disabled uses instead, and the operator opened them the same
+  evening the PRs went up. They are the feature requests P-1 and P-2 implement.
+
+  The verification that condemned them was
+  `gh api repos/cfengine/core/issues/<n>`, which 404s on a discussion no matter
+  how real it is. From that 404 this document concluded the numbers "appear to
+  have been guessed as the next numbers after our PRs" — a fabricated motive
+  for a correct reference. On that basis two live upstream PRs had their
+  history rewritten to strip accurate metadata.
+
+  The rule survives; the **method** was wrong. Restated: *never write a ticket
+  trailer for a ticket you have not seen exist — and when the repository has
+  issues disabled, look for a Discussion before concluding it does not exist.*
+
+  ```sh
+  gh api graphql -f query='query{repository(owner:"cfengine",name:"core"){
+    discussion(number:6295){title closed}}}'
+  ```
+
+  Note also that `site-djbclark`'s `track-issue-activity.yml` has been tracking
+  both of them as `type: discussion` and succeeding hourly throughout — the
+  evidence was already in our own tooling while this document called them
+  phantoms.
+
+  **Not yet repaired:** `ea439e0ad` and `f5ce3a35d` are still the heads of
+  [#6293](https://github.com/cfengine/core/pull/6293) and
+  [#6294](https://github.com/cfengine/core/pull/6294), both open, and neither
+  carries `Ticket:` or `Changelog:`. Restoring them means a third force-push to
+  live upstream PRs; that is the operator's call, not a silent fix.
 - **Jira — no longer on the critical path.** P-1, P-2 and P-3 all reached
   upstream through GitHub without it. The Atlassian API token recorded against
   [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md) is still
