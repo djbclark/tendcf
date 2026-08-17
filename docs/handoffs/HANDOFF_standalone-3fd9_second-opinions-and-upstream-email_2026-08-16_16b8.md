@@ -261,11 +261,31 @@ All reviewers who reported on B-8 rated it **security@** unprompted.
 6. **Watch for a reply from security@northern.tech** and answer it. Offered:
    PRs against cfengine/core, patches by email, or a tracker. Also offered to
    test on Linux.
-7. **Then the remaining surveyed bugs**, in the order 5420 set, each needing
-   its own second opinion before its email: **B-5** (CMDB rejection names no
-   key, and one bad key drops every variable), **B-4** (JSON reals truncated to
-   2dp, libntech), **B-6** (`eval` returns `%lf`), **B-3** (no
-   `process_darwin.c`), **B-7** (dotted CMDB keys — warn only).
+7. **Then the remaining surveyed bugs — ALL NOW FILED as fork issues** at the
+   operator's request at the end of this session, so each has a tracking
+   artifact and none needs re-deriving from the survey. Each still needs a fix,
+   its own second opinion, and then its email:
+   - **B-5a** [core#8](https://github.com/djbclark/core/issues/8) — CMDB
+     rejection names no key. Highest correctness return and nearly free: both
+     `JsonWalk` callbacks already take a `void *data` declared `ARG_UNUSED`
+     (`cmdb.c:70,78`), and the pattern repeats at `:281` and `:384`.
+   - **B-5b** [core#9](https://github.com/djbclark/core/issues/9) — one bad key
+     drops every variable. Filed separately because it is a judgement call
+     about behaviour, not an obvious defect.
+   - **B-4** [libntech#2](https://github.com/djbclark/libntech/issues/2) — JSON
+     reals truncated to 2dp, including through mustache, so it corrupts
+     rendered config. `StringFromDouble` `%.2f` (`string_lib.c:922`) vs
+     `JsonRealCreate` `%.4f` (`json.c:1664`).
+   - **B-6** [core#10](https://github.com/djbclark/core/issues/10) — `eval()`
+     returns `%lf` (`evalfunction.c:7643`).
+   - **B-7** [core#11](https://github.com/djbclark/core/issues/11) — dotted
+     CMDB keys become scope paths. **Warn only; do not change behaviour.**
+   - **B-3** [core#12](https://github.com/djbclark/core/issues/12) — no
+     `process_darwin.c`. Platform-support work, not a bug fix, but it would
+     flip existing `process_test` XFAILs to passing.
+   - **P-3** now also has an issue,
+     [libntech#3](https://github.com/djbclark/libntech/issues/3), alongside its
+     PR #1, since issues are enabled on that fork now.
 8. **Then E-9 and `services:`** — the operator's stated goal for this stretch;
    E-9 (5 MiB `HOST_SPECIFIC_DATA_MAX_SIZE` hard load failure) has never been
    re-measured.
