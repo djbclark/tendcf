@@ -14,7 +14,7 @@ against the GitHub API rather than restated from these notes:
 | `cfengine/core` Pull requests | **open, and we have two live there** | [#6293](https://github.com/cfengine/core/pull/6293), [#6294](https://github.com/cfengine/core/pull/6294) |
 | `NorthernTechHQ/libntech` Issues | **ENABLED** — the old claim that they were disabled was simply wrong | `gh api repos/NorthernTechHQ/libntech` → `has_issues: true`; our [#290](https://github.com/NorthernTechHQ/libntech/issues/290) is filed there |
 | `NorthernTechHQ/libntech` Pull requests | **open, and we have one live there** | [#291](https://github.com/NorthernTechHQ/libntech/pull/291) |
-| CFE Jira | still needs an Atlassian API token, and is **no longer on the critical path** — GitHub took all three items | — |
+| CFE Jira | **WORKING as of 2026-08-17, and now the ONLY filing channel** — see the 2026-08-17 Jira entry below. All 15 open items are filed as `CFE-4715`–`CFE-4729` | `POST /rest/api/2/issue` → 201; anonymous `GET` of `CFE-4715` → 200 |
 
 So the premise that motivated the fork-plus-email workaround **does not hold for
 ordinary bug reporting**. Upstream GitHub accepts our issues and our pull
@@ -33,14 +33,28 @@ everything below should be submittable without re-deriving anything.
 
 ## Channels, and what "reported" currently means
 
-Per the operator, each item gets the same treatment PR 3 got:
+**SUPERSEDED 2026-08-17 — step 3 is now Jira, not email.** Operator
+instruction: *"Going forward, remember to always use Jira, no longer email or
+open discussion threads."* Each item gets:
 
 1. **Code** — a branch on our fork (`djbclark/core`, `djbclark/libntech`).
 2. **A tracking artifact on the fork** — an issue where issues are enabled
    (`djbclark/core`), a pull request where they are not (`djbclark/libntech`).
-3. **Email** — links to both, sent to **contact@northern.tech** for ordinary
-   bugs and **security@northern.tech** for security-relevant ones. **When in
-   doubt, security@** (operator, 2026-08-16).
+3. **A ticket in the CFE Jira project**, which is the upstream reference of
+   record. Do **not** open GitHub Discussions and do **not** email `contact@`
+   or `security@northern.tech` as a filing channel any more.
+
+Replying on an existing email thread, or commenting on an existing Discussion,
+to point at the new Jira key is still correct — that is notification, not
+filing.
+
+The email history below is retained because it is what actually happened and
+because two threads carry corrections that must not be lost:
+`contact@`/`security@` for B-1/B-2/B-8 (`1a00d22ac0d46c9b`, follow-up
+`1a00d44a2758b9ea`), B-10/B-4 (`1a00f99c7e714823`), and P-3
+(`1a007e4362402bd9`, correction `1a00fb936fc1741f`). The old rule was *when in
+doubt, security@* (operator, 2026-08-16); it no longer selects a channel, but
+it still describes how severity should be *stated* in a ticket.
 
 **A second opinion is required before upstream is contacted** (operator,
 2026-08-16), and **every commissioned review must have reported before anything
@@ -455,23 +469,68 @@ claim it does.
   "Requested in #6295/#6296" line it never had, and each carries a comment
   explaining the churn and stating plainly that the 404 was my error and no code
   changed in either direction.
-- **Jira — no longer on the critical path.** P-1, P-2 and P-3 all reached
-  upstream through GitHub without it. The Atlassian API token recorded against
-  [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md) is still
-  unavailable, and that now costs us nothing for these items. Do not treat a
-  missing Jira token as a reason an item cannot be filed.
+- **RESOLVED 2026-08-17 — Jira works, and every open item is now filed there.**
+  The blocker was never the token. Creating the Atlassian account was not
+  sufficient on its own: the operator also had to be granted permission **in
+  the CFE project specifically**, which nickanderson arranged over Matrix.
+  `GET /rest/api/3/myself` → 200 and `POST /rest/api/2/issue` → 201.
+
+  Auth is Basic, `djbclark@gmail.com` + `ATLASSIAN_CFENGINE_API_TOKEN` via
+  `sudo-secretspec` (never echo it). Project **CFE** ("CFEngine Community");
+  issue types include `Bug` and `Feature request`; only `summary` and
+  `description` are required. Descriptions go through `/rest/api/2/` so they
+  can be wiki markup rather than ADF.
+
+  **CFE is fully public and offers no restricted-visibility option** — anonymous
+  `GET` of an issue returns 200, and the create screen has no `security` field.
+  The operator was asked and chose to file the six `security@`-reported items
+  publicly anyway (2026-08-17).
+
+  | item | CFE key | item | CFE key |
+  |---|---|---|---|
+  | P-1 `--simulate-keep-chroot` | [CFE-4715](https://northerntech.atlassian.net/browse/CFE-4715) | B-5b one bad key drops all vars | [CFE-4720](https://northerntech.atlassian.net/browse/CFE-4720) |
+  | P-2 `--simulate-json` | [CFE-4716](https://northerntech.atlassian.net/browse/CFE-4716) | B-6 `eval()` returns `%lf` | [CFE-4721](https://northerntech.atlassian.net/browse/CFE-4721) |
+  | P-3 silent digest failure | [CFE-4717](https://northerntech.atlassian.net/browse/CFE-4717) | B-7 dotted CMDB keys | [CFE-4722](https://northerntech.atlassian.net/browse/CFE-4722) |
+  | B-3 no `process_darwin.c` | [CFE-4718](https://northerntech.atlassian.net/browse/CFE-4718) | B-12 `lowest_metric` unassigned | [CFE-4723](https://northerntech.atlassian.net/browse/CFE-4723) |
+  | B-5a rejected CMDB names nothing | [CFE-4719](https://northerntech.atlassian.net/browse/CFE-4719) | **B-4 + B-10 + B-11** (one stack) | [CFE-4724](https://northerntech.atlassian.net/browse/CFE-4724) |
+  | B-10 core half (`core#13`) | [CFE-4725](https://northerntech.atlassian.net/browse/CFE-4725) | B-8 fail-open | [CFE-4726](https://northerntech.atlassian.net/browse/CFE-4726) |
+  | exec_timeout termination half | [CFE-4727](https://northerntech.atlassian.net/browse/CFE-4727) | B-1 poll loops count iterations | [CFE-4728](https://northerntech.atlassian.net/browse/CFE-4728) |
+  | B-2 descendants not signalled | [CFE-4729](https://northerntech.atlassian.net/browse/CFE-4729) | | |
+
+  B-4, B-10 and B-11 share **one** ticket because they ship as one stack and are
+  not independently landable. CFE-4727 is the first filing anywhere for the
+  exec_timeout termination half.
+
+  **Every ticket was written from the fork issue *plus its correction comments*,
+  never from the body alone.** Five of the six security items carry retractions
+  that live only in comments — B-1's withdrawn fail-open claim, B-2's
+  unconditional-`setpgid` regression and PID-recycling correction, B-8's
+  "kept" → "compliant" relabel, B-10's "rendering" → "copying at policy load"
+  reframing, and P-3's trust-model overstatement. Copying any of those bodies
+  verbatim would have republished a withdrawn claim onto a public tracker.
+  `core#13`'s body is also stale where it says behavioural verification is
+  outstanding; it has since been verified both directions against stock
+  libntech `5b5d04e1`.
+
+  Each CFE key is linked back from its upstream PR/Discussion/issue and from
+  its fork artifact, so the two never diverge.
 
 ## Refiling checklist
 
-When a real tracker opens, each item needs, in this order:
+The tracker is open (CFE Jira, 2026-08-17). Each item needs, in this order:
 
-1. A ticket carrying the fork issue's body verbatim — they are written as
-   standalone bug reports, not as notes to ourselves, precisely so this step is
-   a copy.
-2. A PR against the upstream repo from our branch, titled with the new ticket
-   id if the tracker assigns one.
-3. This register updated in the same commit, and the fork artifact edited to
-   point at the upstream one so the two never diverge.
+1. A CFE ticket. **Do not copy the fork issue's body verbatim** — that
+   instruction stood here until 2026-08-17 and it was wrong. Several fork
+   issues carry claims we later *withdrew*, and the retraction lives in a
+   **comment**, so a verbatim copy republishes a false claim onto a public
+   tracker under a fresh date. Read the body **and every comment**, then write
+   the ticket from the corrected state. Where we retracted something, say so in
+   the ticket: it costs nothing and it is why maintainers can trust the rest.
+2. A PR against the upstream repo from our branch, with `Ticket: CFE-####`
+   in the commit trailer — and per the `#6295` lesson, never write a trailer
+   for a ticket you have not seen exist.
+3. This register updated in the same commit, and the fork artifact commented to
+   point at the CFE key so the two never diverge.
 
 Do **not** rewrite history on the fork branches to suit a new tracker's
 conventions — the fork commits are what our own builds are tested against, and
