@@ -80,6 +80,7 @@ Legend: **done** · *pending* · — not applicable.
 | B-4 | JSON reals truncated to 2 decimals (`0.00049` → `0.00`), including through mustache templating; `%.2f` and `%.4f` disagree | libntech **+ core** | **done** both halves: libntech `fe1ace9`, core `6a4216dad` (core half **not yet behaviourally verified**) | **done** [`fix/json-real-precision`](https://github.com/djbclark/libntech/tree/fix/json-real-precision) + [`fix/json-number-rendering`](https://github.com/djbclark/core/tree/fix/json-number-rendering) | **done** [libntech#2](https://github.com/djbclark/libntech/issues/2) + [core#13](https://github.com/djbclark/core/issues/13) | *pending* | *pending* | *pending* |
 | B-10 | A **valid JSON number terminates the process**: exponent form without a dot (`1e-8`, `2e0`) is misclassified INTEGER, and integers past `long` overflow; both reach `StringToLongExitOnError()` → `DoCleanupAndExit()`. Measured on stock 3.27.1: `cf-promises` dies and **cf-agent falls back to failsafe** | libntech **+ core** | **done** both halves: libntech `f92cd1c`, core `6a4216dad` (core half **not yet behaviourally verified**) | **done** [`fix/json-number-fatal-exit`](https://github.com/djbclark/libntech/tree/fix/json-number-fatal-exit) + [`fix/json-number-rendering`](https://github.com/djbclark/core/tree/fix/json-number-rendering) | **done** [libntech#4](https://github.com/djbclark/libntech/issues/4) + [core#13](https://github.com/djbclark/core/issues/13) | *running* — fable-deep audit | *pending* — **security@** (availability; in doubt → security), **operator-approved** for upstream issue + PR + email once the audit clears | *pending* |
 | B-11 | `JsonRealCreate()` stores reals with `%.4f`, so **`JsonCopy()` changes a document's values**: `0.00049` → `0.0005`, `3.14159265` → `3.1416`. Measured; distinct from B-4, which is the render path | libntech | *not started* | — | *pending* | *pending* | *pending* | *pending* |
+| B-12 | `GetNetworkingInfo()` declares `long lowest_metric = 0;` (`libenv/unix_iface.c:1425`) and **never assigns it**, so the default-route comparison is `metric_value < 0` — false for every real metric. CFEngine therefore picks the **first** active default gateway, not the lowest-metric one, contrary to the variable name and the comparison's intent. Found while verifying B-10's core half; pre-existing and deliberately **not** fixed there | core | *not started* — recorded, not patched | — | *pending* | *pending* | *pending* | *pending* |
 | B-5a | Rejected CMDB file names no key, value or path — the `void *data` carrier already exists and is `ARG_UNUSED` | core | *not started* | — | **done** [#8](https://github.com/djbclark/core/issues/8) | *pending* | *pending* | *pending* |
 | B-5b | One bad key silently drops **every** variable on the host; agent then reports no failures | core | *not started* | — | **done** [#9](https://github.com/djbclark/core/issues/9) | *pending* | *pending* | *pending* |
 | B-6 | `eval()` returns `%lf` for integral results, so arithmetic cannot feed any function taking a count | core | *not started* | — | **done** [#10](https://github.com/djbclark/core/issues/10) | *pending* | *pending* | *pending* |
@@ -239,32 +240,82 @@ claim it does.
   remove. Earlier reviewers waved `inf` through as "acceptable but disclose";
   grok is right that emitting a non-JSON token is worse than that.
 
+  **CORRECTION (2026-08-17, measured):** the paragraph above — and grok's and my
+  own framing of it — is wrong about *when* `inf` happens. Stock does **not**
+  render `1e400` as `inf`: with no decimal point it is misclassified INTEGER and
+  **terminates the process**, never reaching `strtod()`. `inf` appears only once
+  B-10's classification fix routes the value into the REAL path. So `inf` is
+  **introduced by B-10 applied alone** and **removed by B-4** (which stops going
+  through `double` at all). It is not a third patch to write; it is a statement
+  about landing order. Full three-variant measurement:
+  [`b10-number-render-measurement-2026-08-17.md`](b10-number-render-measurement-2026-08-17.md).
+
   ### B-10's remaining work before it goes upstream or to `security@`
 
-  1. **Fix `1e400` → `inf`** (grok), or decide deliberately and pin it in a
-     test either way (cursor).
-  2. **Say plainly that exponent reals still render through `%.2f`**, so `1e-8`
-     mustaches to `0.00`. The fix turns a fatal into a *lossy* result and the
-     filing must not overclaim (cursor, grok).
-  3. **Add mustache coverage** — there is no mustache test binary in libntech,
-     so this needs a proposal, not an invention inside this PR (grok,
-     fable-deep).
-  4. **Verify the core twin branch** `fix/json-number-rendering`. Until it
-     lands, a CMDB *array* of `9223372036854775808` still kills the agent even
-     with the libntech patch applied (grok). It is committed but still has only
-     a syntax check behind it.
+  All four are now **closed**; see the measurement document for the evidence.
+
+  1. ~~**Fix `1e400` → `inf`**~~ — **resolved as a landing-order question, not a
+     patch.** `JsonPrimitiveGetAsReal()` is the only route to `strtod()` here and
+     has exactly **two** in-tree callers, both of which B-4 rewrites, and **zero**
+     callers in core. Once B-4 lands nothing in either tree can produce `inf`
+     from parsed JSON.
+  2. ~~**Say plainly that exponent reals still render through `%.2f`**~~ —
+     **measured and written down.** B-10 alone renders `1e-8` as `0.00`. But the
+     fair framing is narrower than "B-10 leaves a silent wrong value": `%.2f`
+     truncation is a **pre-existing stock defect** (`0.00049` → `0.00` today,
+     unpatched). B-10 moves exponent forms out of a *fatal* path into an
+     *already-broken* lossy one. The filing must not imply they now render
+     correctly.
+  3. ~~**Add mustache coverage**~~ — **confirmed there is none to extend.** No
+     file under `tests/unit/` references `MustacheRender` at all, so
+     `libutils/mustache.c` has **zero** unit coverage. Correct move is a
+     proposal in the filing plus an offer of a separate `mustache_test` PR — not
+     an invention inside this one.
+  4. **Verify the core twin branch** `fix/json-number-rendering` — in progress;
+     `~/src/core-json` is now configured and building against **stock** libntech
+     `5b5d04e1`, which is the honest configuration since core's PR lands
+     independently of the libntech one.
+
+  ### The two libntech branches are NOT independent — measured
+
+  Applying `fix/json-real-precision` on top of `fix/json-number-fatal-exit`
+  **breaks the latter's own test suite**: `json_test.c:1336` asserts
+  `assert_string_equal("0.50", str)`, pinning the `%.2f` rendering of `0.5`.
+  With B-4 applied that becomes `"0.50" != "0.5"` and `json_test` exits 1
+  (verified 2026-08-17, then reverted; tree clean, 39/39 restored).
+
+  Whichever branch lands second must update that assertion. `cfengine/core`'s
+  half (`6a4216dad`) already avoids the whole problem by fixing integers **and**
+  reals together in one commit; the libntech half is the only one split in two.
+  **Recommendation: land B-4 first, or stack B-10 on it.**
 - **Two defects, four call sites, two repositories — and neither half is
   sufficient alone.** B-4 and B-10 are the same underlying mistake: *rendering a
   JSON number by converting it to a C numeric type and formatting it back,
   instead of using the text the parser already kept.* It appears at four sites
   reached by different routes, so fixing one repository leaves the other live:
 
-  | site | repo | reals | integers |
-  |---|---|---|---|
-  | `JsonPrimitiveToString()` | libntech | truncated | fatal |
-  | mustache renderer | libntech | truncated | fatal |
-  | `RlistAppendJson()` | core | truncated | fatal |
-  | iteration equivalent | core | truncated | fatal |
+  | site | repo | reals | integers | reached by |
+  |---|---|---|---|---|
+  | **`JsonPrimitiveCopy()`** | libntech | `%.4f` | **fatal** | **every variable store** — see below |
+  | `JsonPrimitiveToString()` | libntech | truncated | fatal | rendering |
+  | mustache renderer | libntech | truncated | fatal | `string_mustache()` |
+  | `RlistAppendJson()` | core | truncated | fatal | list contexts |
+  | iteration equivalent | core | truncated | fatal | `$(container[key])` |
+
+  **CORRECTION (2026-08-17): the table above was missing its most important
+  row, and the framing around it was wrong.** `JsonPrimitiveCopy()` is a fifth
+  site and it is not a rendering path at all — storing a JSON container as a
+  CFEngine variable deep-copies it, so the conversion happens on **every
+  variable store**. Measured against a build carrying core's half and stock
+  libntech: a policy whose only content is
+  `"d" data => readjson(...)` — no iteration, no mustache, nothing that renders
+  the value — kills `cf-promises` at **policy-load time** and sends `cf-agent`
+  to failsafe. `lldb` stack: `LoadPolicy` → `PolicyResolve` →
+  `ExpandPromise` → `VerifyVarPromise` → `RvalNewRewriter` → `JsonObjectCopy`
+  → `JsonCopy` → `StringToLongExitOnError`. The trigger is therefore **loading
+  the value, not rendering it**, and the whole path is inside libntech — core's
+  half cannot help. Details:
+  [`b10-number-render-measurement-2026-08-17.md`](b10-number-render-measurement-2026-08-17.md).
 
   mustache reaches JSON data by a different path than variables and iteration
   do, which is why the core half was invisible while measuring the libntech
