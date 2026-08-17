@@ -85,8 +85,8 @@ Legend: **done** · *pending* · — not applicable.
 | B-6 | `eval()` returns `%lf` for integral results, so arithmetic cannot feed any function taking a count | core | *not started* | — | **done** [#10](https://github.com/djbclark/core/issues/10) | *pending* | *pending* | *pending* |
 | B-7 | Dotted CMDB keys silently become scope paths, with no warning (**warn only** — do not change behaviour) | core | *not started* | — | **done** [#11](https://github.com/djbclark/core/issues/11) | *pending* | *pending* | *pending* |
 | B-8 | `commands:` promise that exceeded `exec_timeout` is reported **kept** — `RepairExec()` never returns `ACTION_RESULT_TIMEOUT`, so the promise is judged only on the child's exit status. **This is the actual fail-open**; B-1 only narrows its window | core | **done** `326bcdb8d` | **done** [`fix/exec-timeout-promise-result`](https://github.com/djbclark/core/tree/fix/exec-timeout-promise-result) | **done** [#6](https://github.com/djbclark/core/issues/6) | *pending* — found **by** the B-1/B-2 panel | *pending* — **security@** | *pending* |
-| P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** `00c98bc8b` | `simulate-keep-chroot` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | *unknown* | **DONE** [cfengine/core#6293](https://github.com/cfengine/core/pull/6293) — open, mergeable, CLA signed |
-| P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** `8ee015c42` | `simulate-json` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | *unknown* | **DONE** [cfengine/core#6294](https://github.com/cfengine/core/pull/6294) — open, mergeable, CLA signed |
+| P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** `ea439e0ad` | `simulate-keep-chroot` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | *unknown* | **DONE** [cfengine/core#6293](https://github.com/cfengine/core/pull/6293) — open, mergeable, CLA signed |
+| P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** `f5ce3a35d` | `simulate-json` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | *unknown* | **DONE** [cfengine/core#6294](https://github.com/cfengine/core/pull/6294) — open, mergeable, CLA signed |
 | P-3 | Silent digest-initialization failure when hashing | libntech | **done** `dc85a6f` | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) (PR) + [libntech#3](https://github.com/djbclark/libntech/issues/3) (issue) | *pending* — panel running 2026-08-16 | **done** (operator, manually) | **DONE** [NorthernTechHQ/libntech#290](https://github.com/NorthernTechHQ/libntech/issues/290) (issue) + [#291](https://github.com/NorthernTechHQ/libntech/pull/291) (PR) — open, mergeable, CLA signed |
 
 `djbclark/core` [#7](https://github.com/djbclark/core/issues/7) tracks the
@@ -108,11 +108,14 @@ pointed at a commit that no branch reaches. The content was identical each time
 `Ticket: #290`) — which is exactly why it went unnoticed: every diff-based check
 passes, and only `git branch --contains` reveals it.
 
-| item | register said | actually | orphaned commit still exists locally? |
+| item | register said | corrected to | current head |
 |---|---|---|---|
-| P-1 | `5dbd295f6` | `00c98bc8b` | yes, unreferenced |
-| P-2 | `071f85987` | `8ee015c42` | yes, unreferenced |
-| P-3 | `da7d3d9` | `dc85a6f` | yes, unreferenced |
+| P-1 | `5dbd295f6` | `00c98bc8b` | **`ea439e0ad`** (ticket-trailer repair, same day) |
+| P-2 | `071f85987` | `8ee015c42` | **`f5ce3a35d`** (ticket-trailer repair, same day) |
+| P-3 | `da7d3d9` | `dc85a6f` | `dc85a6f` |
+
+P-1 and P-2 moved *again* within hours of the correction, which is the point:
+these SHAs are not stable and citing them is a maintenance liability.
 
 The check that catches this, run against any SHA this document cites:
 
@@ -208,20 +211,27 @@ claim it does.
   failures in the very same functions. Severity is split 2–1 for ordinary bug
   over `security@`. A fable-deep adjudication is running; **nothing goes to
   maintainers until it reports**, per the whole-panel rule above.
-- **OPEN, and it is wrong on a live upstream PR right now — P-1 and P-2 cite
-  ticket numbers that do not exist.** `00c98bc8b` carries `Ticket: #6295` and
-  `8ee015c42` carries `Ticket: #6296`; both numbers **404** against
-  `cfengine/core`, which has issues disabled and could not have had such
-  tickets. These commits are the heads of
+- **RESOLVED 2026-08-16 — P-1 and P-2 cited ticket numbers that did not exist.**
+  `00c98bc8b` carried `Ticket: #6295` and `8ee015c42` carried `Ticket: #6296`;
+  both **404** against `cfengine/core`, which has issues disabled and could not
+  have had such tickets. They appear to have been guessed as "the next numbers
+  after our PRs". Because those commits were the heads of live upstream PRs, a
+  maintainer reading either one saw a dangling reference.
+
+  Neither commit carried a `Changelog:` line, and per `CONTRIBUTING.md`
+  (corroborated by 23 of the last 60 libntech commits) `Ticket:` is only
+  required alongside `Changelog:` — so the repair was to **drop the trailer**,
+  not to invent another number. Done with the operator's approval:
+  messages rewritten with `git commit-tree` so no working tree was touched,
+  trees verified byte-identical, force-pushed with `--force-with-lease`.
+  `00c98bc8b` → `ea439e0ad`, `8ee015c42` → `f5ce3a35d`; both
   [#6293](https://github.com/cfengine/core/pull/6293) and
-  [#6294](https://github.com/cfengine/core/pull/6294), so a maintainer reading
-  either PR sees a dangling reference. Neither commit carries a `Changelog:`
-  line, and per `CONTRIBUTING.md` (corroborated by 23 of the last 60 libntech
-  commits) `Ticket:` is only required alongside `Changelog:` — so the repair is
-  to **drop the trailer**, not to invent a number. Contrast P-3, which got this
-  right: `Ticket: #290` resolves to a real upstream issue.
-  **Needs the operator's approval before acting**, because fixing it means
-  amending and force-pushing branches that live upstream PRs are built on.
+  [#6294](https://github.com/cfengine/core/pull/6294) confirmed still **open
+  and mergeable** on the new heads.
+
+  Contrast P-3, which got this right: `Ticket: #290` resolves to a real upstream
+  issue. **The rule this leaves behind: never write a ticket trailer for a
+  ticket you have not seen exist.**
 - **Jira — no longer on the critical path.** P-1, P-2 and P-3 all reached
   upstream through GitHub without it. The Atlassian API token recorded against
   [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md) is still
