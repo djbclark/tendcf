@@ -101,7 +101,7 @@ Legend: **done** · *pending* · — not applicable.
 | B-5b | One bad key silently drops **every** variable on the host; agent then reports no failures | core | *not started* | — | **done** [#9](https://github.com/djbclark/core/issues/9) | *pending* | *pending* | *pending* |
 | B-6 | `eval()` returns `%lf` for integral results, so arithmetic cannot feed any function taking a count | core | *not started* | — | **done** [#10](https://github.com/djbclark/core/issues/10) | *pending* | *pending* | *pending* |
 | B-7 | Dotted CMDB keys silently become scope paths, with no warning (**warn only** — do not change behaviour) | core | *not started* | — | **done** [#11](https://github.com/djbclark/core/issues/11) | *pending* | *pending* | *pending* |
-| B-8 | `commands:` promise that exceeded `exec_timeout` is reported **kept** — `RepairExec()` never returns `ACTION_RESULT_TIMEOUT`, so the promise is judged only on the child's exit status. **This is the actual fail-open**; B-1 only narrows its window | core | **done** `326bcdb8d` | **done** [`fix/exec-timeout-promise-result`](https://github.com/djbclark/core/tree/fix/exec-timeout-promise-result) | **done** [#6](https://github.com/djbclark/core/issues/6) | **done** — its own 3-model panel (cursor/gemini/grok, 2026-08-16); grok found a real defect in the fix (the flag was sampled before `cf_pclose`), fixed in `7a32e3969`, and caught the unconditional "and was terminated" wording, fixed in `57ac8da22` | **done** — `security@` 2026-08-17, Gmail id `1a00d22ac0d46c9b`, + correcting follow-up `1a00d44a2758b9ea` carrying the retracted ALARM_PID refutation | *pending* — not offered as an upstream PR yet |
+| B-8 | `commands:` promise that exceeded `exec_timeout` is reported **compliant** — `RepairExec()` never returns `ACTION_RESULT_TIMEOUT`, so the promise is judged only on the child's exit status. **This is the actual fail-open**; B-1 only narrows its window. (Said "reported **kept**" until 2026-08-17; the panel's correction is that the default outcome for exit 0 is *repaired*, so the accurate word is **compliant** — 100% aggregate, `promise_repaired` set, `repair_timeout` not set, `PromiseResultIsOK()` true. Defect unchanged, our label was wrong) | core | **done** `326bcdb8d` + `7a32e3969` + `57ac8da22`, plus five acceptance tests in `46be075d4` | **done** [`fix/exec-timeout-promise-result`](https://github.com/djbclark/core/tree/fix/exec-timeout-promise-result) | **done** [#6](https://github.com/djbclark/core/issues/6) | **done** — its own 3-model panel (cursor/gemini/grok, 2026-08-16); grok found a real defect in the fix (the flag was sampled before `cf_pclose`), fixed in `7a32e3969`, and caught the unconditional "and was terminated" wording, fixed in `57ac8da22` | **done** — `security@` 2026-08-17, Gmail id `1a00d22ac0d46c9b`, + correcting follow-up `1a00d44a2758b9ea` carrying the retracted ALARM_PID refutation | **done** [cfengine/core#6299](https://github.com/cfengine/core/pull/6299) — OPEN, MERGEABLE, 2 commits, branch [`fix/exec-timeout-promise-outcome`](https://github.com/djbclark/core/tree/fix/exec-timeout-promise-outcome) cut from master `17eb78e6d`, trailers `Ticket: CFE-4726` + `Changelog:`. Byte-identical tree to `fix/exec-timeout-promise-result`, recommitted in the project's own style (past-tense subjects) with the two review defects squashed into the fix rather than shipped as separate correcting commits. PR body states all three known limits up front | [CFE-4726](https://northerntech.atlassian.net/browse/CFE-4726) |
 | P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** `f6c06f9e2` (corrected 2026-08-17) | `simulate-keep-chroot` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | — not emailed; went straight to an upstream PR (operator, 2026-08-15). Verified 2026-08-17: only four threads to northern.tech exist and none concerns `--simulate` | **DONE** [cfengine/core#6293](https://github.com/cfengine/core/pull/6293) — open, mergeable, CLA signed |
 | P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** `b3a6c3da5` (corrected 2026-08-17) | `simulate-json` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | — not emailed; went straight to an upstream PR (operator, 2026-08-15). Verified 2026-08-17: only four threads to northern.tech exist and none concerns `--simulate` | **DONE** [cfengine/core#6294](https://github.com/cfengine/core/pull/6294) — open, mergeable, CLA signed |
 | P-3 | Silent digest-initialization failure when hashing | libntech | **done** `e76700b` (was `dc85a6f`; corrected 2026-08-17) | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) (PR) + [libntech#3](https://github.com/djbclark/libntech/issues/3) (issue) |  **done** — panel + fable adjudication, correction pushed `e76700b` | **done** (operator, manually) | **DONE** [NorthernTechHQ/libntech#290](https://github.com/NorthernTechHQ/libntech/issues/290) (issue) + [#291](https://github.com/NorthernTechHQ/libntech/pull/291) (PR) — open, mergeable, CLA signed |
@@ -173,9 +173,11 @@ claim it does.
   at `upstream-opinion-{cursor,gemini,grok}-2026-08-16.md`, reconciled in
   [`upstream-b1-b2-reconciliation-2026-08-16.md`](upstream-b1-b2-reconciliation-2026-08-16.md).
   It paid for itself: it refuted B-1's headline claim, caught a hang B-2
-  introduced, and turned up B-8. `#4` and `#5` are updated. **B-8 still needs
+  introduced, and turned up B-8. `#4` and `#5` are updated. ~~**B-8 still needs
   its own second opinion before its email**, per the standing rule — it was
-  found *by* this panel, not reviewed by it.
+  found *by* this panel, not reviewed by it.~~ **Discharged**: B-8 got its own
+  3-model panel (cursor/gemini/grok, 2026-08-16), which found a real defect in
+  the fix, and the email went 2026-08-17.
 - **Which address.** All three go to **security@northern.tech**. B-8 is the
   fail-open — a check whose verification timed out is reported as satisfied.
   B-1 is the timing defect that narrows B-8's window and was originally filed
@@ -210,8 +212,12 @@ claim it does.
   Our core branches are built and tested against libntech `dc85a6f` (our P-3
   fix, `fork/silent-digest-failure`, offered as libntech PR #1 and not merged),
   while upstream records `5b5d04e1`. Before any core branch is offered upstream
-  it must be confirmed to build and pass against **stock** libntech — not yet
-  done for B-1, B-2 or B-8. The tracking issue lives on `djbclark/core`
+  it must be confirmed to build and pass against **stock** libntech. **Done for
+  B-8** (2026-08-17): the `core-acceptance` worktree carries the stock submodule
+  pointer `5b5d04e1` — exactly what upstream master `17eb78e6d` records — and
+  `#6299` was built (`rc=0`, no new warnings) and its five acceptance tests run
+  green against it, with the discrimination run done at the same pointer. **Not
+  yet done for B-1 or B-2.** The tracking issue lives on `djbclark/core`
   because that is where the submodule pointer bites.
 - **B-10's panel is partly in. gemini: *ship as is*, severity `security@`** —
   it argues "attacker-controlled" is accurate, since CMDB facts, external data
