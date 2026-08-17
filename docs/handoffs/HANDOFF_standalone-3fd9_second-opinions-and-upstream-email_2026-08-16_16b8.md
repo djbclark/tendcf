@@ -83,15 +83,22 @@ inner-fork script, both the `setpgid` and non-`setpgid` arms hung, so it
 distinguished nothing. Abandoned it and inspected the **real** hang with `ps`
 instead, which settled it immediately. Don't rebuild the synthetic harness.
 
-### 3. B-9 — a diagnosis that was refuted by implementing it
+### 3. B-9 — I called a correct diagnosis "refuted", and had to retract it
 
-Gemini claimed `exec_timeout` never bounds a command that closes its output
+Gemini said `exec_timeout` never bounds a command that closes its output
 because `cf_pclose()` sets `ALARM_PID = -1` (`pipes_unix.c:874`) before
-`cf_pwait()`. The clear is real. I built the fix on a branch — and **wall clock
-did not change** (10.3s vs stock 10.2s). Branch deleted, nothing filed. The
-second `ALARM_PID = -1` at :962 is in `cf_pclose_full_duplex`, not on this path.
-**Do not re-derive the ALARM_PID theory.** What survives is the measurement
-only; see Evidence.
+`cf_pwait()`. I built that change on a branch, saw **no wall-clock movement**
+(10.3s vs stock 10.2s), deleted the branch, and recorded the theory as refuted
+with a "do not re-derive" note in four places.
+
+**That was wrong and is retracted.** Grok reached the same diagnosis
+independently and supplied the discriminator I had missed: the two branches of
+`TimeOut()` log *different lines*, and this case prints `verbose: > Time out`,
+which is the `ALARM_PID == -1` branch. Confirmed on our own build once the
+message was made honest (see Key Decisions). Two reviewers converging, plus a
+log line that discriminates the branches, beats one negative experiment of
+mine. **Start from the ALARM_PID theory.** I have not worked out what my
+experiment actually measured — that is the first thing to establish.
 
 ### 4. Classifying the timeout in the wrong place (50% compliance)
 
@@ -141,6 +148,13 @@ a real defect in B-8, so the call paid off.
 **Sent one email covering all three, not three emails** — they are one story
 about `exec_timeout` and easier to triage together. Operator's rule permits
 "each bug, or set of bugs".
+
+**Made the timeout message honest** (`57ac8da22`, grok's finding). It said "and
+was terminated" unconditionally, which is false whenever `TimeOut()` fires with
+`ALARM_PID == -1`. `TimeOut()` now records whether it had a process to signal
+and the message says which happened. Both cases stay
+`PROMISE_RESULT_TIMEOUT` at 0%. Rejected papering over it: the false branch is
+what makes the still-open termination defect visible.
 
 **Rejected** cursor's `<stdbool.h>` nit for `timeout.h`: in-tree convention is
 that headers assume the includer has `cf3.defs.h`/`platform.h` — `timeout.h`
@@ -192,11 +206,18 @@ it). Under a pty, `sh -c 'read x; echo GOT-$x'`, **no `exec_timeout` at all**:
 Zero orphans. Before the series, row 2 was 100% and `sleep 30` took 30.3s
 leaving an orphan.
 
-**OPEN, mechanism NOT established.** Row 1 above still takes ~12s, and **stock
-3.27.1 takes 10.2s** for the same policy — so `exec_timeout` does not bound wall
+**OPEN — the termination half.** Row 1 above still takes ~12s, and **stock
+3.27.1 takes 10.2s** for the same policy: `exec_timeout` does not bound wall
 clock for a command that closes its output before exiting. Pre-existing
-upstream, not ours. Disclosed in the email as an observation only. See What We
-Tried §3 for the refuted theory.
+upstream, not ours. Disclosed in the email as an observation. The mechanism is
+now **supported, not refuted** — see What We Tried §3 for the retraction. Since
+`57ac8da22` the agent says so out loud rather than claiming a termination that
+did not happen:
+
+```
+> Time out
+... exceeded exec_timeout of 2 seconds; it was NOT terminated and ran to completion
+```
 
 **Regression, every branch and the merge:** `tests/unit` — *all 68 behaved as
 expected, 4 expected failures*, exit 0, identical to baseline.
@@ -235,13 +256,14 @@ All reviewers who reported on B-8 rated it **security@** unprompted.
 
 ## Where We're Going
 
-1. **THE NEXT ACTION — collect Grok's B-8 opinion and fold it in.** It was
-   still building a scratch clone of `326bcdb8d` at session end, i.e. the
-   version **before** `7a32e3969`, so it will most likely re-report the
-   already-fixed early-sample defect. Check
-   `docs/architecture/upstream-opinion-b8-grok-2026-08-16.md`; if it landed,
-   add anything new to issue #6 and to the register. If it found nothing new,
-   say so and close the panel out.
+1. **THE NEXT ACTION — write the acceptance tests.** All six reviewer reports
+   asked for them and they are the top stated gap in the email we sent. Grok
+   specified the set: the `sleep 2.4` repro; the same command finishing inside
+   the timeout (still repaired on exit 0, failed on non-zero);
+   `kept_returncodes => { "0" }` must not resurrect "kept"; the output-closed
+   shape; and two sequential `commands:` proving the timeout flag does not
+   leak. (Grok's B-8 opinion DID land before session end and is folded in —
+   the panel is closed.)
 2. **Write the acceptance tests all three reviewers asked for** — two shapes:
    `sleep 2.4; exit 0` and `exec 1>&- 2>&-; sleep 10; exit 0`, both under
    `exec_timeout => "2"`, asserting compliance 0% and a `repair_timeout` class.
@@ -251,9 +273,12 @@ All reviewers who reported on B-8 rated it **security@** unprompted.
 3. **Close the two accepted-but-unfixed items on #5**: unchecked
    `setpgid()`/`getpgid()` returns (silent no-op on failure), and the
    parent-side `setpgid(pid, pid)` POSIX both-sides pattern.
-4. **Pin the mechanism for the open observation** (Evidence, last bullet)
-   before filing anything about it. The ALARM_PID theory is refuted — start
-   somewhere else.
+4. **File and fix the termination half** — a timed-out command is not always
+   terminated. Start from the `ALARM_PID` theory (`cf_pclose()` clears it
+   before `cf_pwait()`), which two reviewers reached independently and which
+   the `> Time out` log line supports; my contrary experiment is retracted and
+   working out what it actually measured is step one. Not yet filed as its own
+   issue. The reporting half is closed in #6.
 5. **Work [djbclark/core#7](https://github.com/djbclark/core/issues/7)** — its
    first unchecked box is the live one: confirm #4/#5/#6 build and pass against
    **stock** libntech `5b5d04e1`, not only against our patched `dc85a6f`. Not

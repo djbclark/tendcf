@@ -104,19 +104,20 @@ B-1's full evidence is in
   earlier draft of this register said B-2 goes to contact@, and separately
   argued B-1 could go to contact@ because the fork issue was already public;
   both were **wrong** and are superseded by the operator's instruction.
-- **OPEN, mechanism not established — `exec_timeout` may not bound wall clock
-  at all for a command that closes its output before it exits.** Measured:
-  `"/bin/sh" arglist => { "-c", "exec 1>&- 2>&-; sleep 10; exit 0" }` under
-  `exec_timeout => "2"` takes **~10.2s on stock 3.27.1** and ~12.1s on the
-  integration build. The read loop ends at EOF, so the wait happens inside
-  `cf_pclose()`/`cf_pwait()`. Gemini proposed `cf_pclose()`'s
-  `ALARM_PID = -1` (`pipes_unix.c:874`), which precedes `cf_pwait()`, as the
-  cause. That clear is real, **but the fix was implemented and measured and the
-  behaviour did not change** (10.3s), so the diagnosis is refuted and the
-  branch was discarded unfiled. Do not re-derive the ALARM_PID theory. Recorded
-  in [#6](https://github.com/djbclark/core/issues/6) and disclosed in the
-  security@ email as an observation only. Next step is to pin the actual
-  mechanism before filing anything.
+- **OPEN — a timed-out command is not always terminated. Mechanism SUPPORTED,
+  and my earlier "refuted" verdict is RETRACTED.** A command that closes its
+  output and then outlives `exec_timeout` runs to completion: `exec 1>&- 2>&-;
+  sleep 10; exit 0` under `exec_timeout => "2"` takes ~10.2s on **stock
+  3.27.1**. Gemini and Grok independently diagnosed `cf_pclose()` clearing
+  `ALARM_PID` before `cf_pwait()`, so `TimeOut()` fires with nothing to signal.
+  I implemented that change, saw no wall-clock movement, and **wrongly recorded
+  the theory as refuted**. Grok supplied the discriminator I missed: the two
+  branches of `TimeOut()` log differently, and this case prints `verbose: >
+  Time out`, which **is** the `ALARM_PID == -1` branch — confirmed on our own
+  build. **Start from the ALARM_PID theory; do not avoid it.** What was wrong
+  with my experiment is not yet known. The *reporting* half is closed
+  ([#6](https://github.com/djbclark/core/issues/6)); this is the *termination*
+  half and is not yet filed as its own issue.
 - **libntech submodule pointer stays uncommitted in `~/src/cfengine-core`** —
   not an external rule, and earlier notes overstated it as "required". The
   reason: the checkout sits at `dc85a6f` ("Handle digest initialization failure
