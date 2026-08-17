@@ -196,6 +196,35 @@ claim it does.
   it must be confirmed to build and pass against **stock** libntech — not yet
   done for B-1, B-2 or B-8. The tracking issue lives on `djbclark/core`
   because that is where the submodule pointer bites.
+- **B-10's panel is partly in. gemini: *ship as is*, severity `security@`** —
+  it argues "attacker-controlled" is accurate, since CMDB facts, external data
+  sources and `readjson()` inputs can be populated by unprivileged users or
+  third-party systems, so a crafted number is a persistent denial of service.
+  It confirmed our unverified belief that core's `rlist.c` and `iteration.c`
+  are twins, and **found a site we had missed**:
+  `libpromises/generic_agent.c:2051` reads `"timestamp"` from the
+  policy-validated file through `JsonPrimitiveGetAsInteger()`. Confirming that
+  turned up **a second one gemini also missed**, `libenv/unix_iface.c:1440`,
+  which reads a route `"metric"` the same way. Both fixed in core `367c27fc5`
+  — these two genuinely want an integer, so the repair is a non-fatal
+  conversion rather than keeping the text: an unreadable timestamp means "not
+  validated" and an unreadable metric simply does not win. gemini's one test
+  gap — `JsonSelect()` with an oversized all-digit index — is closed in
+  libntech `76856ee`.
+
+  **cursor: *ship with changes*,** four of them, agreeing the three crashes are
+  real and the fixes hold under measurement. Two are already done: the
+  `JsonSelect` overflow test (`76856ee`), and its warning not to treat this as
+  closing CFEngine because `rlist.c`/`iteration.c` still die until
+  `fix/json-number-rendering` lands. **Two remain open:** pin `1e400` → `inf`
+  versus lexeme in a test, whichever we actually mean; and say plainly, in the
+  filing and the email, that exponent *reals* still render through `%.2f`, so
+  `1e-8` mustaches to `0.00`, not `1e-8`. That last one matters — the fix turns
+  a fatal into a *lossy* result, and claiming otherwise would repeat exactly
+  the overstatement the P-3 panel caught us in.
+
+  **grok was still running.** Nothing goes upstream or to `security@` until it
+  reports — a quorum is not the gate.
 - **Two defects, four call sites, two repositories — and neither half is
   sufficient alone.** B-4 and B-10 are the same underlying mistake: *rendering a
   JSON number by converting it to a C numeric type and formatting it back,
