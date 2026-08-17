@@ -77,7 +77,9 @@ Legend: **done** · *pending* · — not applicable.
 | B-1 | Poll loops count iterations instead of measuring elapsed time, so the termination ladder overshoots ~4.5x on Darwin | core | **done** `26634ac1f` + `943d5371f` | **done** [`fix/exec-timeout-commands`](https://github.com/djbclark/core/tree/fix/exec-timeout-commands) | **done** [#4](https://github.com/djbclark/core/issues/4) | **done** 3-model panel; found 2 defects, both fixed; **withdrew the fail-open claim** | *pending* — **security@** | *pending* |
 | B-2 | Descendants not signalled on timeout; grandchild holds the pipe, so `exec_timeout` does not bound wall clock | core | **done** `cb2561584` + `847373cf6` | **done** [`fix/timeout-process-group`](https://github.com/djbclark/core/tree/fix/timeout-process-group) | **done** [#5](https://github.com/djbclark/core/issues/5) | **done** 3-model panel; all three refused the unconditional `setpgid`; regression found and fixed | *pending* — **security@** (in doubt → security) | *pending* |
 | B-3 | No `process_darwin.c`; macOS uses the stub, so `GetProcessState()` never reports ZOMBIE/STOPPED and `SafeKill()`'s PID-recycling guard is disabled | core | *not started* | — | **done** [#12](https://github.com/djbclark/core/issues/12) | *pending* | *pending* | *pending* |
-| B-4 | JSON reals truncated to 2 decimals (`0.00049` → `0.00`), including through mustache templating; `%.2f` and `%.4f` disagree | libntech | *not started* | — | **done** [libntech#2](https://github.com/djbclark/libntech/issues/2) | *pending* | *pending* | *pending* |
+| B-4 | JSON reals truncated to 2 decimals (`0.00049` → `0.00`), including through mustache templating; `%.2f` and `%.4f` disagree | libntech | **done** `fe1ace9` — **libntech half only**, core's `rlist.c`/`iteration.c` still truncate | **done** [`fix/json-real-precision`](https://github.com/djbclark/libntech/tree/fix/json-real-precision) | **done** [libntech#2](https://github.com/djbclark/libntech/issues/2) | *pending* | *pending* | *pending* |
+| B-10 | A **valid JSON number terminates the process**: exponent form without a dot (`1e-8`, `2e0`) is misclassified INTEGER, and integers past `long` overflow; both reach `StringToLongExitOnError()` → `DoCleanupAndExit()`. Measured on stock 3.27.1: `cf-promises` dies and **cf-agent falls back to failsafe** | libntech | **done** `f92cd1c` | **done** [`fix/json-number-fatal-exit`](https://github.com/djbclark/libntech/tree/fix/json-number-fatal-exit) | **done** [libntech#4](https://github.com/djbclark/libntech/issues/4) | *running* — fable-deep audit | *pending* — **security@** (availability; in doubt → security) | *pending* |
+| B-11 | `JsonRealCreate()` stores reals with `%.4f`, so **`JsonCopy()` changes a document's values**: `0.00049` → `0.0005`, `3.14159265` → `3.1416`. Measured; distinct from B-4, which is the render path | libntech | *not started* | — | *pending* | *pending* | *pending* | *pending* |
 | B-5a | Rejected CMDB file names no key, value or path — the `void *data` carrier already exists and is `ARG_UNUSED` | core | *not started* | — | **done** [#8](https://github.com/djbclark/core/issues/8) | *pending* | *pending* | *pending* |
 | B-5b | One bad key silently drops **every** variable on the host; agent then reports no failures | core | *not started* | — | **done** [#9](https://github.com/djbclark/core/issues/9) | *pending* | *pending* | *pending* |
 | B-6 | `eval()` returns `%lf` for integral results, so arithmetic cannot feed any function taking a count | core | *not started* | — | **done** [#10](https://github.com/djbclark/core/issues/10) | *pending* | *pending* | *pending* |
@@ -191,6 +193,21 @@ claim it does.
   it must be confirmed to build and pass against **stock** libntech — not yet
   done for B-1, B-2 or B-8. The tracking issue lives on `djbclark/core`
   because that is where the submodule pointer bites.
+- **P-3's panel has reported, unanimously: push a correction.** cursor, gemini
+  and grok all say the 21-line C patch itself holds — none could break the
+  control flow, the free handling or `hash_test`. What is wrong is the *package*
+  already in front of maintainers on
+  [#291](https://github.com/NorthernTechHQ/libntech/pull/291):
+  **(a)** the claim that this cannot be unit-tested without core's
+  `CryptoDeInitialize()` is **false** — cursor and grok independently forced
+  `EVP_DigestInit` to fail from a libntech-only harness (symbol override, and
+  an OpenSSL 3 provider drain), so the PR carries a false statement *and* is
+  missing a test it could have; **(b)** "feeds the TLS paths" overstates it —
+  peer TOFU uses `HashNewFromKey()`, which already fails closed; **(c)** gemini
+  alone adds that the patch ignores `EVP_DigestUpdate`/`EVP_DigestFinal`
+  failures in the very same functions. Severity is split 2–1 for ordinary bug
+  over `security@`. A fable-deep adjudication is running; **nothing goes to
+  maintainers until it reports**, per the whole-panel rule above.
 - **OPEN, and it is wrong on a live upstream PR right now — P-1 and P-2 cite
   ticket numbers that do not exist.** `00c98bc8b` carries `Ticket: #6295` and
   `8ee015c42` carries `Ticket: #6296`; both numbers **404** against
