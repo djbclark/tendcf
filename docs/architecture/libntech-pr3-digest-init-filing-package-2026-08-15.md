@@ -2,19 +2,32 @@
 
 **Status: reference record, kept in tendcf.** It documents work on the
 `djbclark/libntech` fork and must NOT be committed to the libntech branch or
-included in the upstream PR. Everything below is ready to paste.
+included in the upstream PR.
+
+> **SUPERSEDED IN PART, 2026-08-16.** This package was written to prepare a
+> filing that has since *happened*, by a different route than it plans for.
+> P-3 is now upstream as **issue
+> [NorthernTechHQ/libntech#290](https://github.com/NorthernTechHQ/libntech/issues/290)**
+> and **PR [#291](https://github.com/NorthernTechHQ/libntech/pull/291)** (both
+> opened by the operator, 2026-08-15 evening), so Part 1's Jira ticket and
+> Part 2's "ready to open" PR are **historical, not to-do**. Two concrete
+> corrections carried below: the commit is **`dc85a6f`**, not `da7d3d9` (the
+> commit was amended to carry `Ticket: #290`, orphaning the old SHA), and Jira
+> is not blocked-and-needed, it is simply unused. Part 3's verification record
+> and Part 4's credential notes remain accurate.
 
 ## Where this stands
 
 | Item | State |
 |---|---|
 | Fork | **`djbclark/libntech`** — created 2026-08-15 (did not exist before) |
-| Branch | `silent-digest-failure`, one commit `da7d3d9`, **pushed to the fork** |
+| Branch | `silent-digest-failure`, one commit `dc85a6f`, **pushed to the fork** |
 | Base | libntech master `0c0620d` — 1 ahead, **0 behind**, no rebase needed |
 | Build | clean; `hash_test` 6/6 pass |
-| Jira ticket | **BLOCKED** — needs an Atlassian API token (see "What is blocked") |
+| Jira ticket | **never filed, and not needed** — GitHub took it instead |
 | Fork PR | **djbclark/libntech#1** — review URL and diff |
-| Upstream PR | not opened; waits on the ticket number for the title |
+| Upstream issue | **[NorthernTechHQ/libntech#290](https://github.com/NorthernTechHQ/libntech/issues/290)**, open |
+| Upstream PR | **[NorthernTechHQ/libntech#291](https://github.com/NorthernTechHQ/libntech/pull/291)**, open, mergeable, CLA signed |
 
 Operator decisions taken 2026-08-15: file a real CFE Jira ticket (not
 ticketless), and own the fork under `djbclark` (not `frdminc`).
@@ -138,7 +151,7 @@ own sibling keeps the change an oversight repair rather than a new opinion.
   https://github.com/NorthernTechHQ/libntech/compare/master...djbclark:libntech:silent-digest-failure
 
   Commit:
-  https://github.com/djbclark/libntech/commit/da7d3d93d8d7b6e51c94cae1f8ac1ed1c6a21b6d
+  https://github.com/djbclark/libntech/commit/dc85a6f513091df3cae558cad126d334b90edafd
 
 The pull request above is on a fork, opened so the change has a stable review
 URL. Happy to open it against NorthernTechHQ/libntech directly whenever that
@@ -176,21 +189,37 @@ verbatim, *minus* the `Changelog:`/`Ticket:` trailers, which belong only in
 the commit. The commit body is already written and needs no edit; read it with:
 
 ```sh
-cd ~/src/cfengine-core/libntech && git log -1 --format=%B da7d3d9
+cd ~/src/cfengine-core/libntech && git log -1 --format=%B dc85a6f
 ```
 
-**One edit is required before opening the PR:** the commit currently carries
-the placeholder `Ticket: CFE-XXXX`. Amend it to the real number:
+**This edit has been made.** The commit carried the placeholder
+`Ticket: CFE-XXXX`; it was amended to `Ticket: #290` — the real upstream
+libntech issue — which is what orphaned `da7d3d9` in favour of `dc85a6f`. No
+further amend is needed for P-3.
 
 ```sh
-cd ~/src/cfengine-core/libntech
-git commit --amend            # replace CFE-XXXX with the real CFE number
-git push --force-with-lease fork silent-digest-failure
+cd ~/src/cfengine-core/libntech && git log -1 --format=%B dc85a6f | tail -3
+#   Changelog: Title
+#   Ticket: #290
 ```
 
 The commit keeps `Changelog: Title`, which is correct here — the behaviour
 change is user-visible (a previously silent wrong answer now reports itself)
-and it now has a ticket to reference.
+and it now has a real ticket to reference.
+
+> **P-1 and P-2 did NOT get this right, and it is still wrong upstream.**
+> Their commits carry `Ticket: #6295` and `Ticket: #6296`, and **neither
+> number exists** — `gh api repos/cfengine/core/issues/6295` → 404, likewise
+> 6296. `cfengine/core` has issues disabled, so no such ticket could have been
+> created; the numbers appear to have been guessed as "the next ones after our
+> PRs". Both commits are the heads of **live upstream pull requests**
+> ([#6293](https://github.com/cfengine/core/pull/6293),
+> [#6294](https://github.com/cfengine/core/pull/6294)). Neither commit carries
+> a `Changelog:` line, and this package's own Part 1 research established that
+> `Ticket:` is only *required* alongside `Changelog:` — so the correct repair
+> is to **drop the bogus trailer**, not invent another number. Doing so means
+> amending and force-pushing a branch that an upstream PR is built on, which
+> is operator's-call territory; tracked in the register.
 
 ### Two things a reviewer will raise, both answered in the commit already
 
@@ -303,16 +332,28 @@ in `~/ops`) or, once filing is done, by
 `sudo-secretspec delete ATLASSIAN_CFENGINE_API_TOKEN` followed by
 `undeclare`, in that order.
 
-**Then, in order:** amend `CFE-XXXX` → the real number, force-push to the
-fork, open the PR against `NorthernTechHQ/libntech` with the `CFE-NNNN:`
-title, and add the PR link back to the Jira ticket.
+**All of this is now done, by a different route.** The plan above was to amend
+`CFE-XXXX` to a Jira number and open the upstream PR titled `CFE-NNNN:`. What
+actually happened: upstream libntech **has GitHub issues enabled**, so the
+report was filed as issue
+[#290](https://github.com/NorthernTechHQ/libntech/issues/290), the commit was
+amended to `Ticket: #290`, and PR
+[#291](https://github.com/NorthernTechHQ/libntech/pull/291) was opened against
+`NorthernTechHQ/libntech` with the plain title. No Jira ticket exists or is
+needed. The `ATLASSIAN_CFENGINE_API_TOKEN` drift described above is therefore
+pure overhead now — deleting and undeclaring the token is the cheaper of the
+two resolutions, and nothing upstream depends on it.
 
 ## Related records
 
 - Handoff `d199` — `docs/handoffs/HANDOFF_standalone-3fd9_libntech-pr3-schema-panel_2026-08-15_d199.md`
 - PR 2 report — `docs/architecture/cfengine-pr2-simulate-json-report-2026-08-15.md`
 - PRs 1 and 2 live on `djbclark/core`, branches `simulate-keep-chroot`
-  (`5dbd295f6`) and `simulate-json` (`071f85987`). **Both still carry
-  `Ticket: CFE-XXXX` too.** Whether they share one ticket with each other, and
-  whether PR 3 shares it despite being a different repo in a different org, is
-  still an open operator decision.
+  (**`00c98bc8b`**) and `simulate-json` (**`8ee015c42`**) — the SHAs previously
+  given here, `5dbd295f6` and `071f85987`, were orphaned by an amend and reach
+  no branch. Both are now open upstream as
+  [cfengine/core#6293](https://github.com/cfengine/core/pull/6293) and
+  [#6294](https://github.com/cfengine/core/pull/6294). They no longer carry
+  `Ticket: CFE-XXXX`; they carry `Ticket: #6295` / `Ticket: #6296`, **neither
+  of which exists** (both 404). See the boxed note in Part 2. The
+  shared-ticket question is moot — there is no ticket to share.

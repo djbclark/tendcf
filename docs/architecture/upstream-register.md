@@ -2,24 +2,34 @@
 
 **Living document. Update it in the same commit that changes an item's state.**
 
-This exists because the channels we would normally file through are closed or
-broken, so our reports live in places upstream does not read yet:
+**CORRECTED 2026-08-16 (later session).** This document previously opened by
+asserting that every upstream channel was closed and that "nothing is filed on
+an upstream tracker yet". **Both statements were false when written**, and the
+error hid three live upstream contributions. What is actually true, verified
+against the GitHub API rather than restated from these notes:
 
-- `cfengine/core` has **GitHub Issues disabled** (Discussions only).
-- `NorthernTechHQ/libntech` has **Issues disabled** too. (Our own fork
-  `djbclark/libntech` had them disabled as well, which is why P-3 was filed as
-  a PR; the operator **enabled issues there on 2026-08-16**, so libntech items
-  from now on get the same issue-plus-branch shape as core items — B-4 is the
-  next one that needs it.)
-- The CFE Jira (`northerntech.atlassian.net`) needs an Atlassian API token we do
-  not have.
-- `CONTRIBUTING.md`'s contribution process is **out of date and deliberately not
-  followed** (operator instruction, 2026-08-16). The rest of that file — code
-  style, log levels, commit hygiene — still applies.
+| channel | reality | verified by |
+|---|---|---|
+| `cfengine/core` Issues | genuinely **disabled** | `gh api repos/cfengine/core` → `has_issues: false` |
+| `cfengine/core` Pull requests | **open, and we have two live there** | [#6293](https://github.com/cfengine/core/pull/6293), [#6294](https://github.com/cfengine/core/pull/6294) |
+| `NorthernTechHQ/libntech` Issues | **ENABLED** — the old claim that they were disabled was simply wrong | `gh api repos/NorthernTechHQ/libntech` → `has_issues: true`; our [#290](https://github.com/NorthernTechHQ/libntech/issues/290) is filed there |
+| `NorthernTechHQ/libntech` Pull requests | **open, and we have one live there** | [#291](https://github.com/NorthernTechHQ/libntech/pull/291) |
+| CFE Jira | still needs an Atlassian API token, and is **no longer on the critical path** — GitHub took all three items | — |
 
-So the register's job is to make every item **refilable on demand**: if Jira
-starts working, or upstream opens an issue tracker, everything below should be
-submittable without re-deriving anything.
+So the premise that motivated the fork-plus-email workaround **does not hold for
+ordinary bug reporting**. Upstream GitHub accepts our issues and our pull
+requests today. The fork-issue-plus-email shape remains correct for anything we
+are not ready to put in front of maintainers, and email remains the right
+channel for security-relevant items (B-1/B-2/B-8), but "we cannot file
+upstream" is not a reason available to us any more. **Check the tracker before
+asserting it is closed.**
+
+`CONTRIBUTING.md`'s contribution *process* is **out of date and deliberately not
+followed** (operator instruction, 2026-08-16). The rest of that file — code
+style, log levels, commit hygiene — still applies.
+
+The register's remaining job is to make every item **refilable on demand**:
+everything below should be submittable without re-deriving anything.
 
 ## Channels, and what "reported" currently means
 
@@ -51,7 +61,10 @@ correcting follow-up to an external security team. Wait for every reviewer. If
 one must be abandoned, cancel it explicitly and say in the email how many
 reviews informed the report; never send while one is still running.
 
-Nothing is filed on an upstream tracker yet, by necessity rather than choice.
+**Three items ARE filed upstream** — P-1, P-2 and P-3, all opened by the
+operator manually on 2026-08-15 evening and not recorded here until the
+2026-08-16 correction. An earlier version of this line claimed the opposite.
+Nothing is filed on the CFE Jira.
 
 ## Register
 
@@ -70,9 +83,9 @@ Legend: **done** · *pending* · — not applicable.
 | B-6 | `eval()` returns `%lf` for integral results, so arithmetic cannot feed any function taking a count | core | *not started* | — | **done** [#10](https://github.com/djbclark/core/issues/10) | *pending* | *pending* | *pending* |
 | B-7 | Dotted CMDB keys silently become scope paths, with no warning (**warn only** — do not change behaviour) | core | *not started* | — | **done** [#11](https://github.com/djbclark/core/issues/11) | *pending* | *pending* | *pending* |
 | B-8 | `commands:` promise that exceeded `exec_timeout` is reported **kept** — `RepairExec()` never returns `ACTION_RESULT_TIMEOUT`, so the promise is judged only on the child's exit status. **This is the actual fail-open**; B-1 only narrows its window | core | **done** `326bcdb8d` | **done** [`fix/exec-timeout-promise-result`](https://github.com/djbclark/core/tree/fix/exec-timeout-promise-result) | **done** [#6](https://github.com/djbclark/core/issues/6) | *pending* — found **by** the B-1/B-2 panel | *pending* — **security@** | *pending* |
-| P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** | `simulate-keep-chroot` `5dbd295f6` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | *unknown* | *pending* |
-| P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** | `simulate-json` `071f85987` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | *unknown* | *pending* |
-| P-3 | Silent digest-initialization failure when hashing | libntech | **done** `da7d3d9` | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) (PR) + [libntech#3](https://github.com/djbclark/libntech/issues/3) (issue) | *not done* | **done** (operator, manually) | *pending* |
+| P-1 | Retain the changes chroot after a `--simulate` run (feature) | core | **done** `00c98bc8b` | `simulate-keep-chroot` | **done** [#2](https://github.com/djbclark/core/issues/2) | *not done* | *unknown* | **DONE** [cfengine/core#6293](https://github.com/cfengine/core/pull/6293) — open, mergeable, CLA signed |
+| P-2 | `--simulate-json`: machine-readable rendering of the change set (feature) | core | **done** `8ee015c42` | `simulate-json` | **done** [#3](https://github.com/djbclark/core/issues/3) | *not done* | *unknown* | **DONE** [cfengine/core#6294](https://github.com/cfengine/core/pull/6294) — open, mergeable, CLA signed |
+| P-3 | Silent digest-initialization failure when hashing | libntech | **done** `dc85a6f` | `silent-digest-failure` | **done** [libntech#1](https://github.com/djbclark/libntech/pull/1) (PR) + [libntech#3](https://github.com/djbclark/libntech/issues/3) (issue) | *pending* — panel running 2026-08-16 | **done** (operator, manually) | **DONE** [NorthernTechHQ/libntech#290](https://github.com/NorthernTechHQ/libntech/issues/290) (issue) + [#291](https://github.com/NorthernTechHQ/libntech/pull/291) (PR) — open, mergeable, CLA signed |
 
 `djbclark/core` [#7](https://github.com/djbclark/core/issues/7) tracks the
 unmerged-libntech submodule dependency, and
@@ -83,6 +96,41 @@ B-2 through B-7 are described, measured and sourced in
 [`cfengine-upstream-candidates-2026-08-16.md`](cfengine-upstream-candidates-2026-08-16.md);
 B-1's full evidence is in
 [`cfengine-exec-timeout-filing-package-2026-08-16.md`](cfengine-exec-timeout-filing-package-2026-08-16.md).
+
+### Cite branch heads, not remembered SHAs
+
+All three P-item SHAs in the table above were **wrong** until 2026-08-16, in the
+same way: the commit was amended after the SHA was written down, so the register
+pointed at a commit that no branch reaches. The content was identical each time
+— only the message differed (P-3's amend replaced `Ticket: CFE-XXXX` with
+`Ticket: #290`) — which is exactly why it went unnoticed: every diff-based check
+passes, and only `git branch --contains` reveals it.
+
+| item | register said | actually | orphaned commit still exists locally? |
+|---|---|---|---|
+| P-1 | `5dbd295f6` | `00c98bc8b` | yes, unreferenced |
+| P-2 | `071f85987` | `8ee015c42` | yes, unreferenced |
+| P-3 | `da7d3d9` | `dc85a6f` | yes, unreferenced |
+
+The check that catches this, run against any SHA this document cites:
+
+```sh
+git branch -a --contains <sha>     # empty output = orphaned, the citation is dead
+```
+
+Prefer citing the **branch name** and resolving the head on demand. A SHA is
+only worth pinning when the point being made is about that specific commit.
+
+### Upstream CI on libntech#291
+
+`mender-test-bot` posted *"There was an error running your pipeline"* on
+[#291](https://github.com/NorthernTechHQ/libntech/pull/291), but **no check
+status was ever reported** (`gh pr checks 291` → "no checks reported";
+the combined status API returns `total_count: 0`). The linked log is a private
+GCP console URL we cannot read. So this is unattributable from outside and is
+most likely Northern.tech infrastructure rather than our patch — but it is
+**not evidence that our patch passes CI**, and nothing in this register should
+claim it does.
 
 ## Blocked on
 
@@ -143,9 +191,25 @@ B-1's full evidence is in
   it must be confirmed to build and pass against **stock** libntech — not yet
   done for B-1, B-2 or B-8. The tracking issue lives on `djbclark/core`
   because that is where the submodule pointer bites.
-- **Jira.** Every *pending* in the Upstream column is waiting on the same
-  Atlassian API token recorded against
-  [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md).
+- **OPEN, and it is wrong on a live upstream PR right now — P-1 and P-2 cite
+  ticket numbers that do not exist.** `00c98bc8b` carries `Ticket: #6295` and
+  `8ee015c42` carries `Ticket: #6296`; both numbers **404** against
+  `cfengine/core`, which has issues disabled and could not have had such
+  tickets. These commits are the heads of
+  [#6293](https://github.com/cfengine/core/pull/6293) and
+  [#6294](https://github.com/cfengine/core/pull/6294), so a maintainer reading
+  either PR sees a dangling reference. Neither commit carries a `Changelog:`
+  line, and per `CONTRIBUTING.md` (corroborated by 23 of the last 60 libntech
+  commits) `Ticket:` is only required alongside `Changelog:` — so the repair is
+  to **drop the trailer**, not to invent a number. Contrast P-3, which got this
+  right: `Ticket: #290` resolves to a real upstream issue.
+  **Needs the operator's approval before acting**, because fixing it means
+  amending and force-pushing branches that live upstream PRs are built on.
+- **Jira — no longer on the critical path.** P-1, P-2 and P-3 all reached
+  upstream through GitHub without it. The Atlassian API token recorded against
+  [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md) is still
+  unavailable, and that now costs us nothing for these items. Do not treat a
+  missing Jira token as a reason an item cannot be filed.
 
 ## Refiling checklist
 
