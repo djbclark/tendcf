@@ -6,7 +6,11 @@ This exists because the channels we would normally file through are closed or
 broken, so our reports live in places upstream does not read yet:
 
 - `cfengine/core` has **GitHub Issues disabled** (Discussions only).
-- `NorthernTechHQ/libntech` has **Issues disabled** too.
+- `NorthernTechHQ/libntech` has **Issues disabled** too. (Our own fork
+  `djbclark/libntech` had them disabled as well, which is why P-3 was filed as
+  a PR; the operator **enabled issues there on 2026-08-16**, so libntech items
+  from now on get the same issue-plus-branch shape as core items — B-4 is the
+  next one that needs it.)
 - The CFE Jira (`northerntech.atlassian.net`) needs an Atlassian API token we do
   not have.
 - `CONTRIBUTING.md`'s contribution process is **out of date and deliberately not
@@ -117,6 +121,13 @@ B-1's full evidence is in
   and is **not upstream**. `cfengine/core` records `5b5d04e1`. Committing the
   bump would put an unresolvable submodule reference into every core branch we
   offer upstream and entangle two contributions meant to land separately.
+- **Unmerged libntech dependency — [core#7](https://github.com/djbclark/core/issues/7).**
+  Our core branches are built and tested against libntech `dc85a6f` (our P-3
+  fix, `fork/silent-digest-failure`, offered as libntech PR #1 and not merged),
+  while upstream records `5b5d04e1`. Before any core branch is offered upstream
+  it must be confirmed to build and pass against **stock** libntech — not yet
+  done for B-1, B-2 or B-8. The tracking issue lives on `djbclark/core`
+  because that is where the submodule pointer bites.
 - **Jira.** Every *pending* in the Upstream column is waiting on the same
   Atlassian API token recorded against
   [PR 3](libntech-pr3-digest-init-filing-package-2026-08-15.md).
