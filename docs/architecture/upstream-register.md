@@ -515,6 +515,61 @@ claim it does.
   Each CFE key is linked back from its upstream PR/Discussion/issue and from
   its fork artifact, so the two never diverge.
 
+  ### Issue linking is not available to us — use URLs (2026-08-17)
+
+  **`Link Issues` is refused, permanently. Do not ask again.** The operator
+  asked Northern.tech and was told they do not grant that permission to
+  community reporters. Enumerated rather than guessed —
+  `GET /rest/api/3/mypermissions?projectKey=CFE`:
+
+  | permission | granted |
+  |---|---|
+  | `CREATE_ISSUES`, `EDIT_ISSUES`, `ADD_COMMENTS` | **yes** |
+  | `CREATE_ATTACHMENTS`, `TRANSITION_ISSUES`, `BROWSE_PROJECTS` | **yes** |
+  | `LINK_ISSUES` | **no** |
+  | `MANAGE_WATCHERS`, `SCHEDULE_ISSUES`, `SET_ISSUE_SECURITY` | no |
+
+  **Remote/web links are gated on the same permission** — they are not a way
+  round it. `POST /rest/api/2/issue/CFE-4715/remotelink` returns
+  **HTTP 403** `No Link Issue Permission`. (Probed with a disposable
+  `globalId`; the 403 meant nothing was created.)
+
+  So relationships are carried as **plain URLs in the description**, which needs
+  only `EDIT_ISSUES`. Every one of the 15 tickets now ends with an
+  `h3. References` section holding, as appropriate: its related tickets as
+  `browse/CFE-####` URLs, its `Public working record:` GitHub URLs, and a
+  wiki-markup link to a JQL query returning the whole set. The query names the
+  keys explicitly, so it carries **no Atlassian accountId** and is safe to
+  reproduce in this public repo:
+
+  ```
+  https://northerntech.atlassian.net/issues/?jql=key+in+(CFE-4715,+...,+CFE-4729)+ORDER+BY+key+ASC
+  ```
+
+  Verified anonymously (HTTP 200, 15 keys) — and note **`/rest/api/2/search` is
+  now HTTP 410**; the live endpoint is `/rest/api/3/search/jql`.
+
+  The clusters the URLs encode, chosen where items share a code area or a
+  landing dependency rather than merely a theme: `CFE-4715`+`CFE-4716`
+  (`--simulate`); `CFE-4719`+`CFE-4720`+`CFE-4722` (CMDB);
+  `CFE-4724`+`CFE-4725` (JSON numbers, two repos, two PRs);
+  `CFE-4726`+`CFE-4727`+`CFE-4728`+`CFE-4729` (`exec_timeout`). `CFE-4717`,
+  `CFE-4718`, `CFE-4721` and `CFE-4723` stand alone, with `CFE-4721` carrying a
+  "see also" to `CFE-4724` as related-but-not-duplicate.
+
+  **Correction to this register's own record.** It previously said the sibling
+  keys had been written into the descriptions as the workaround. Audited
+  2026-08-17: that had only happened on **6 of 15** tickets, asymmetrically
+  (`4719`↔`4720` and `4724`↔`4725` both ways; `4727`→`4726`, `4728`→`4726`,
+  `4729`→`4728` one way only), with **zero** browse URLs, **zero** labels, and
+  **seven** tickets — `4718`–`4723` and `4727` — carrying no GitHub artifact
+  link at all. All of that is now filled in and read back from stored state.
+
+  **Labels were deliberately not used.** A shared label would have been the
+  other way to make the set retrievable, but the reporter is already visible on
+  every ticket, so reporter-scoped JQL retrieves the same set without adding
+  a foreign label to someone else's board.
+
 ## Refiling checklist
 
 The tracker is open (CFE Jira, 2026-08-17). Each item needs, in this order:
@@ -531,6 +586,12 @@ The tracker is open (CFE Jira, 2026-08-17). Each item needs, in this order:
    for a ticket you have not seen exist.
 3. This register updated in the same commit, and the fork artifact commented to
    point at the CFE key so the two never diverge.
+4. An `h3. References` section on the ticket carrying its relationships as
+   **URLs** — related `browse/CFE-####` keys, the `Public working record:`
+   GitHub URLs, and the all-15 JQL link. Do **not** reach for
+   `POST /rest/api/3/issueLink` or `/remotelink`: both need `Link Issues`,
+   which Northern.tech does not grant us and which the operator has already
+   asked for and been refused.
 
 Do **not** rewrite history on the fork branches to suit a new tracker's
 conventions — the fork commits are what our own builds are tested against, and
