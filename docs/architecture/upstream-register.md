@@ -223,8 +223,36 @@ claim it does.
   a fatal into a *lossy* result, and claiming otherwise would repeat exactly
   the overstatement the P-3 panel caught us in.
 
-  **grok was still running.** Nothing goes upstream or to `security@` until it
-  reports — a quorum is not the gate.
+  **grok: *ship with changes*, severity `security@`** — the panel is now
+  **COMPLETE** (fable-deep, gemini, cursor, grok). Consensus severity is
+  `security@` on availability, and grok sharpened the threat statement in a way
+  the filing should adopt verbatim: *"attacker-controlled" is overstated for a
+  remote exploit; it is honest for a CMDB operator, a `readjson()` of
+  third-party JSON, or an author who writes scientific notation by mistake.*
+  A primitive `1e-8` in `def.json` or `host_specific.json` is enough to make
+  `cf-promises` exit before any promise body runs.
+
+  **grok found one thing nobody else did, and it is a real defect, not a
+  disclosure item: `1e400` now renders as `inf`, which is not JSON.**
+  `JsonWriteCompact()` still emits `1e400`, so render and serialise disagree
+  again — the exact class of inconsistency this whole change set exists to
+  remove. Earlier reviewers waved `inf` through as "acceptable but disclose";
+  grok is right that emitting a non-JSON token is worse than that.
+
+  ### B-10's remaining work before it goes upstream or to `security@`
+
+  1. **Fix `1e400` → `inf`** (grok), or decide deliberately and pin it in a
+     test either way (cursor).
+  2. **Say plainly that exponent reals still render through `%.2f`**, so `1e-8`
+     mustaches to `0.00`. The fix turns a fatal into a *lossy* result and the
+     filing must not overclaim (cursor, grok).
+  3. **Add mustache coverage** — there is no mustache test binary in libntech,
+     so this needs a proposal, not an invention inside this PR (grok,
+     fable-deep).
+  4. **Verify the core twin branch** `fix/json-number-rendering`. Until it
+     lands, a CMDB *array* of `9223372036854775808` still kills the agent even
+     with the libntech patch applied (grok). It is committed but still has only
+     a syntax check behind it.
 - **Two defects, four call sites, two repositories — and neither half is
   sufficient alone.** B-4 and B-10 are the same underlying mistake: *rendering a
   JSON number by converting it to a C numeric type and formatting it back,
