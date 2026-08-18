@@ -731,7 +731,7 @@ Finished code sitting on a fork branch is not shared. Audited every branch on
 | `fix/exec-timeout-promise-result` | superseded — tree is **byte-identical** to `fix/exec-timeout-promise-outcome` (#6299) |
 | `fix/timeout-process-group` | absorbed — both commits are in #6305 |
 | `fix/json-number-rendering` | **blocked, correctly.** Points the `libntech` submodule at `5b5d04e19`, which is only on the unmerged PRs [#291](https://github.com/NorthernTechHQ/libntech/pull/291)/[#294](https://github.com/NorthernTechHQ/libntech/pull/294) branches, not on libntech master (`0c0620d`). A core PR would show the submodule regressing. This is what [djbclark/core#7](https://github.com/djbclark/core/issues/7) tracks. Open it once #294 merges |
-| `pr-getopt-optstring-fixes` | **unshared and not ready** — see below |
+| `pr-getopt-optstring-fixes` | **PR [#6313](https://github.com/cfengine/core/pull/6313)**, ticket [CFE-4736](https://northerntech.atlassian.net/browse/CFE-4736) — re-authored, audited, extended and shipped 2026-08-18; see below |
 | `tendcf-integration` | ours, never for upstream |
 | libntech `silent-digest-failure` / `fix/json-string-codec` / `fix/json-number-handling` | already PRs #291 / #293 / #294 |
 
@@ -739,7 +739,7 @@ Three of the six above are **stacked** on #6305's series, so each shows 10–11
 commits against master. Each PR body names the single commit that is actually
 new and states what it depends on.
 
-### `pr-getopt-optstring-fixes` — held back deliberately
+### `pr-getopt-optstring-fixes` — resolved, shipped as CFE-4736 / #6313
 
 Ten commits from **2026-07-31**, predating this register: getopt short-option
 string fixes across `cf-check`, `cf-execd`, `cf-monitord`, `cf-net`,
@@ -760,3 +760,36 @@ prerequisites:
 
 It is not "in doubt", it is "known not ready", which is why the standing order
 does not apply. Fixing 1–3 is a small task and should be scheduled.
+
+**Resolution, same day.** The operator directed that the commits be re-attributed
+to `Daniel Joseph Barnhart Clark <djbclark@gmail.com>` and confirmed that upstream
+understands and accepts his multi-AI vetting process, which removes the authorship
+objection (the AI involvement was never the problem; the author field was). All 12
+commits now carry that single author.
+
+Rather than post the partial fix, the audit was **completed first**. A checker was
+written that pairs each `getopt_long()` call site with the `struct option` table it
+actually references, resolving the option-string variable to its *nearest preceding*
+definition. Both refinements mattered — pairing naively per file reports `cf-net`'s
+`-o/--output` and `-j/--jobs` as missing when they are correctly declared in
+subcommand-local tables with their own option strings. Two rounds of false positives
+were found and removed this way before anything was filed.
+
+Findings the original branch did **not** cover, now fixed: duplicate `V` and bare `g`
+in `cf-execd`, duplicate `g:` in `cf-promises` (all provably dead — `getopt_long()`
+matches the first occurrence, so behaviour is unchanged, and this was confirmed by
+running the rebuilt binaries).
+
+Two findings were deliberately **not** patched and were raised as questions instead.
+`cf-agent`'s `-x/--self-diagnostics` and `cf-check`'s `-h/--help` both declare
+`optional_argument` against a bare character in the option string — but **neither
+handler reads `optarg`** (`cf-check.c:166`, `cf-agent.c:649` both print and exit).
+So the *table* is the wrong side, and the mechanical "fix the option string to `h::`"
+would have advertised an argument that is silently discarded, i.e. worse than the
+status quo. Both reconciliations are user-visible, so the choice was left upstream.
+
+Verified by running, not only reading: `cf-check -V` prints the version (previously
+"unrecognized option"), `cf-secret -v` enables verbose logging, `cf-testd -r` now
+correctly *demands* its argument, and `cf-execd -V` / `-g info` are unchanged after
+the duplicate removal. `tests/acceptance/mock_package_manager.c` passes a literal
+`""` and is intentionally long-options-only — excluded, not a defect.
