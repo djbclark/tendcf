@@ -159,6 +159,58 @@ most likely Northern.tech infrastructure rather than our patch — but it is
 **not evidence that our patch passes CI**, and nothing in this register should
 claim it does.
 
+### 2026-08-18 — FIRST MAINTAINER ENGAGEMENT, on two PRs the same day
+
+After weeks in which every open PR drew nothing but `CLAassistant`,
+`mender-test-bot` and our own comments, two real Northern.tech maintainers
+reviewed on 2026-08-18. **The "zero maintainer engagement" line that ran
+through every prior session's notes is now false and must not be repeated.**
+
+- **[libntech#291](https://github.com/NorthernTechHQ/libntech/pull/291) —
+  `larsewi`, 10:51Z**, a substantive review: return `bool` from
+  `HashFile_Stream`/`HashFile`; also check `EVP_DigestUpdate`/
+  `EVP_DigestFinal_ex`; why did `HashBasicInit()` move; the test "seems a bit
+  overkill for an error path that should never happen — how did you come
+  across it?"; and **shorten the commit message**.
+
+  All addressed and force-pushed as `8023f452a` (was `4642a502f`), reply
+  [`#issuecomment-5330023350`](https://github.com/NorthernTechHQ/libntech/pull/291#issuecomment-5330023350).
+  Commit message cut **70 lines → 19**.
+
+  **`HashPubKey` was deliberately NOT converted**, and the reason is load-
+  bearing: `cfengine/core` redefines it as `void` in three places
+  (`tests/unit/lastseen_test.c:676`, `tests/unit/lastseen_migration_test.c:279`,
+  `tests/load/lastseen_load.c:98`), so a signature change breaks core's build
+  until a matching core PR lands. `HashFile` has **no** such stubs — verified
+  for real by dropping the patch into core's vendored libntech, force-rebuilding
+  all ten `HashFile` callers plus core's `tests/unit`, clean, then restoring the
+  submodule.
+
+  Provenance given to larsewi, corrected by the operator mid-session: this was
+  **not** static analysis and **not** a field incident — it was hit while
+  building the `--simulate` work now open as `#6293`/`#6294`, writing unit tests
+  for a schema linter over that output, with hashes silently all-zero. Earlier
+  drafts framed it as an audit finding; that framing was wrong.
+
+- **[cfengine/core#6305](https://github.com/cfengine/core/pull/6305) —
+  `nickanderson`, 12:28Z**, one inline note on `cf-agent/verify_exec.c:454`:
+  *"It feels a bit comment heavy. Probably 'terse' comments will be sufficient
+  in most cases."* Trimmed across the whole diff as `0e06ad3d7` (−37 lines,
+  comment volume roughly halved), left as a **separate** commit so his thread
+  stays anchored, with an offer to squash. Proved comment-only by comparing the
+  comment-stripped token stream: byte-identical in all four files.
+
+**Both reviewers independently asked for less verbosity.** With the earlier
+"be terse" feedback that is three data points on one axis — treat word volume
+as a defect, in commit messages, comments and PR replies alike.
+
+### 2026-08-18 — the acceptance suite does not run on this machine
+
+`tests/acceptance/testall` needs `fakeroot`, which is not installed: a run
+reports **0 passed / 0 failed / 2558 skipped** and exit 0. That is a vacuous
+green. Do not cite an acceptance run as evidence here without checking the
+passed count is non-zero.
+
 ## Blocked on
 
 - **Email — the remaining gate for B-1, B-2 and B-8.** Emailing is **not
