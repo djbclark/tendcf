@@ -989,6 +989,27 @@ privilege **fail rather than skip**: `01_vars/02_functions` under it gives
 environmental failures, confirmed against unmodified upstream. A directory that
 "passes" under `--gainroot=env` is only evidence for the subset not needing root.
 
+## First maintainer review, 2026-08-18
+
+nickanderson (MEMBER) reviewed two PRs same day. #6305 (B-17-family): inline
+comment-density note on `verify_exec.c`, fixed same day in `0e06ad3d7`
+(pushed before this review cycle), no further action. #6308 (B-15/CFE-4732):
+**CHANGES_REQUESTED** — commit message didn't follow cfengine style
+(past-tense subject, no `fix:` prefix, `Changelog:`/`Ticket:` trailers), plus
+an inline suggestion collapsing a 6-line comment to one line, plus a general
+comment on prose volume: "This one is like 100 characters of prose ... per
+character of code... Bite sized PRs that are demonstrated issues (existing
+bugs with reports from users) are likely to go in easier than PRs that are
+very large which have not been reported by users."
+
+Addressed same session: commit message rewritten and amended
+(`190f869a5` → `9dd5eb51c`, force-pushed), comment shrunk per the suggestion,
+PR description cut to defect + fix + why-no-test, replied on the PR. Recorded
+as a standing rule (auto-memory `be-terse-upstream-asked`, now covers two
+independent instances): terser prose everywhere upstream-facing, cfengine's
+own commit trailer style (not ours), and a preference going forward for small
+PRs on demonstrated user-reported bugs over large self-discovered ones.
+
 ### Cross-worktree contamination between parallel subagents
 
 While three subagents worked in parallel worktrees, one agent's file was
