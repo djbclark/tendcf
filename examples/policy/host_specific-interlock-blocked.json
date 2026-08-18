@@ -1,0 +1,33 @@
+{
+  "vars": {
+    "tendcf_interlock": {
+      "gate-always-fails": {
+        "blocks": "enclosing-bundle",
+        "bundle": "gated",
+        "defines_class": "gate_ok",
+        "pre_action": {
+          "command": ["/bin/false"],
+          "expect_exit": 0,
+          "timeout_seconds": 5
+        },
+        "report": true,
+        "state": "present"
+      }
+    },
+    "tendcf_service": {
+      "com.tendcf.gated.main": {
+        "bundle": "gated",
+        "command": ["/bin/true"],
+        "run_as": "nobody",
+        "state": "present",
+        "unit": {
+          "launchd": {
+            "keep_alive": false,
+            "run_at_load": false
+          }
+        },
+        "working_dir": "/"
+      }
+    }
+  }
+}

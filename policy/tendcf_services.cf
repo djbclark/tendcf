@@ -1,0 +1,147 @@
+# tendcf's generic bundle (v1, launchd only).
+#
+# Reads $(data:variables.tendcf_service) / $(data:variables.tendcf_interlock)
+# -- the data containers CFEngine's CMDB loader (LoadCMDBData/ReadCMDBVars in
+# libpromises/cmdb.c) installs from $(sys.workdir)/data/host_specific.json's
+# top-level "vars" key. Bare (unprefixed) CMDB keys default to namespace
+# "data", scope "variables" (cmdb.c:GetCMDBVariableRef) -- confirmed against
+# a real build, not assumed: an earlier draft of this file guessed the
+# augments-loader's `def.*` scope, which is a DIFFERENT loader
+# (LoadAugmentsData, used for def.json) that never runs on this file.
+#
+# host_specific.json is projector output and is policy-free: it only copies
+# `state` verbatim per entry (goal-file-schema-reconciliation-2026-08-15.md,
+# projector-reconciliation-2026-08-16.md C-1). Every decision below --
+# present vs absent, whether an interlock's guard is met -- is this bundle's
+# job, not the projector's.
+#
+# Interlocks are bundle-scoped refusal (architecture-DEFINITIVE-v3.md
+# S7 / D16): an unmet interlock blocks every entry tagged with the same
+# `bundle` name, not only the entries that reference the interlock
+# directly. There is no literal per-service `bundle agent` -- nothing
+# generates those -- so the scoping is reproduced with one guard class
+# per distinct `bundle` tag (interlock_blocked_<tag>), computed once and
+# checked by every entry carrying that tag.
+#
+# Entry ids and bundle tags are NOT valid CFEngine class-name fragments as
+# written: the schema allows `.`/`-`/`@` (service ids can be a launchd
+# label like "com.tendcf.caddy.main"; bundle tags are lowercase-kebab).
+# CFEngine class names accept neither, confirmed against a real build
+# ("Context string is invalid/out of range" on a raw hyphenated class).
+# Every id/tag that becomes PART OF a class name goes through canonify()
+# into its own variable first; raw ids are kept for data lookups and the
+# rendered plist Label, where the real, uncanonified value is required.
+
+bundle agent tendcf_services
+{
+  vars:
+      "service_ids"
+        slist => getindices("data:variables.tendcf_service");
+
+      "interlock_ids"
+        slist => getindices("data:variables.tendcf_interlock");
+
+      "service_canon[$(service_ids)]"
+        string => canonify("$(service_ids)");
+
+      "interlock_canon[$(interlock_ids)]"
+        string => canonify("$(interlock_ids)");
+
+      "service_bundle_canon[$(service_ids)]"
+        string => canonify(
+          "$(data:variables.tendcf_service[$(service_ids)][bundle])");
+
+      "interlock_bundle_canon[$(interlock_ids)]"
+        string => canonify(
+          "$(data:variables.tendcf_interlock[$(interlock_ids)][bundle])");
+
+  classes:
+      # state dispatch -- the one place this bundle inspects an entry's
+      # value to pick a promise, which C-1 says belongs here and nowhere
+      # upstream of it.
+      "service_$(service_canon[$(service_ids)])_present"
+        expression => strcmp("$(data:variables.tendcf_service[$(service_ids)][state])",
+                              "present");
+
+  vars:
+      # commands: promise runs <promiser> <arglist...>, and non-scalar
+      # attributes (arglist, template_data below) can't take an indexed
+      # data-container element directly -- CFEngine rejects "container
+      # assigned to an indexed variable name" for that, and neither `@()`
+      # nor bare `$()` accept a bracket path as a full non-scalar rvalue
+      # (confirmed against a real build; both give parse errors, not just
+      # a hunch). join() over the container path (a proven idiom: pass
+      # the path as a plain string, CFEngine resolves it) sidesteps that,
+      # at the cost of shell-quoting argv back together -- acceptable
+      # here since pre_action.command comes from our own schema-validated
+      # goal file, not attacker input, but a real limitation worth
+      # flagging: an argv element containing a space or shell
+      # metacharacter is not currently isolated.
+      "pre_action_cmd[$(interlock_ids)]"
+        string => join(" ",
+          "data:variables.tendcf_interlock[$(interlock_ids)][pre_action][command]");
+
+  commands:
+      # pre_action: run the interlock's check under its own timeout, and
+      # classify strictly by the entry's own expect_exit -- not bare
+      # zero, since the schema allows any code 0-255.
+      "$(pre_action_cmd[$(interlock_ids)])"
+        contain => tendcf_interlock_contain(
+          "$(data:variables.tendcf_interlock[$(interlock_ids)][pre_action][timeout_seconds])"),
+        classes => tendcf_interlock_result(
+          "interlock_ok_$(interlock_canon[$(interlock_ids)])",
+          "$(data:variables.tendcf_interlock[$(interlock_ids)][pre_action][expect_exit])");
+
+  classes:
+      # Bundle-scoped blast radius: named by the interlock's OWN bundle
+      # tag, not by which service references it, so N interlocks sharing
+      # one tag OR together with no join against the service list.
+      "interlock_blocked_$(interlock_bundle_canon[$(interlock_ids)])"
+        expression => "!interlock_ok_$(interlock_canon[$(interlock_ids)])";
+
+  files:
+      "/Library/LaunchDaemons/$(service_ids).plist"
+        create => "true",
+        edit_template => "$(this.promise_dirname)/templates/launchd.plist.mustache",
+        template_method => "mustache",
+        template_data => mergedata("data:variables.tendcf_service[$(service_ids)]",
+                                    '{"id": "$(service_ids)"}'),
+        ifvarclass => "service_$(service_canon[$(service_ids)])_present.!interlock_blocked_$(service_bundle_canon[$(service_ids)])";
+
+      "/Library/LaunchDaemons/$(service_ids).plist"
+        delete => tendcf_tidy,
+        ifvarclass => "!service_$(service_canon[$(service_ids)])_present";
+
+  commands:
+      "/bin/launchctl"
+        arglist => { "load", "-w", "/Library/LaunchDaemons/$(service_ids).plist" },
+        ifvarclass => "service_$(service_canon[$(service_ids)])_present.!interlock_blocked_$(service_bundle_canon[$(service_ids)])";
+
+      "/bin/launchctl"
+        arglist => { "unload", "/Library/LaunchDaemons/$(service_ids).plist" },
+        ifvarclass => "!service_$(service_canon[$(service_ids)])_present";
+
+  reports:
+      "interlock_blocked_$(interlock_bundle_canon[$(interlock_ids)])"::
+        "tendcf: interlock '$(interlock_ids)' not satisfied, bundle '$(data:variables.tendcf_interlock[$(interlock_ids)][bundle])' refused";
+}
+
+body contain tendcf_interlock_contain(timeout)
+{
+      useshell     => "true";
+      exec_timeout => "$(timeout)";
+}
+
+body delete tendcf_tidy
+{
+      dirlinks => "delete";
+      rmdirs   => "true";
+}
+
+body classes tendcf_interlock_result(class, code)
+{
+      kept_returncodes     => { "$(code)" };
+      repaired_returncodes => { "$(code)" };
+      promise_kept         => { "$(class)" };
+      promise_repaired     => { "$(class)" };
+}
