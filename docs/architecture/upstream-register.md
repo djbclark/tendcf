@@ -819,3 +819,73 @@ is why `rlist_test` sits on the macOS `XFAIL_TESTS` list. Pre-existing, unrelate
 **Lesson:** "developed against X" is not the same claim as "requires X", and the
 difference is one rebase and one build. [djbclark/core#7](https://github.com/djbclark/core/issues/7)'s premise should be
 re-checked the same way for any other branch it covers, rather than assumed.
+
+## Test-coverage audit, 2026-08-18
+
+Operator asked whether we have been writing tests for what we find, given that
+the number of open items makes regressions hard to track. Audited every
+submitted branch rather than answering from memory.
+
+**15 of 17 branches ship tests.** `cfengine/core` has 80 unit-test `.c` files
+and 32 acceptance directories; `CONTRIBUTING.md` requires unit tests for C
+functions and acceptance tests for promise types.
+
+| branch / PR | test |
+|---|---|
+| #6309 B-16 | new `tests/unit/unix_test.c` |
+| #6314 CFE-4737 | `test_from_container_numbers` in `rlist_test.c` |
+| #6310 B-17 | `test_pclose_leaves_the_alarm_its_process` + acceptance |
+| #6311 B-18 | unit 6/6 → 10/10 + acceptance |
+| #6312 B-19 | `test_leftover_alarm_does_not_kill_next_child` |
+| #6300 / #6302 | `process_terminate_unix_test.c` / new `unix_iface_test.c` |
+| #6299, #6305, #6293, #6294 | acceptance tests |
+| libntech #291 / #293 / #294 | new `hash_init_fail_test.c` / `json_test.c` additions |
+| #6307 B-3 | no new test **by design** — removes `process_test` from the macOS `XFAIL_TESTS`, so an existing upstream test now guards the change. Arguably the strongest outcome, but a distinct category from "wrote a test" |
+| **#6313 CFE-4736** | **gap closed this session** — see below |
+| **#6308 B-15** | **gap documented, not closeable** — see below |
+
+Beyond mere existence, the bar has been **discrimination**: proving the test
+fails without the fix. B-19's panel disproved an "untestable" claim outright;
+CFE-4737's test does not merely fail on unpatched code, it takes the process
+down with `StringToLongExitOnError`.
+
+### #6313 — closed with a class-killing test
+
+`tests/unit/getopt_optstring_test.sh` (POSIX sh + awk, no python: CFEngine
+targets AIX/Solaris/HP-UX and the existing `check_SCRIPTS` are all shell).
+Parses each `getopt_long()` call site, pairs it with the table it *names*, and
+requires every table character to be present in that call's option string.
+
+Two design points, both learned by getting it wrong first:
+
+1. **Pairing must be per call site, not per file.** `cf-net` has three call
+   sites, two of whose tables share the name `longopts`; a file-wide compare
+   reports its subcommand-local `-o`/`-j` as missing. Caught on the first run.
+2. **Silent skips are the real hazard.** The parser skips what it cannot
+   understand so it can never break the build — but a file that calls
+   `getopt_long()` and yields no usable call site now **exits 2** rather than
+   passing quietly. Verified by renaming a table so the parser could not find
+   it. Without this the test would have reported success while checking almost
+   nothing, which is how it behaved before two parser bugs were fixed
+   (`cf-testd`'s `{NULL, …}};` sentinel sharing a line, and a trailing comma
+   making a wrapped call look complete).
+
+Discriminates: silent on the branch, reports **all ten** faults on unpatched
+master. `PASS: getopt_optstring_test.sh`, all 68 tests behaved as expected.
+
+### #6308 — not unit-testable, and said so upstream
+
+Deliberately **not** given a manufactured test, because a test that does not
+reach the fix is worse than none — it is exactly the false confidence this
+audit was asking about. `ReconcileMountOptions()` links, but: under a dry run
+it returns at `nfs.c:1399` via `MakingInternalChanges()` *before* the arm/disarm
+code; without one it runs a real `mount -o remount`; `VMOUNTCOMM` is
+`static const char *const` at `nfs.c:64` so it cannot be redirected; and
+`nfs_test` covers only pure string helpers. Recorded on the PR and in
+CFE-4732 (comment 159443) with the minimal seam that would make it testable,
+left as upstream's call.
+
+*Correction to an earlier claim in this register:* I had justified this as "the
+nfs.c family isn't testable". Too strong — `nfs_test` exists
+(`tests/unit/Makefile.am:421`). The accurate statement is that *this function*
+is out of reach of the existing pattern.
