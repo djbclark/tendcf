@@ -730,7 +730,7 @@ Finished code sitting on a fork branch is not shared. Audited every branch on
 | `fix/exec-timeout-commands` | superseded — tree is **byte-identical** to `fix/exec-timeout-poll-deadline` (#6300) |
 | `fix/exec-timeout-promise-result` | superseded — tree is **byte-identical** to `fix/exec-timeout-promise-outcome` (#6299) |
 | `fix/timeout-process-group` | absorbed — both commits are in #6305 |
-| `fix/json-number-rendering` | **blocked, correctly.** Points the `libntech` submodule at `5b5d04e19`, which is only on the unmerged PRs [#291](https://github.com/NorthernTechHQ/libntech/pull/291)/[#294](https://github.com/NorthernTechHQ/libntech/pull/294) branches, not on libntech master (`0c0620d`). A core PR would show the submodule regressing. This is what [djbclark/core#7](https://github.com/djbclark/core/issues/7) tracks. Open it once #294 merges |
+| `fix/json-number-rendering` | **PR [#6314](https://github.com/cfengine/core/pull/6314)**, ticket [CFE-4737](https://northerntech.atlassian.net/browse/CFE-4737). **My earlier "correctly blocked" call was wrong** — corrected same day, see below |
 | `pr-getopt-optstring-fixes` | **PR [#6313](https://github.com/cfengine/core/pull/6313)**, ticket [CFE-4736](https://northerntech.atlassian.net/browse/CFE-4736) — re-authored, audited, extended and shipped 2026-08-18; see below |
 | `tendcf-integration` | ours, never for upstream |
 | libntech `silent-digest-failure` / `fix/json-string-codec` / `fix/json-number-handling` | already PRs #291 / #293 / #294 |
@@ -793,3 +793,29 @@ Verified by running, not only reading: `cf-check -V` prints the version (previou
 correctly *demands* its argument, and `cf-execd -V` / `-g info` are unchanged after
 the duplicate removal. `tests/acceptance/mock_package_manager.c` passes a literal
 `""` and is intentionally long-options-only — excluded, not a defect.
+
+### `fix/json-number-rendering` was never actually blocked
+
+Recorded because the mistake is instructive. I marked this branch blocked on
+libntech [#294](https://github.com/NorthernTechHQ/libntech/pull/294) because it had been *developed* against an
+unmerged libntech commit (`5b5d04e19`), and inferred a build dependency from
+that. I never tested the inference.
+
+It does not hold. `JsonPrimitiveGetAsString()` — the function the fix switches
+to — **already exists on libntech master** (`libutils/json.h:246`), and master
+already creates primitives from the parsed text buffer (`json.c:2377`), which is
+the property the fix relies on.
+
+Verified rather than re-reasoned: rebased the three commits onto current
+upstream master, which brings the `libntech` submodule pointer to master's own
+`0c0620d` (the diff is then 5 source files and **no** submodule change), built
+clean with zero errors, and ran the fix's own new test — `test_from_container_numbers`
+passes against libntech master.
+
+`rlist_test` does abort later at `rlist.c:135` in `test_rval_to_scalar2`, but a
+control run on unpatched upstream master aborts at exactly the same place, which
+is why `rlist_test` sits on the macOS `XFAIL_TESTS` list. Pre-existing, unrelated.
+
+**Lesson:** "developed against X" is not the same claim as "requires X", and the
+difference is one rebase and one build. [djbclark/core#7](https://github.com/djbclark/core/issues/7)'s premise should be
+re-checked the same way for any other branch it covers, rather than assumed.
