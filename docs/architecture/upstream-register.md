@@ -826,7 +826,10 @@ Operator asked whether we have been writing tests for what we find, given that
 the number of open items makes regressions hard to track. Audited every
 submitted branch rather than answering from memory.
 
-**15 of 17 branches ship tests.** `cfengine/core` has 80 unit-test `.c` files
+**16 of 17 branches ship tests** — 15 when this audit started, plus the
+regression test added to #6313 below. The single remaining gap is #6308, and it
+is documented rather than closed, for the reason given there. `cfengine/core`
+has 80 unit-test `.c` files
 and 32 acceptance directories; `CONTRIBUTING.md` requires unit tests for C
 functions and acceptance tests for promise types.
 
