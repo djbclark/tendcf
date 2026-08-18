@@ -229,3 +229,53 @@ than a confident guess.
 - Name at least one thing in this brief you think is wrong, weakly supported,
   or overstated. If you genuinely find nothing, say that explicitly rather
   than inventing something.
+
+---
+
+## Corrections after freezing (2026-08-18)
+
+The body above is left as the panel saw it. These are the errors it
+contained, found by me or by the reviewers, and recorded rather than
+silently edited.
+
+1. **"macOS 15" is wrong** throughout — this box is macOS 26.6.1 (Darwin
+   25.6.0), arm64. grok caught it. It also confirmed
+   `sizeof(struct kinfo_proc) == 648` on the 15.0, 15.4, 26.0 and 26.5 SDKs,
+   so the number the brief quoted is right even though the version label
+   was not.
+
+2. **Q3's pointer to `processes_select.c` was wrong.** It has no
+   `GetProcessState()` callers. There are exactly two, both in
+   `process_unix.c` (`:50`, `:92`). Darwin process listing goes through
+   `/bin/ps auxw` instead. The `SIDL` question is correspondingly narrower.
+
+3. **"Linux returns jiffies-derived seconds"** (Q6) is loose. The kernel
+   returns clock ticks; `process_linux.c:123` divides by
+   `sysconf(_SC_CLK_TCK)`. Both reviewers flagged this independently.
+
+4. **"~7.0 s" was false precision.** grok measured ~12.5 s on this same
+   machine under its own load. The mechanism is right and the attribution
+   to zombie visibility holds, but the figure tracks `nanosleep()`
+   overshoot on the host, so the commit now says "several seconds".
+
+5. **"`len == 0` is sufficient" was overclaimed**, and the brief's implied
+   "fails closed" is wrong — gemini repeated it, grok refuted it. A grown
+   `kinfo_proc` yields `ENOMEM`, `GetProcessStat()` returns false, and
+   `ProcessWaitUntilExited()` treats `DOES_NOT_EXIST` as **success**
+   (`process_unix.c:96`), so a wait would return "already gone". Not
+   fail-closed. Judged not worth blocking a platform file on Apple growing
+   a frozen compat struct; the buffer is now zeroed so there is no
+   uninitialised read either way.
+
+6. **The brief missed the biggest user-visible impact entirely.** Custom
+   promise modules cannot load on macOS at all — `mod_custom.c:504` fails
+   the module when the start time is unknown, unconditional on the stub.
+   grok found it; verified independently before it went into the commit
+   message and the ticket.
+
+7. **The lock database angle was not in the brief.** `locks.c:193`
+   *persists* the start time, so this patch changes stored data. Upgrade
+   degrades gracefully (old records hold 0 → plain `kill(2)`, as today);
+   downgrade would stop killing stale lock holders, since the old stub
+   returns 0 and `SafeKill()`'s comparison at `process_unix.c:175` then
+   mismatches. Narrow, and downgrade is not a supported path.
