@@ -937,6 +937,47 @@ the plausible mechanism — but with n=2 stalls this is **correlation, not a
 proven cause**. Use `--debug --debug-file <FILE>` (not `--log-file`) for
 diagnostics next time one hangs.
 
+### Test harness: use fakeroot with a FRESH workdir; no NOPASSWD rule
+
+**Settled 2026-08-18 after measuring all three options.**
+
+`--gainroot=fakeroot` (`brew install fakeroot`) is the right default — it is
+the suite's own (`DEFAULT_GAINROOT=fakeroot` on every non-Windows platform).
+With a clean workdir it runs `00_basics/06_host_specific_data` 13/13, exit 0,
+and cleans up after itself. Its limit is real and measured: fakeroot's uid
+faking is **broken by SIP** here (`fakeroot id -u` → 501, not 0) because it
+works through `DYLD_INSERT_LIBRARIES`, which macOS strips when spawning
+protected binaries like `/bin/sh`. So `getgroups`, `getgroupinfo`,
+`getusers_vararg` and `filestat_xattr` still fail under it — those need real
+root, and nothing but real sudo gives it.
+
+**A dirty workdir inflates the reported pass count, and this put a wrong
+number in a public PR.** `BASE_WORKDIR` defaults to `$(pwd)/workdir`; runs
+under `--gainroot=sudo` leave root-owned files a later non-root run cannot
+delete, and the stale entries get counted. B-5a's branch has 13 test files
+but reported "17 passed", which reached PR #6315's body and the CFE-4719
+comment before being caught and corrected (PR body edited, Jira comment
+159448). Always:
+
+```
+export BASE_WORKDIR=<scratch>/wd; rm -rf $BASE_WORKDIR; mkdir -p $BASE_WORKDIR
+```
+
+and check the total against `ls *.cf | wc -l` before quoting it. `Permission
+denied` on `rm` in the log means the count is not trustworthy.
+
+**Do not add a NOPASSWD sudoers rule for the test suite.** `testall` line 514
+is `$GAINROOT "$WORKDIR/runtest"`, and that path lives inside the checkout,
+writable by the user — so a NOPASSWD rule on it is `NOPASSWD: ALL` in
+practice. That is not theoretical here: reviewer CLIs and parallel subagents
+demonstrably edit files in these worktrees unprompted (see the contamination
+notes above), and this machine also holds the Atlassian token and the
+secretspec broker. Contrast the existing `sudo-secretspec` rule, which is
+safe because its target is a fixed root-owned binary the user cannot rewrite.
+The actual cause of mid-session prompts is `timestamp_timeout=5`; raise that
+in a `/etc/sudoers.d/` drop-in or run `sudo -v` before a batch, keeping
+password auth as the real control.
+
 ### `--gainroot=env` is not a free substitute for sudo
 
 The sudo credential cache expires mid-session, after which
