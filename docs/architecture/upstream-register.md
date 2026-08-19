@@ -1058,3 +1058,60 @@ branches were verified isolated afterwards** — each contains only its own
 change, none contains the others'. When running parallel agents on the same
 file in different worktrees, verify isolation before pushing, e.g.
 `grep -c <other-branch-symbol> <worktree>/<file>` for each pair.
+
+## Jira staleness sweep, 2026-08-18
+
+Operator noticed CFE-4715/CFE-4716 still carried a "please do not merge yet"
+banner from filing time, even though both corrections had landed and been
+panel-reviewed the same day — fixed (see below), then the operator asked for
+a full sweep of every ticket this suite owns, **CFE-4715 through CFE-4740**
+(26 tickets), not just those two.
+
+**CFE-4715 / CFE-4716 (P-1/P-2):** both descriptions still said "a correction
+is in progress" while the pushed corrections (`f6c06f9e2`/`b3a6c3da5`) were
+already panel-reviewed and the PRs OPEN/MERGEABLE, with **zero comments on
+either ticket since creation**. Rewrote both "Current state" sections to
+reflect DONE, added a CFE-4731 see-also to CFE-4716. While testing whether
+CFE-4716's `RestoreUtf8InJson()` workaround is actually safe against the
+fixed libntech (an open question this register had previously left
+untested), built a throwaway `core-p2` worktree against the merged overlay
+and found the "no corruption" claim only half held — see the CORRECTED note
+in the P-2/B-13 interaction section above. Posted as a CFE-4716 comment
+rather than a new ticket, since it's a gap in P-2's own unmerged test, not an
+independent libntech defect.
+
+**Full sweep result — 9 more tickets had a PR already open that the ticket
+itself never linked**, the same shape as CFE-4715/4716 but worse (no link at
+all, not just stale status text): CFE-4718 (#6307), CFE-4727 (#6310),
+CFE-4729 (#6305 — description also still names the pre-merge branch
+`fix/timeout-process-group`, not the shipped `-merged` one), CFE-4732
+(#6308), CFE-4733 (#6309), CFE-4734 (#6311), CFE-4735 (#6312), CFE-4736
+(#6313), CFE-4737 (#6314). All confirmed OPEN/MERGEABLE via `gh pr view`
+before posting, not assumed from memory.
+
+**A real duplicate, not just staleness: CFE-4725 and CFE-4737 describe the
+identical defect and the identical branch** (`fix/json-number-rendering`).
+CFE-4725 was filed first (2026-08-17), said the branch was blocked on
+CFE-4724/libntech#294 landing, and was never revisited. The next day a new
+ticket, CFE-4737, was filed for the same branch after discovering the
+"blocked" assumption was wrong (see `fix/json-number-rendering was never
+actually blocked` above) — without cross-checking that CFE-4725 already
+existed. PR #6314 carries `Ticket: CFE-4737`, so that ticket is now
+canonical; CFE-4725 got a comment marking it a duplicate pointing there. No
+way to formally merge them — `Link Issues` is still refused (see CFE-4715's
+References section).
+
+**CFE-4727 and CFE-4738 were also missing cross-links to their own
+follow-ups**: CFE-4727's References section didn't list CFE-4734/CFE-4735,
+which its own review produced; CFE-4738 didn't link CFE-4739, which fixes
+the identical root cause it explicitly flagged as "wants its own ticket."
+Both fixed with a comment.
+
+**Checked and NOT stale**: CFE-4717, CFE-4719–4724, 4726, 4728, 4730, 4731,
+4739, 4740 all correctly link their PR and reflect current status, either in
+the description or via a later comment that supersedes an earlier draft
+section — confirmed by reading each ticket in full, not by pattern-matching
+alone. The lesson generalizes: **a comment recording a fix is not the same
+as the description reflecting it**, and a ticket filed before a PR exists
+needs a follow-up pass once the PR actually opens, or it silently regresses
+to looking like unstarted work.
