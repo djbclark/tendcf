@@ -866,10 +866,39 @@ Operator asked whether we have been writing tests for what we find, given that
 the number of open items makes regressions hard to track. Audited every
 submitted branch rather than answering from memory.
 
-**16 of 17 branches ship tests** — 15 when this audit started, plus the
-regression test added to #6313 below. The single remaining gap is #6308, and it
-is documented rather than closed, for the reason given there. `cfengine/core`
-has 80 unit-test `.c` files
+**EXTENDED 2026-08-18 (later session) to every open PR, not just the 17 first
+audited.** The original pass covered 17 PRs — which included the two P-item
+*features* (#6293/#6294) and omitted eight defect-fix PRs opened after it ran
+(#6315, #6316, #6317, #6318, #6319, #6320, libntech #297, #298). Restating
+the result against the full set, and against the PR file lists via
+`gh pr view <n> --json files` rather than from these notes:
+
+**22 of the 23 defect-fix PRs ship a test. The single gap is #6308.**
+
+All eight previously-unaudited PRs ship tests; none needed one written. That
+is the answer to "can we say all 23" — we cannot, and the honest number is 22,
+because #6308 remains genuinely not unit-testable for the reason recorded
+below. Verified file lists for the eight:
+
+| PR | test files in the diff |
+|---|---|
+| #6315 (B-5a) | `12-variable-references-name-offender.cf{,.json}`, `15-variable-references-metadata-format.cf{,.json}` |
+| #6316 (B-20) | `13-null-values.cf{,.json}` |
+| #6317 (B-7) | `14-dotted-keys.cf{,.json}` |
+| #6318 (B-6) | `tests/unit/evalfunction_test.c`, `01_vars/02_functions/eval.cf` |
+| #6319 (B-21) | `00_basics/def.json/null_values.cf{,.json}` |
+| #6320 (B-5b) | adds `16-variable-references-good-entry-survives.cf{,.json}` on top of #6315's |
+| libntech #297 (B-14) | `tests/unit/json_test.c` |
+| libntech #298 (B-23) | `tests/unit/mustache_test.c` |
+
+Counting note, since the two numbers get confused: **26** PRs are open, of
+which 23 are defect fixes, 2 are features (#6293/#6294 — both of which do ship
+acceptance tests) and 1 is pure test coverage (libntech #296). The "22 of 23"
+figure is over defect fixes only.
+
+The original pass, retained for its reasoning: **16 of 17 branches ship
+tests** — 15 when that audit started, plus the regression test added to #6313
+below. `cfengine/core` has 80 unit-test `.c` files
 and 32 acceptance directories; `CONTRIBUTING.md` requires unit tests for C
 functions and acceptance tests for promise types.
 

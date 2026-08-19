@@ -1268,11 +1268,12 @@ As of 2026-08-18 there are **twenty-six pull requests open** against
 [cfengine/core](https://github.com/cfengine/core) (twenty) and
 [NorthernTechHQ/libntech](https://github.com/NorthernTechHQ/libntech) (six),
 tracked as CFE-4715–CFE-4740 in the CFEngine Jira. Twenty-three carry a
-defect fix; two are features and one is pure test coverage. An audit of every
-branch submitted as of that date found sixteen of seventeen shipping a test,
-with the one gap documented on the pull request rather than quietly left. The
-bar has been **discrimination** — showing the test fails without the fix and
-passes with it — not merely that a test exists.
+defect fix; two are features and one is pure test coverage. **Twenty-two of
+the twenty-three defect fixes ship a test**, and the one exception is
+documented on the pull request rather than quietly left, because the function
+it touches cannot be unit-tested in isolation. The bar has been
+**discrimination** — showing the test fails without the fix and passes with
+it — not merely that a test exists.
 The full record — measurements, branches, review panels, and
 the corrections our *own* claims turned out to need — is
 [`docs/architecture/upstream-register.md`](../architecture/upstream-register.md).

@@ -1491,13 +1491,17 @@ As of 2026-08-18 we have **twenty-six pull requests open** against
 `cfengine/core` (twenty) and `NorthernTechHQ/libntech` (six), tracked as
 `CFE-4715`–`CFE-4740` in the upstream Jira. Twenty-three carry a defect fix;
 two are features (`--simulate-json`, and retaining the simulate chroot) and
-one is pure test coverage. An audit of every branch submitted as of that
-date found sixteen of seventeen shipping a test, with the single gap
-documented on the pull request rather than quietly left; the bar throughout
-has been **discrimination** — showing the test fails without the fix and
-passes with it — rather than the test's mere existence. The complete
-register, with measurements, branches, review panels and the corrections our
-own claims needed, is
+one is pure test coverage. **Twenty-two of the twenty-three defect fixes ship
+a test**, and the single exception is documented on the pull request rather
+than quietly left, because the function it touches is genuinely not
+unit-testable in isolation. One of the twenty-two is a category of its own
+and worth naming: it adds no new test, but removes an existing upstream test
+from the macOS expected-failure list, so the project's own suite now guards
+the change — arguably a better outcome than writing another one. The bar
+throughout has been **discrimination** — showing the test fails without the
+fix and passes with it, recorded per item — rather than the test's mere
+existence. The complete register, with measurements, branches, review panels
+and the corrections our own claims needed, is
 [`docs/architecture/upstream-register.md`](../architecture/upstream-register.md).
 
 **Ten of the defects are in the data path this design depends on.** Three of
