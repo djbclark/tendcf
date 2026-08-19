@@ -651,6 +651,42 @@ passed count is non-zero.
   `5b5d04e1` and rebuilding it against the fix was out of scope. **Do not
   pre-emptively remove `RestoreUtf8InJson()`** — nothing is decided upstream.
 
+  **CORRECTED 2026-08-18 — actually executed.** Built a fresh `core-p2`
+  worktree (`core-p2-utf8test`) with its `libntech` submodule repointed at
+  the merged overlay (`45c816c`, B-13+B-14+B-22+B-23) and ran
+  `tests/unit/simulate_mode_test` for real, plus a standalone probe isolating
+  `RestoreUtf8InJson()`/`GetJsonEscapedByte()`/`ValidUtf8SequenceLength()`
+  against the fixed `JsonEncodeStringWriter()`. Two different results for the
+  two claims above:
+
+  - **Valid multi-byte UTF-8 (e.g. "é", U+00E9): confirmed safe, as
+    predicted.** The fixed encoder emits one `é` escape per code point
+    instead of one `\u00XX` per UTF-8 byte, so `RestoreUtf8InJson()` never
+    collects the 2+ consecutive escapes it looks for and passes the text
+    through unchanged — dead code for this case, not corruption.
+    `test_special_characters_in_path`'s failure is cosmetic: it asserts the
+    *old* raw-byte output shape, which a conformant parse no longer needs;
+    the parsed value itself is correct.
+  - **Invalid non-UTF-8 bytes (e.g. a lone 0xE9 filename byte): the "no
+    corruption" claim does NOT hold, but not for the reason the workaround
+    was written to guard against.** The probe shows a genuine `é` (U+00E9)
+    and a lone invalid byte `0xE9` both encode to the **identical**
+    `é` escape — `RestoreUtf8InJson()` cannot tell them apart and
+    leaves both alone. `test_invalid_utf8_in_path` only ever "passed"
+    because the *old* non-conformant parser and writer were exact inverses
+    (this register's own B-13 language) and canceled each other out —
+    exactly the "codec round-trips its own corruption" trap. Once the
+    parser side is also conformant, `é` correctly decodes to `é`,
+    which is **not** the original byte: a non-UTF-8-valid path byte cannot
+    be represented exactly in a JSON string at all, conformant or not. This
+    is a real, pre-existing representational gap that the old test
+    accidentally papered over, not a new defect `RestoreUtf8InJson()`
+    introduces. It needs a real upstream design decision (replacement
+    character, error out, a separate raw/base64 field) before B-13 lands
+    and this test starts failing for real. Documented as a comment on
+    CFE-4716 rather than a new ticket, since it is P-2's own test gap, not
+    an independent libntech defect.
+
   **Correction to this register's own record.** It previously said the sibling
   keys had been written into the descriptions as the workaround. Audited
   2026-08-17: that had only happened on **6 of 15** tickets, asymmetrically
