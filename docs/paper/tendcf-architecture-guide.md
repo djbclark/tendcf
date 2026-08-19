@@ -1269,9 +1269,14 @@ As of 2026-08-18 there are **twenty-six pull requests open** against
 [NorthernTechHQ/libntech](https://github.com/NorthernTechHQ/libntech) (six),
 tracked as CFE-4715–CFE-4740 in the CFEngine Jira. Twenty-three carry a
 defect fix; two are features and one is pure test coverage. **Twenty-two of
-the twenty-three defect fixes ship a test**, and the one exception is
-documented on the pull request rather than quietly left, because the function
-it touches cannot be unit-tested in isolation. The bar has been
+the twenty-three defect fixes ship a test.** The one exception is documented
+on the pull request rather than quietly left, and we went back and tried to
+close it rather than leaving the number where it was. It cannot be closed:
+that fix clears an alarm which a function it calls immediately re-arms on
+every path, so a build with the fix and a build without it behave
+identically from outside. Any test there would be asserting a difference the
+program does not have — the same fault as the codec above, only committed on
+purpose. The bar has been
 **discrimination** — showing the test fails without the fix and passes with
 it — not merely that a test exists.
 The full record — measurements, branches, review panels, and

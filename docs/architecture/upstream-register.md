@@ -949,13 +949,55 @@ master. `PASS: getopt_optstring_test.sh`, all 68 tests behaved as expected.
 
 Deliberately **not** given a manufactured test, because a test that does not
 reach the fix is worse than none — it is exactly the false confidence this
-audit was asking about. `ReconcileMountOptions()` links, but: under a dry run
-it returns at `nfs.c:1399` via `MakingInternalChanges()` *before* the arm/disarm
-code; without one it runs a real `mount -o remount`; `VMOUNTCOMM` is
-`static const char *const` at `nfs.c:64` so it cannot be redirected; and
-`nfs_test` covers only pure string helpers. Recorded on the PR and in
-CFE-4732 (comment 159443) with the minimal seam that would make it testable,
-left as upstream's call.
+audit was asking about.
+
+**CORRECTED 2026-08-18 (later session), and the correction matters: the
+reason given below was the wrong reason.** Asked whether the gap could be
+closed so the audit could say 23 of 23, I went back to the code instead of
+restating this entry, and the original justification does not survive it.
+
+The old reason was **reachability** — dry-run returns early at `nfs.c:1399`
+via `MakingInternalChanges()`; a real run executes `mount -o remount`;
+`VMOUNTCOMM` is `static const char *const` at `nfs.c:64` and cannot be
+redirected; `nfs_test` covers only pure string helpers. The middle claim is
+**false**. The remount path arms at `:1436` and then calls
+`cf_popen()`; forcing that `cf_popen()` to fail — `RLIMIT_NOFILE`, exactly
+the technique B-19's panel used to demolish *its* "untestable" claim — reaches
+the arm and the disarm without ever running `mount`. Reachability is solvable.
+
+The real blocker is **observability**, and it is absolute:
+
+| line | what happens | conditional? |
+|---|---|---|
+| `nfs.c:1436` / `:1461` | `SetTimeOut(timeout)` — the arm | per method |
+| `nfs.c:1472` | `alarm(0); signal(SIGALRM, SIG_DFL);` — **the fix** | unconditional |
+| `nfs.c:1476` | `LiveMountConverged()` → `LoadMountInfo()` | unconditional fall-through |
+| `nfs.c:403` | `SetTimeOut(RPCTIMEOUT)` — **re-arms** | **unconditional, and before every early return at `:408`, `:427`, `:487`** |
+| `nfs.c:581` | `alarm(0); signal(SIGALRM, SIG_DFL);` | normal path only |
+
+Because `:403` is unconditional and precedes all three of `LoadMountInfo()`'s
+own early returns, it **overwrites the alarm state on every path**, leaked or
+not. Patched and unpatched builds are therefore byte-for-byte
+indistinguishable to any observer outside `ReconcileMountOptions()` — not
+merely on the normal path, which is what the severity correction already said,
+but on *all* of them. The only interval in which the two differ is between the
+dispatch completing and `:403`, and nothing runs there but `LiveMountConverged()`'s
+`SeqNew` and an assert. There is no test to write.
+
+That reframes the fix, consistent with the severity correction above: it is
+**fragility removal, not a bug fix**. The non-leak today depends entirely on a
+callee happening to re-arm; the fix makes the pairing local and guaranteed
+instead of incidental. Worth having, and honest to describe as hygiene.
+
+Consequence for the audit: **the gap cannot be closed, and 22 of 23 is the
+correct figure.** Manufacturing a test here would mean asserting something the
+build cannot distinguish — the precise failure mode B-13 taught us to name
+(see `test-with-conformant-decoder`): a check that measures its own
+consistency and reports it as correctness.
+
+*Owed to upstream:* PR #6308 and CFE-4732 comment 159443 carry the old
+reachability argument. That is now known to be wrong on one of its three
+legs, and the stronger reason should replace it. Not yet posted.
 
 *Correction to an earlier claim in this register:* I had justified this as "the
 nfs.c family isn't testable". Too strong — `nfs_test` exists

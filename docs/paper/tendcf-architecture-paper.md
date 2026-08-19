@@ -1492,9 +1492,15 @@ As of 2026-08-18 we have **twenty-six pull requests open** against
 `CFE-4715`–`CFE-4740` in the upstream Jira. Twenty-three carry a defect fix;
 two are features (`--simulate-json`, and retaining the simulate chroot) and
 one is pure test coverage. **Twenty-two of the twenty-three defect fixes ship
-a test**, and the single exception is documented on the pull request rather
-than quietly left, because the function it touches is genuinely not
-unit-testable in isolation. One of the twenty-two is a category of its own
+a test.** The single exception is documented on the pull request rather than
+quietly left, and it is worth a sentence because we tried to close it and
+could not: the fix clears an alarm that a callee then unconditionally re-arms
+before any of its own early returns, so patched and unpatched builds are
+indistinguishable to any observer outside the function. A test there could
+only assert something the program cannot tell apart — the same fault as the
+codec in §7.2, committed deliberately instead of accidentally. The fix stands
+as fragility removal rather than as a bug fix, and the audit stays at
+twenty-two. One of the twenty-two is a category of its own
 and worth naming: it adds no new test, but removes an existing upstream test
 from the macOS expected-failure list, so the project's own suite now guards
 the change — arguably a better outcome than writing another one. The bar
