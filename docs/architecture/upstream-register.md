@@ -995,9 +995,18 @@ build cannot distinguish — the precise failure mode B-13 taught us to name
 (see `test-with-conformant-decoder`): a check that measures its own
 consistency and reports it as correctness.
 
-*Owed to upstream:* PR #6308 and CFE-4732 comment 159443 carry the old
-reachability argument. That is now known to be wrong on one of its three
-legs, and the stronger reason should replace it. Not yet posted.
+*Corrected upstream 2026-08-18* — both channels, since both carried the wrong
+reason:
+
+- PR #6308, [`#issuecomment-5336528513`](https://github.com/cfengine/core/pull/6308#issuecomment-5336528513)
+- CFE-4732, comment **159468** (HTTP 201, author verified from the response)
+
+Both are deliberately short — nickanderson's review on this very PR asked for
+less prose, and a correction is not the place to spend the budget back. Both
+end by offering him the option of closing #6308 on the fragility-removal
+basis, with a commitment not to re-open. That is the right shape given the
+maintainer-bandwidth complaint: we should not be defending a churn-y patch we
+have just downgraded from bug fix to hygiene.
 
 *Correction to an earlier claim in this register:* I had justified this as "the
 nfs.c family isn't testable". Too strong — `nfs_test` exists
