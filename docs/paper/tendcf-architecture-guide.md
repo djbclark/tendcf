@@ -14,9 +14,9 @@ Archival files (dated notes, briefs, handoffs, deprecated drafts, paper
 reviews) are snapshots; do not rewrite them to match — they lose on
 conflict.
 
-Draft for review — not published, not submitted.
+Draft, circulated for comment. Not submitted for publication.
 Daniel Joseph Barnhart Clark (djbclark@mit.edu).
-Prepared 2026-08-14.
+Prepared 2026-08-14; re-checked against the repository 2026-08-18.
 
 The implementer map (decisions, build order, protection rules) is
 [`architecture-DEFINITIVE-v3.md`](../architecture/architecture-DEFINITIVE-v3.md)
@@ -24,10 +24,15 @@ and must agree with this guide. The technical paper, with citations and
 open questions in research form, is
 [`tendcf-architecture-paper.md`](tendcf-architecture-paper.md).
 
-**Nothing described here is deployed.** Some data formats exist and are
-checked. The compiler, the on-device executor, and the screens a person
-would use to accept or refuse a change are still to be built. No device has
-been set up from factory reset by this automation.
+**Nothing described here is deployed.** The data formats exist and are
+checked, a first generic policy bundle runs, and the projection step has a
+reference implementation. The compiler, the on-device executor, and the
+screens a person would use to accept or refuse a change are still to be
+built. No device has been set up from factory reset by this automation.
+
+One thing that *was* built, and was not planned: §19 describes the defects
+found underneath, in CFEngine itself, by leaning on the parts of it this
+design depends on.
 
 A previous configuration stack on this fleet is **legacy reference only**.
 It is not a dependency, not an upstream, and not copied into this project.
@@ -193,11 +198,28 @@ floor at CFEngine 3.18, not 3.7. The name is historical, and despite it
 YAML remains an authoring format for the Site Model (§7) and never reaches
 the agent. The compiler is a tool, not the home of schemas.
 
+**The two files are not read by the same code, and they do not land in the
+same place.** `def.json` goes through the augments loader and its keys
+become `def.<key>`. `host_specific.json` goes through CFEngine's CMDB
+loader, where an unprefixed key defaults to namespace `data`, scope
+`variables` — so policy reads it as `$(data:variables.<key>)`. The first
+draft of the generic bundle below assumed the augments scope for both. It
+was wrong, and it failed *silently*: the variables simply did not exist and
+nothing said so. That is the kind of thing this project now confirms
+against a running agent rather than reading off a documentation page, and
+§19 is what happened when that habit was applied more widely.
+
 CFEngine’s [Masterfiles Policy Framework](https://github.com/cfengine/masterfiles)
 is already largely data-driven on top of that layer. For the common case
 the compiler therefore emits *data*, not CFEngine source text. A generic
 bundle written once handles “this package is present and pinned, these
 directories exist, this service is loaded” for any entry in the data.
+
+A first version of that bundle exists and runs:
+[`policy/tendcf_services.cf`](../../policy/tendcf_services.cf). It handles
+launchd only — systemd, runit and Jobber are unwritten — so “supervisors
+are adapters” (§5) is still a claim about a design, not about running code.
+§16.C shows it working, including an interlock that genuinely refuses.
 
 The pipeline has four stages:
 
@@ -479,7 +501,12 @@ neither is something a proposer gets to assert.
 CFEngine’s own `cf-agent --simulate` can additionally show a person what a
 run would change on this device right now. It covers files and packages, not
 whether a service ends up loaded and running, so it confirms a diff rather
-than establishing one.
+than establishing one — which is also why it is not a substitute for the
+comparison above. Making it usable for that confirmation is the origin of
+two of the upstream contributions in §19: `--simulate-json`, so the change
+set is machine-readable rather than prose, and an option to keep the
+simulation chroot afterwards so it can be inspected. Both are offered and
+neither has merged, so today this remains a manual check.
 
 ---
 
@@ -558,7 +585,7 @@ provides and what it needs (§10), why conflict errors carry a resolution,
 why “show me device X” is first in the compiler, and why generated
 explanations must point at the plan they summarize.
 
-The rule is a working hypothesis, not a law. §19 asks what would count
+The rule is a working hypothesis, not a law. §20 asks what would count
 against it.
 
 ---
@@ -688,6 +715,10 @@ Blast radius and reporting are required constants in the schema, not
 author-settable fields. An author who could narrow either one could
 reintroduce the bug the mechanism exists to close.
 
+This is the one mechanism in this guide that has been demonstrated rather
+than only described: §16.C shows a real `cf-agent` run refusing a gated
+service because its precondition genuinely failed.
+
 ---
 
 ## 13. Peer actions: help without a global lock
@@ -769,16 +800,18 @@ not “don’t require names.”
 
 ---
 
-## 16. Two walkthroughs
+## 16. Three walkthroughs
 
 The inputs below are excerpts from
 [`examples/services.yml`](../../examples/services.yml)
-— a fixture, schema-validated, not live site data. The outputs
-(CFEngine JSON, the launchd plist, the promise sketch) are hand-authored
-to show the target shape. The compiler’s render stage does not exist yet,
-so nothing below except the YAML was produced mechanically. launchd here
-is one adapter; the same service record would render a systemd unit or a
-runit service on another host.
+— a fixture, schema-validated, not live site data. In **A** and **B** the
+outputs (CFEngine JSON, the launchd plist, the promise sketch) are
+hand-authored to show the target shape: the compiler’s render stage does
+not exist yet, so nothing in those two except the YAML was produced
+mechanically. **C** is different — it is the part that was subsequently
+built, and everything in it is real. launchd here is one adapter; the same
+service record would render a systemd unit or a runit service on another
+host.
 
 ### A. An ordering edge nobody wrote
 
@@ -967,6 +1000,78 @@ The guard is attached once, at the bundle, and inherited by every promise
 in it — because the schema gave the render stage no field to read a
 narrower scope from.
 
+### C. The same interlock, actually running
+
+A and B show intent. This shows the two artifacts that were built
+afterwards, so a reader can tell which parts of this guide are argument and
+which are code.
+
+The projection of §7, applied to a goal file, produces
+[`examples/host_specific.json`](../../examples/host_specific.json) — the
+only shape the agent actually reads. It is canonical bytes on disk (one
+line, sorted keys); pretty-printed and trimmed to one service here:
+
+```json
+{
+  "vars": {
+    "tendcf_service": {
+      "com.tendcf.caddy.main": {
+        "bundle": "caddy",
+        "command": ["/opt/homebrew/bin/caddy", "run",
+                    "--config", "/etc/caddy/Caddyfile"],
+        "env": { "CADDY_ADMIN_TOKEN": "CADDY_ADMIN_TOKEN" },
+        "run_as": "caddy",
+        "state": "present",
+        "unit": { "launchd": { "keep_alive": true, "run_at_load": true } },
+        "working_dir": "/"
+      },
+      "com.tendcf.caddy.retired": { "state": "absent" }
+    }
+  }
+}
+```
+
+Two design claims are visible as data rather than prose.
+`com.tendcf.caddy.retired` says `"state": "absent"` and is *still in the
+file* — the tombstone of §7, which is what makes a removal converge instead
+of evaporating when a device catches up across several releases. And `env`
+maps a variable name to a secret **name**, never a value; a resolved secret
+in that position is a load-breaking error, not a warning.
+
+The bundle that reads it is where every decision lives, because the
+projection makes none. Two of its mechanics were forced by CFEngine rather
+than chosen, and neither was guessed:
+
+- Entry ids are launchd labels (`com.tendcf.caddy.main`) and bundle tags
+  are kebab-case. **CFEngine class names accept neither dots nor hyphens** —
+  a raw hyphenated class is rejected outright. So anything that becomes part
+  of a class name is passed through `canonify()` first, while the raw id is
+  kept for data lookups and for the plist `Label`, where the real value is
+  required.
+- The blast radius is keyed on the interlock’s **own bundle tag**, not on
+  which service happens to reference it, so several interlocks sharing a tag
+  combine without any join against the service list. That is §12’s
+  “enclosing-bundle” constant, made mechanical.
+
+**The refusal was tested for real.**
+[`examples/policy/host_specific-interlock-blocked.json`](../../examples/policy/host_specific-interlock-blocked.json)
+declares a service whose bundle carries an interlock whose check is
+`/bin/false` — a command that genuinely fails, not a mocked failure — and a
+real, non-dry-run `cf-agent` run confirms the gated service’s promises are
+skipped and the refusal reported. It is a small result. It is also the only
+place in this guide where a mechanism is demonstrated rather than described.
+
+Three limits, since v1 invites over-reading. It is **launchd-only**. It
+renders the plist through mustache templating, which does **not** do
+CFEngine’s own `$()` substitution, so anything needing expansion must be
+expanded before it reaches the template. And the interlock’s command is
+reassembled into a shell string, because CFEngine will not accept an indexed
+container element as a non-scalar attribute — so an argument containing a
+space or a shell metacharacter is not currently isolated. That input comes
+from our own schema-checked goal file rather than from an attacker, which
+makes it a limitation rather than a hole, but it is one we would rather a
+reader found here than in the code.
+
 ---
 
 ## 17. Where a different design is a better fit
@@ -1078,7 +1183,7 @@ observe themselves crossing is a disclaimer rather than a ceiling.
   compiler wins. If agents are worse than assumed — fluent,
   schema-conformant, and semantically wrong — then types are the wrong
   defense, and what is needed is a review-and-test loop: property tests over
-  rendered output, differential runs against the previous release. §19 asks
+  rendered output, differential runs against the previous release. §20 asks
   this as a question; here it is the boundary.
 
 ---
@@ -1087,23 +1192,42 @@ observe themselves crossing is a disclaimer rather than a ceiling.
 
 **Built today**
 
-- Site Model schemas in this repository (`schema/`, `examples/`),
-  including `provides` / `requires` per type, `interlocks` per bundle, and
-  `comprehensive` plus `opt_out_reason` per domain.
-- The report-row schema (release stamp, separate managed /
-  not-yet-migrated / deliberately-unmanaged counters).
+- **Eight schemas** in this repository (`schema/`, `examples/`). Five are
+  the Site Model and its reporting — `provides` / `requires` per type,
+  `interlocks` per bundle, `comprehensive` plus `opt_out_reason` per
+  domain, and the report row (release stamp, separate managed /
+  not-yet-migrated / deliberately-unmanaged counters). Three are the
+  consent contract of §7: the goal file, the structural diff, and the
+  approval record.
 - A lint that carries the cross-file rules JSON Schema cannot state
   alone: reference resolution, launchd labels checked against declared
-  writer prefixes, no prefix nested inside another.
-- Twelve deliberately broken fixtures in `examples/broken/`, which the lint
-  must catch. A passing lint on correct input is not a check.
+  writer prefixes, no prefix nested inside another. A second lint checks
+  that every cross-reference in the documentation resolves.
+- **Ninety-two deliberately broken fixtures**, every one of which the lint
+  must catch, and it fails if any is accepted. A passing lint on correct
+  input is not a check. They come in three kinds: fifty-nine schema-level
+  (an opt-out with no reason, a rogue launchd label, a literal secret where
+  a key name belongs, a proposer setting a privileged flag, a migration
+  that is not a no-op); six byte-level, which exist because a
+  canonicalization fault is invisible once the file has been parsed (a
+  pretty-printed twin, duplicate keys, a non-NFC path, `15.0` where `15`
+  belongs); and twenty-seven projection-level (a resolved secret value
+  where a name belongs, a goal file smuggled in under `vars`). Each rule in
+  the projector’s checker has a fixture that trips **that rule alone** —
+  a suite where one fixture trips three rules cannot tell you the other two
+  work.
+- **A reference projector** (`bin/projector.py`) for §7’s projection step,
+  gated in CI against golden bytes so the agent’s eventual second
+  implementation has something to agree with.
+- **A first generic bundle** (`policy/tendcf_services.cf`), launchd only —
+  the first thing here that CFEngine actually executes (§16.C).
 
-**Not built — this is most of it**
+**Not built — this is still most of it**
 
-The compiler, all three platform adapters, the signed release path, the
-goal-file and diff schemas, the on-device validator, the consent surface,
-peer-action runtime, generic supervisor switch. No operational numbers of
-any kind.
+The compiler `nix2cf` itself (merge, conflict check, inference, render),
+every supervisor adapter except launchd, the signed release path, the
+on-device validator, the consent surface, and the peer-action runtime. No
+operational numbers of any kind.
 
 **Build order from here** (each step is meant to leave the system in a
 coherent, describable state):
@@ -1111,7 +1235,7 @@ coherent, describable state):
 | Step | What | Notes |
 | --- | --- | --- |
 | 0 | Schemas in tendcf | Existing contract is `schema/` + `examples/` + `bin/schema_lint.py`. Remaining: peer_actions, trust-policy shape, generic unit-writers, lookup stub, YAML canonicalize. Transcribe reality (`not-yet-migrated` is the correct day-one state). |
-| 1 | macOS services adapter | Render services as CFEngine promises from `services.yml` via the launchd adapter. Dry-run default. Not in this step: nix-darwin. |
+| 1 | macOS services adapter | **Started.** `policy/tendcf_services.cf` renders and loads launchd services from projected data, with interlocks enforced (§16.C). Still open in this step: package and file promises, environment rendering, the unit-writer detector. Dry-run default. Not in this step: nix-darwin. |
 | 2 | Android under the Site Model | Same vocabulary. Agent owns JSONL+SQLite in app-private storage. |
 | 3 | `nix2cf` compiler | “What would device X receive?” first, then conflict check, extra-entry reporting, then inference. Inference waits until types exist on two platforms. |
 | 4 | Linux reference path | A stock distro, not NixOS. Distro choice is open until this step; Ubuntu Server is the working default. |
@@ -1129,7 +1253,137 @@ adoption requirement, not an observability extra.
 
 ---
 
-## 19. Open questions
+## 19. What we found underneath
+
+This design bets everything on one thing: that the right place to put a
+compiler’s output is CFEngine’s own JSON data layer, so the policy text
+stays generic and every site-specific fact arrives as data (§4). Acting on
+that bet meant pushing far more through `def.json` and `host_specific.json`
+than an ordinary CFEngine deployment does, where a policy server ships
+policy *text* and augments carry a thin slice of variables.
+
+Every time we leaned on that layer, something under it broke.
+
+As of 2026-08-18 there are **twenty-six pull requests open** against
+[cfengine/core](https://github.com/cfengine/core) (twenty) and
+[NorthernTechHQ/libntech](https://github.com/NorthernTechHQ/libntech) (six),
+tracked as CFE-4715–CFE-4740 in the CFEngine Jira. Twenty-three carry a
+defect fix; two are features and one is pure test coverage. An audit of every
+branch submitted as of that date found sixteen of seventeen shipping a test,
+with the one gap documented on the pull request rather than quietly left. The
+bar has been **discrimination** — showing the test fails without the fix and
+passes with it — not merely that a test exists.
+The full record — measurements, branches, review panels, and
+the corrections our *own* claims turned out to need — is
+[`docs/architecture/upstream-register.md`](../architecture/upstream-register.md).
+
+**Ten of those defects are in the data path this design depends on**, and
+three of them stop a run before it evaluates a single promise — dropping the
+host to failsafe — on input a correct compiler would legitimately produce:
+
+- A JSON `null` anywhere in `host_specific.json` segfaults `cf-promises`
+  and `cf-agent` *before a single promise is evaluated*, so the host drops
+  to failsafe. It is valid JSON and it passes CFEngine’s own checks.
+- The same root cause sits in the `def.json` loader, at three places.
+- A **valid** JSON number written in exponent form without a decimal point
+  — `1e-8` — is misclassified as an integer and reaches an exit-on-error
+  path. So do integers larger than a C `long`.
+
+The other seven are quieter and, in a configuration system, arguably worse:
+one malformed entry silently discarding every other entry in its section;
+rejected data that names no key, no value and no file; a key containing a
+dot silently becoming a scope path; reals rendered to two decimal places so
+`0.00049` becomes `0.00`; *copying* a document changing its numbers; and a
+JSON string codec wrong in both directions, so `{"city":"中国"}` reads back
+as the literal text `u4e2du56fd`.
+
+### Why they were still there
+
+The count is not the interesting part. These are old, shallow defects in
+code that has tests. Two things explain that, and both are §9’s second rule
+— prefer machine-checkable to conventional — seen from the outside.
+
+**A codec tested only against itself cannot find a fault its two halves
+share.** The reader and the writer were exact inverses: the writer escaped
+each byte, the reader turned those escapes back into the same bytes. The
+library round-tripped its own output perfectly, so *no write-then-read test
+could catch either half*. The bug is visible only from outside, against
+someone else’s decoder. There was a test suite. It was measuring
+self-consistency and reporting it as correctness.
+
+**Coverage was thinnest exactly where this design leans hardest.** The
+mustache renderer — 916 lines, one entry point, and the thing our generic
+bundle uses to write every unit file — had **no unit tests at all**.
+Writing seventeen surfaced two more defects immediately, which is about
+what nine hundred untested lines should be expected to yield.
+
+Neither point is a criticism of the maintainers, who have been responsive
+and, on the two reviews we have had, sharp. Both are observations about
+where test effort naturally lands: on the paths a project’s own deployment
+shape exercises. A design that routes its traffic somewhere else is, in
+effect, a new test suite — and ours came back red.
+
+### What it costs us
+
+- **This project currently depends on a fork.** Our builds come from a
+  branch merging all twenty-three fixes. If none land, tendcf ships against
+  a patched CFEngine permanently, which is a real maintenance liability.
+- **The channel is open but slow.** For weeks the pull requests drew only
+  bots. On 2026-08-18 two Northern.tech maintainers reviewed properly — the
+  first genuine engagement, and enough to retire the “no upstream response”
+  framing. Both independently asked for less verbosity. Nothing has merged.
+- **Time spent here is time not spent building.** §18 says most of this
+  system does not exist. One person who answers every discovered defect by
+  fixing it upstream has chosen a contribution to someone else’s codebase
+  over a working system of their own. That may well be the right call. It
+  is a call, and it should be visible as one.
+- **We cannot tell you whether twenty-three is a lot.** There is no base
+  rate here — no comparable figure for a similarly intense month against any
+  other mature configuration engine. Reading this as “CFEngine is unusually
+  buggy” goes past the evidence. The defensible claim is narrower: *a
+  compile-to-data design stresses a different surface than the tool’s own
+  deployment model, and that surface was less exercised.*
+
+### Who wrote the fixes
+
+§9 says most of this system’s configuration will be written by AI agents, and
+this section is the largest body of work the project has produced, so it
+would be odd to report it without saying how it was made. The defects were
+found by AI agents doing ordinary development work against CFEngine, and most
+of the fixes were drafted by them too.
+
+What made them submittable was the gate placed afterwards, not the drafting.
+Every fix had to carry a **discrimination proof** — revert it, watch the test
+fail with the exact symptom, restore it, watch it pass — and most went through
+an adversarial review panel of two to four independent models working from a
+frozen brief, whose findings were binding. Those panels caught real problems:
+a fix that read a flag before the call that sets it; a platform guard that
+would have silently disabled `exec_timeout` on Cygwin where no CI job would
+have noticed; a test that could not have failed for the reason it claimed. They
+also caught several of **our own claims to upstream** that were overstated —
+including one that forced a correcting follow-up to an external security team,
+and one severity assessment we had to retract and rewrite.
+
+That cuts both ways, and the second half matters more. Machine authors did
+produce twenty-three reviewable patches to a mature C codebase. They also
+produced a steady stream of confident, plausible, wrong statements — about
+severity, about line numbers, about what had been tested rather than merely
+looked tested. That is exactly the failure §9 describes, turning up in prose
+instead of in configuration. What worked was not better authorship. It was
+making each claim checkable and then running the check.
+
+### One last thing, and it cuts against §9
+
+None of these ten defects would have been caught by any amount of schema
+design at our layer. They sit *below* the surface the schemas defend. If the
+argument of §9 is that machine authors fail at global consistency and types
+are the answer, this section is the reminder that types bind only the layer
+they are written for, and that everything underneath is still ordinary
+software with ordinary bugs.
+
+---
+
+## 20. Open questions
 
 These are the places the current design is weakest.
 
@@ -1218,9 +1472,17 @@ These are the places the current design is weakest.
     to be read with it in mind.
 
 The schemas most of the later questions turn on — goal file, diff, approval
-record — are not written yet. They are the artifact the implementer map
-holds at its §14.2 for independent adversarial review before anything is
-built on them.
+record — **are now written** and have been through the independent
+adversarial review the implementer map held them for at its §14.2. That
+review changed them, and two of its findings were corrections to claims this
+project had made about its own work rather than to the schemas: a
+specification sentence that had been promoted out of an illustrative sketch
+without its “illustrative” marking, and a set of counts asserted from memory
+that a later audit re-measured and found wrong. Both are recorded rather
+than quietly fixed, which is the same reason §19 exists. What is *not*
+written is the code those schemas describe — the validator, the release
+path, the consent surface — so the questions above are still open in the
+way that matters.
 
 Token discovery (how an author finds the right name) is a mechanism
 (§15), not an open question. Whether authors actually use the lookup and
