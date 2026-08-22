@@ -2,6 +2,54 @@
 
 **Living document. Update it in the same commit that changes an item's state.**
 
+---
+
+## SUPERSEDED 2026-08-22 — read this before anything below
+
+**Everything below this banner describes an upstream-first regime that no
+longer applies.** Two things changed it:
+
+**2026-08-19: upstream closed the entire effort.** All 26 pull requests (20
+`cfengine/core`, 6 `NorthernTechHQ/libntech`) and all 26 Jira tickets
+`CFE-4715`–`CFE-4740` were closed/Rejected by `olehermanse`. The stated reason
+is **review volume, not a technical finding** —
+[core#6293 comment](https://github.com/cfengine/core/pull/6293#issuecomment-5340989869)
+asks us to restart with **one** bug ticket and **one** small, easily-reviewed
+pull request, and states that *"we expect @djbclark, the human, not the LLM, to
+be in the loop for each PR."* Full disposition: [Blanket closure and rejection,
+2026-08-19](#blanket-closure-and-rejection-2026-08-19).
+
+**2026-08-22, operator instruction: the fork is the destination, not a staging
+area.** We maintain and use `djbclark/core` and `djbclark/libntech` from here
+on. We are no longer trying to get everything into upstream on any timeline.
+The current rules, which override every conflicting rule below:
+
+1. **Still fix everything we find.** The bug-hunting policy is unchanged; only
+   its destination moved.
+2. **Still always open a PR and/or issue** — but **only** against
+   `djbclark/core` / `djbclark/libntech`. Nothing is opened, commented on, or
+   re-filed on `cfengine/core`, `NorthernTechHQ/libntech`, or the CFE Jira.
+3. **No email, ever, without a specific operator request.** Not `contact@`, not
+   `security@northern.tech`, not a reply on an existing thread.
+4. **No Jira writes, by API or otherwise, without a specific operator request.**
+   Anonymous read-only `GET` against `northerntech.atlassian.net` is fine and is
+   how ticket state is verified.
+5. **Jira host correction:** `cfengine.atlassian.net` **404s sitewide** — it is
+   not a permissions mask; `/rest/api/2/myself` with a valid token and control
+   tickets `CFE-3000`/`CFE-4000` all 404 too. The live host is
+   `northerntech.atlassian.net`, and anonymous `GET` needs no token:
+   `curl -s https://northerntech.atlassian.net/rest/api/2/issue/CFE-4736?fields=status,resolution`
+6. **The eventual shape of any future upstream contribution** is thematic, not
+   one-defect-per-PR: bugs touching the same code get merged into a single
+   reviewable change so a human does not read the same function four times
+   across four pull requests. Nothing goes out until the operator says so.
+
+Sections below are retained as the record of what actually happened. Where one
+says "email upstream", "file in Jira", or "the fork is a staging area", read it
+as history.
+
+---
+
 **CORRECTED 2026-08-16 (later session).** This document previously opened by
 asserting that every upstream channel was closed and that "nothing is filed on
 an upstream tracker yet". **Both statements were false when written**, and the
@@ -14,7 +62,7 @@ against the GitHub API rather than restated from these notes:
 | `cfengine/core` Pull requests | **open, and we have two live there** | [#6293](https://github.com/cfengine/core/pull/6293), [#6294](https://github.com/cfengine/core/pull/6294) |
 | `NorthernTechHQ/libntech` Issues | **ENABLED** — the old claim that they were disabled was simply wrong | `gh api repos/NorthernTechHQ/libntech` → `has_issues: true`; our [#290](https://github.com/NorthernTechHQ/libntech/issues/290) is filed there |
 | `NorthernTechHQ/libntech` Pull requests | **open, and we have one live there** | [#291](https://github.com/NorthernTechHQ/libntech/pull/291) |
-| CFE Jira | **WORKING as of 2026-08-17, and now the ONLY filing channel** — see the 2026-08-17 Jira entry below. All open items are filed as `CFE-4715`–`CFE-4730` (15 migrated 2026-08-17, plus `CFE-4730` filed the same day) | `POST /rest/api/2/issue` → 201; anonymous `GET` of `CFE-4715` → 200 |
+| CFE Jira | ~~WORKING as of 2026-08-17, and now the ONLY filing channel~~ — **DEAD AND CLOSED TO US as of 2026-08-19/22.** All 26 tickets `CFE-4715`–`CFE-4740` are Rejected, and the host in this row was wrong besides: `cfengine.atlassian.net` 404s sitewide; the live host is `northerntech.atlassian.net`, read-only for us by operator instruction | `POST /rest/api/2/issue` → 201 *(2026-08-17, on the live host)*; every `CFE-47xx` now returns `status: Rejected` to an anonymous `GET` |
 
 So the premise that motivated the fork-plus-email workaround **does not hold for
 ordinary bug reporting**. Upstream GitHub accepts our issues and our pull
@@ -33,20 +81,22 @@ everything below should be submittable without re-deriving anything.
 
 ## Channels, and what "reported" currently means
 
-**SUPERSEDED 2026-08-17 — step 3 is now Jira, not email.** Operator
-instruction: *"Going forward, remember to always use Jira, no longer email or
-open discussion threads."* Each item gets:
+**SUPERSEDED 2026-08-22 — there is no upstream step any more.** The
+2026-08-17 rule ("always use Jira, no longer email or open discussion threads")
+is itself now history; Jira is read-only to us. Current process, per the top
+banner — every step lands on our own infrastructure:
 
 1. **Code** — a branch on our fork (`djbclark/core`, `djbclark/libntech`).
-2. **A tracking artifact on the fork** — an issue where issues are enabled
-   (`djbclark/core`), a pull request where they are not (`djbclark/libntech`).
-3. **A ticket in the CFE Jira project**, which is the upstream reference of
-   record. Do **not** open GitHub Discussions and do **not** email `contact@`
-   or `security@northern.tech` as a filing channel any more.
+2. **An issue on the same fork** — issues are enabled on both
+   (`gh api repos/djbclark/libntech -q .has_issues` → `true`; the old note that
+   they were not is stale).
+3. **A pull request on the fork**, branch → fork `master`. This is the whole
+   pipeline now. There is no step 4.
 
-Replying on an existing email thread, or commenting on an existing Discussion,
-to point at the new Jira key is still correct — that is notification, not
-filing.
+Do **not** open anything on `cfengine/core` or `NorthernTechHQ/libntech`, do
+**not** write to Jira, and do **not** email anyone about this work without a
+specific operator request. Reading upstream — issues, pull requests, Jira via
+anonymous `GET` — is unrestricted and expected.
 
 The email history below is retained because it is what actually happened and
 because two threads carry corrections that must not be lost:
@@ -79,6 +129,81 @@ reviews informed the report; never send while one is still running.
 operator manually on 2026-08-15 evening and not recorded here until the
 2026-08-16 correction. An earlier version of this line claimed the opposite.
 Nothing is filed on the CFE Jira.
+
+## Blanket closure and rejection, 2026-08-19
+
+Every item we had in front of upstream was closed on one day, by one
+maintainer (`olehermanse`), in two batches: the **20 `cfengine/core` pull
+requests between 10:42:09Z and 10:45:41Z**, and the **6
+`NorthernTechHQ/libntech` pull requests between 14:10:22Z and 14:12:01Z**. All
+26 Jira tickets moved to status **Rejected** — `CFE-4715` and `CFE-4716` (the
+two features) with resolution *Won't Do*, the other 24 with *Done*.
+
+**The reason is process, not substance.** The one substantive statement is
+[core#6293 issuecomment-5340989869](https://github.com/cfengine/core/issues/comments/5340989869):
+restart with **one** bug ticket and **one** small pull request that is easy to
+review, and *"we expect @djbclark, the human, not the LLM, to be in the loop for
+each PR."* Read it in full before acting on any of this:
+
+```
+gh api repos/cfengine/core/issues/comments/5340989869 -q .body
+```
+
+Not one of the 23 defects was rebutted, reproduced-and-denied, or shown to be a
+non-issue. That is worth stating plainly because it determines what the fork
+inherits: **fixes with intact discrimination tests and no counter-argument
+against them**, not fixes upstream examined and turned down.
+
+Counts do not line up 1:1 and never did: 26 tickets against 26 pull requests,
+but `CFE-4725` duplicates `CFE-4737` (both point at core#6314), and
+libntech#296 (`MustacheRender()` unit tests, B-22) never had a ticket.
+
+| Ticket | Disposition | Pull request | Item |
+|---|---|---|---|
+| [CFE-4715](https://northerntech.atlassian.net/browse/CFE-4715) | Rejected / Won't Do | core#6293 | `--simulate-keep-chroot` (feature) |
+| [CFE-4716](https://northerntech.atlassian.net/browse/CFE-4716) | Rejected / Won't Do | core#6294 | `--simulate-json` (feature) |
+| [CFE-4717](https://northerntech.atlassian.net/browse/CFE-4717) | Rejected / Done | libntech#291 | digest init failure silently ignored |
+| [CFE-4718](https://northerntech.atlassian.net/browse/CFE-4718) | Rejected / Done | core#6307 | no `process_darwin.c` on macOS |
+| [CFE-4719](https://northerntech.atlassian.net/browse/CFE-4719) | Rejected / Done | core#6315 | rejected CMDB file names no key/value/path |
+| [CFE-4720](https://northerntech.atlassian.net/browse/CFE-4720) | Rejected / Done | core#6320 | one bad CMDB key drops every variable |
+| [CFE-4721](https://northerntech.atlassian.net/browse/CFE-4721) | Rejected / Done | core#6318 | `eval()` returns `%lf` for integral results |
+| [CFE-4722](https://northerntech.atlassian.net/browse/CFE-4722) | Rejected / Done | core#6317 | dotted CMDB keys silently become scope paths |
+| [CFE-4723](https://northerntech.atlassian.net/browse/CFE-4723) | Rejected / Done | core#6302 | `lowest_metric` never assigned in `GetNetworkingInfo()` |
+| [CFE-4724](https://northerntech.atlassian.net/browse/CFE-4724) | Rejected / Done | libntech#294 | valid JSON number terminates the process |
+| [CFE-4725](https://northerntech.atlassian.net/browse/CFE-4725) | Rejected / Done | core#6314 | **duplicate of CFE-4737** — same branch, same PR |
+| [CFE-4726](https://northerntech.atlassian.net/browse/CFE-4726) | Rejected / Done | core#6299 | timed-out `commands:` promise reported compliant |
+| [CFE-4727](https://northerntech.atlassian.net/browse/CFE-4727) | Rejected / Done | core#6310 | `exec_timeout` misses a command that closed its output |
+| [CFE-4728](https://northerntech.atlassian.net/browse/CFE-4728) | Rejected / Done | core#6300 | poll loops count iterations, not elapsed time |
+| [CFE-4729](https://northerntech.atlassian.net/browse/CFE-4729) | Rejected / Done | core#6305 | descendants not signalled on timeout |
+| [CFE-4730](https://northerntech.atlassian.net/browse/CFE-4730) | Rejected / Done | libntech#293 | JSON string codec non-conformant both ways |
+| [CFE-4731](https://northerntech.atlassian.net/browse/CFE-4731) | Rejected / Done | libntech#297 | JSON parser double-decodes escapes |
+| [CFE-4732](https://northerntech.atlassian.net/browse/CFE-4732) | Rejected / Done | core#6308 | `ReconcileMountOptions()` never disarms its alarm |
+| [CFE-4733](https://northerntech.atlassian.net/browse/CFE-4733) | Rejected / Done | core#6309 | `ALARM_PID` left naming a reaped pid |
+| [CFE-4734](https://northerntech.atlassian.net/browse/CFE-4734) | Rejected / Done | core#6311 | `SetTimeOut()` arms before the fork publishes the pid |
+| [CFE-4735](https://northerntech.atlassian.net/browse/CFE-4735) | Rejected / Done | core#6312 | `fdopen()` failure paths leave `ALARM_PID` armed |
+| [CFE-4736](https://northerntech.atlassian.net/browse/CFE-4736) | Rejected / Done | core#6313 | short option strings disagree with long option tables |
+| [CFE-4737](https://northerntech.atlassian.net/browse/CFE-4737) | Rejected / Done | core#6314 | JSON reals truncated / large integers fatal in core |
+| [CFE-4738](https://northerntech.atlassian.net/browse/CFE-4738) | Rejected / Done | core#6316 | JSON `null` in `host_specific.json` segfaults the agent |
+| [CFE-4739](https://northerntech.atlassian.net/browse/CFE-4739) | Rejected / Done | core#6319 | same null crash in the `def.json` augments loader |
+| [CFE-4740](https://northerntech.atlassian.net/browse/CFE-4740) | Rejected / Done | libntech#298 | `mustache.c` truncation format bug + OOB pointer |
+
+**Verifying any of this** — anonymous, no token, read-only:
+
+```
+curl -s https://northerntech.atlassian.net/rest/api/2/issue/CFE-4736?fields=status,resolution
+gh pr view 6308 -R cfengine/core --json state,closedAt
+```
+
+`gh pr list` state is **unreliable** here: during the 2026-08-19 session its
+search index reported the six closed libntech pull requests as OPEN for roughly
+50 minutes after they were closed. Per-PR `gh pr view` and the timeline API are
+authoritative.
+
+**Where the work went.** Per the 2026-08-22 operator instruction at the top of
+this document, all 26 items were copied to our own trackers —
+[`djbclark/core`](https://github.com/djbclark/core/issues) and
+[`djbclark/libntech`](https://github.com/djbclark/libntech/issues) — which are
+now the only trackers we file on.
 
 ## Register
 
@@ -702,6 +827,13 @@ passed count is non-zero.
 
 ## Refiling checklist
 
+**SUPERSEDED 2026-08-22 for its destination, still binding for its method.**
+Steps 1–4 below describe filing into the CFE Jira, which is closed to us. The
+same sequence now applies to `djbclark/core` / `djbclark/libntech` issues, and
+**rule 1 in particular carries over unchanged and matters more, not less**: do
+not copy a body verbatim, because retractions live in comments. Read the body
+*and every comment* of the source ticket, then write from the corrected state.
+
 The tracker is open (CFE Jira, 2026-08-17). Each item needs, in this order:
 
 1. A CFE ticket. **Do not copy the fork issue's body verbatim** — that
@@ -730,12 +862,21 @@ these the same way it applies to the projector.
 
 ## The fork is a staging area, not a product
 
+**REVERSED 2026-08-22 — the fork is the product now.** After the 2026-08-19
+blanket closure the operator's instruction is that we maintain and use
+`djbclark/core` and `djbclark/libntech` ourselves, and stop trying to get
+everything into upstream on any timeline. Items are no longer *waiting* to
+leave the fork. The paragraph below is the superseded 2026-08-16 position,
+retained because the diff discipline it justifies still holds — for a different
+reason: cheap rebasing onto new upstream releases is what keeps a maintained
+fork viable, whether or not anything ever leaves it.
+
 Operator instruction, 2026-08-16: *"We do not want to maintain forked code
 long-term if at all possible. We totally want to maintain a fork that fixes
 whatever issues are not currently fixed upstream."*
 
 So the fork carries exactly what upstream has not taken yet, and every item here
-is meant to leave it. That is also why the diff discipline from PR 1 still
+was meant to leave it. That is also why the diff discipline from PR 1 still
 governs every fix: additive over modifying, few tight hunks, no reflowing of
 neighbouring code, so that carrying an item across upstream releases stays cheap
 while it waits.

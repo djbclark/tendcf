@@ -1264,11 +1264,21 @@ policy *text* and augments carry a thin slice of variables.
 
 Every time we leaned on that layer, something under it broke.
 
-As of 2026-08-18 there are **twenty-six pull requests open** against
-[cfengine/core](https://github.com/cfengine/core) (twenty) and
+Between 2026-08-15 and 2026-08-18 we opened **twenty-six pull requests**
+against [cfengine/core](https://github.com/cfengine/core) (twenty) and
 [NorthernTechHQ/libntech](https://github.com/NorthernTechHQ/libntech) (six),
 tracked as CFE-4715–CFE-4740 in the CFEngine Jira. Twenty-three carry a
-defect fix; two are features and one is pure test coverage. **Twenty-two of
+defect fix; two are features and one is pure test coverage. **On 2026-08-19
+upstream closed all twenty-six pull requests and rejected all twenty-six
+tickets** — on review volume, not on any technical finding. The maintainer
+asked that we restart with one bug report and one small pull request, and
+that a human rather than an LLM be in the loop for each. That is a fair thing
+to ask of someone who has just put twenty-six items in front of a small team,
+and we do not dispute it. But not one of the defects below was rebutted,
+reproduced-and-denied, or shown to be a non-issue; the fixes and their
+discrimination tests still exist, on our fork rather than in front of
+upstream. Every count here is a count of what we found and submitted, not of
+what is pending review — the open count upstream is zero. **Twenty-two of
 the twenty-three defect fixes ship a test.** The one exception is documented
 on the pull request rather than quietly left, and we went back and tried to
 close it rather than leaving the number where it was. It cannot be closed:

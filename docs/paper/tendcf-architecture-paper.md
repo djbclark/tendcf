@@ -1487,11 +1487,22 @@ thin slice of variables. Each time we leaned on the layer, it broke.
 
 ### 7.1 What we found
 
-As of 2026-08-18 we have **twenty-six pull requests open** against
-`cfengine/core` (twenty) and `NorthernTechHQ/libntech` (six), tracked as
-`CFE-4715`–`CFE-4740` in the upstream Jira. Twenty-three carry a defect fix;
+Between 2026-08-15 and 2026-08-18 we opened **twenty-six pull requests**
+against `cfengine/core` (twenty) and `NorthernTechHQ/libntech` (six), tracked
+as `CFE-4715`–`CFE-4740` in the upstream Jira. Twenty-three carry a defect fix;
 two are features (`--simulate-json`, and retaining the simulate chroot) and
-one is pure test coverage. **Twenty-two of the twenty-three defect fixes ship
+one is pure test coverage. **On 2026-08-19 upstream closed all twenty-six
+pull requests and rejected all twenty-six tickets**, on grounds of review
+volume rather than of any technical finding: the maintainer asked that we
+restart with a single bug report and a single small pull request, and that a
+human rather than an LLM be in the loop for each one. That is a fair thing to
+ask of a submitter who has just put twenty-six items in front of a small team,
+and we do not dispute it. It does leave the defects below in an unusual state:
+not one was rebutted, reproduced-and-denied, or shown to be a non-issue. The
+fixes and their discrimination tests still exist; they now live on our fork
+rather than in front of upstream. Every count in this section is therefore a
+count of what we found and submitted, not of what is pending review — the open
+count upstream is zero. **Twenty-two of the twenty-three defect fixes ship
 a test.** The single exception is documented on the pull request rather than
 quietly left, and it is worth a sentence because we tried to close it and
 could not: the fix clears an alarm that a callee then unconditionally re-arms
@@ -1854,8 +1865,8 @@ existing tool's native data layer, rather than shipping a new client, is not
 the path most configuration-management projects take.
 
 One thing did change while this was being written, and it was not something
-the design predicted. §7 reports twenty-three defect fixes now open against
-the substrate, ten of them in the exact data layer this architecture compiles
+the design predicted. §7 reports twenty-three defect fixes we found in the
+substrate, ten of them in the exact data layer this architecture compiles
 into and three of them fatal to a run before it evaluates anything. We offer that less as a result
 about CFEngine — we have no base rate, and say so — than as a result about
 compile-to-data as a strategy: routing a tool's traffic through a path its own
