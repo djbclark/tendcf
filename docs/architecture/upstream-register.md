@@ -205,6 +205,48 @@ this document, all 26 items were copied to our own trackers —
 [`djbclark/libntech`](https://github.com/djbclark/libntech/issues) — which are
 now the only trackers we file on.
 
+### Migration record, 2026-08-22
+
+Every ticket was read **in full, body and every comment**, and written from its
+corrected state — never copied verbatim, because several descriptions were
+stale or carried claims we later withdrew (CFE-4727's refutation-of-a-refutation,
+CFE-4732's two severity corrections, CFE-4719's inflated test count, the "no
+patch offered" lines on CFE-4738/4739 that a later comment superseded).
+
+**Eleven tickets had no fork issue and got one:**
+
+| Ticket | New issue |
+|---|---|
+| CFE-4727 | [djbclark/core#15](https://github.com/djbclark/core/issues/15) |
+| CFE-4732 | [djbclark/core#16](https://github.com/djbclark/core/issues/16) |
+| CFE-4733 | [djbclark/core#17](https://github.com/djbclark/core/issues/17) |
+| CFE-4734 | [djbclark/core#18](https://github.com/djbclark/core/issues/18) |
+| CFE-4735 | [djbclark/core#19](https://github.com/djbclark/core/issues/19) |
+| CFE-4736 | [djbclark/core#20](https://github.com/djbclark/core/issues/20) |
+| CFE-4738 | [djbclark/core#21](https://github.com/djbclark/core/issues/21) |
+| CFE-4739 | [djbclark/core#22](https://github.com/djbclark/core/issues/22) |
+| CFE-4730 | [djbclark/libntech#6](https://github.com/djbclark/libntech/issues/6) |
+| CFE-4731 | [djbclark/libntech#7](https://github.com/djbclark/libntech/issues/7) |
+| CFE-4740 | [djbclark/libntech#8](https://github.com/djbclark/libntech/issues/8) |
+
+**Fifteen already had one and got a closure comment** carrying the upstream
+disposition plus whatever lived only in the ticket: core `#2`(4715), `#3`(4716),
+`#4`(4728), `#5`(4729), `#6`(4726), `#8`(4719), `#9`(4720), `#10`(4721),
+`#11`(4722), `#12`(4718), `#13`(4737 **and** its duplicate 4725), `#14`(4723);
+libntech `#2`(4724, truncation half), `#3`(4717), `#4`(4724, fatal half).
+
+No issue was created for CFE-4725 — it duplicates CFE-4737 and both map to
+core `#13`.
+
+**The open worklist is [djbclark/core#23](https://github.com/djbclark/core/issues/23)**,
+the consolidated judgment-call issue: sixteen items in five groups — the one
+unresolved technical objection (nickanderson could not reproduce the CFE-4726
+fail-open on 3.27.1, and we never answered), five behaviour/compatibility
+decisions, two testability decisions, six known-unfixed defects named in our own
+commit messages, and two risks the fork now carries alone. **Every "question for
+upstream" in the set converts to a decision we own**, since there is no upstream
+to ask.
+
 ## Register
 
 Legend: **done** · *pending* · — not applicable.
